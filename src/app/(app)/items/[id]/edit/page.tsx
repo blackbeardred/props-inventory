@@ -18,7 +18,7 @@ import {
   type ItemRow,
 } from "@/lib/inventory";
 import { PHOTOS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
-import { deleteItem, updateItem } from "./actions";
+import { deleteItem, regenerateTags, updateItem } from "./actions";
 
 export const metadata: Metadata = {
   title: "Edit item · Props & Costume Inventory",
@@ -43,6 +43,7 @@ export default async function EditItemPage({
 
   const { id } = await params;
   const error = first((await searchParams).error);
+  const notice = first((await searchParams).notice);
 
   const supabase = await createClient();
 
@@ -82,6 +83,13 @@ export default async function EditItemPage({
     <>
       <PageHeading title="Edit item" intro={typedItem.name} />
 
+      {notice === "tags-regenerated" ? (
+        <div className="mb-6">
+          <Notice title="Tags regenerated">
+            Ran AI detection again on the current photo.
+          </Notice>
+        </div>
+      ) : null}
       {error ? (
         <div className="mb-6">
           <Notice title="Couldn’t save this item">{error}</Notice>
@@ -190,6 +198,20 @@ export default async function EditItemPage({
 
         <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
       </form>
+
+      {currentPhotoUrl ? (
+        <form action={regenerateTags} className="mt-4 max-w-lg">
+          <input type="hidden" name="itemId" value={typedItem.id} />
+          <SubmitButton pendingText="Regenerating…" variant="ghost">
+            Regenerate tags from photo
+          </SubmitButton>
+          <p className="mt-1 font-body text-xs text-muted">
+            Re-runs AI detection on the current photo without re-uploading it.
+            Replaces the tags above (including any manual edits) — save
+            afterward if you also want to tweak the result.
+          </p>
+        </form>
+      ) : null}
 
       <form action={deleteItem} className="mt-10 border-t border-rule pt-6">
         <input type="hidden" name="itemId" value={typedItem.id} />

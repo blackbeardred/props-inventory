@@ -162,6 +162,69 @@ export async function updateItem(formData: FormData) {
   redirect("/items");
 }
 
+/**
+ * Re-runs AI tag detection on an item's existing photo, without requiring a
+ * fresh upload. Discards whatever is currently in auto_tags (including any
+ * manual edits) in favor of a new guess from the current photo — same
+ * "tags always describe the current photo" rule the upload path follows.
+ */
+export async function regenerateTags(formData: FormData) {
+  const itemId = String(formData.get("itemId") ?? "");
+  if (!itemId) {
+    redirect("/items");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect(`/login?next=/items/${itemId}/edit`);
+  }
+
+  const { data: existingItem } = await supabase
+    .from("items")
+    .select("photo_url")
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (!existingItem) {
+    redirect("/items");
+  }
+
+  const photoPath: string | null = existingItem.photo_url;
+  if (!photoPath) {
+    fail(itemId, "This item doesn\u2019t have a photo to tag.");
+  }
+
+  const { data: photoBlob, error: downloadError } = await supabase.storage
+    .from(PHOTOS_BUCKET)
+    .download(photoPath);
+
+  if (downloadError || !photoBlob) {
+    fail(
+      itemId,
+      `Couldn\u2019t re-tag: ${downloadError?.message ?? "photo not found in storage"}`
+    );
+  }
+
+  const mediaType = photoBlob.type || "image/jpeg";
+  const photoBytes = new Uint8Array(await photoBlob.arrayBuffer());
+  const autoTags = await tagPhoto(photoBytes, mediaType);
+
+  const { error: updateError } = await supabase
+    .from("items")
+    .update({ auto_tags: autoTags })
+    .eq("id", itemId);
+
+  if (updateError) {
+    fail(itemId, updateError.message);
+  }
+
+  redirect(`/items/${itemId}/edit?notice=tags-regenerated`);
+}
+
 export async function deleteItem(formData: FormData) {
   const itemId = String(formData.get("itemId") ?? "");
   if (!itemId) {

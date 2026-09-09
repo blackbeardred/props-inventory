@@ -11,10 +11,23 @@
  * detected" (an empty array), with the failure logged server-side. Photo
  * uploads should keep working exactly the same with or without an
  * ANTHROPIC_API_KEY configured.
+ *
+ * Before the photo is sent to the vision API it's downscaled/recompressed
+ * with sharp (see prepareForTagging below) — this only affects the copy
+ * sent for tagging, never the original file stored in Supabase Storage.
  */
+
+import sharp from "sharp";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_API_VERSION = "2023-06-01";
+
+// Claude's vision input is downscaled server-side to roughly this size
+// anyway, so sending anything larger only costs upload time and tokens for
+// no accuracy benefit. Also keeps every image comfortably under Anthropic's
+// per-image size limit, regardless of how large the original upload was.
+const MAX_TAGGING_DIMENSION = 1568;
+const TAGGING_JPEG_QUALITY = 82;
 
 // Fastest/cheapest current vision-capable model — plenty for short tag lists.
 const TAGGING_MODEL = "claude-haiku-4-5-20251001";
@@ -71,6 +84,41 @@ function parseTagList(raw: string): string[] {
 }
 
 /**
+ * Downscales and recompresses a photo to a JPEG suitable for tagging.
+ * Falls back to the original bytes/media type if sharp can't process the
+ * image for any reason (unsupported/corrupt input, etc.) — tagging still
+ * gets a shot at the original rather than being skipped outright.
+ */
+async function prepareForTagging(
+  photoBytes: Uint8Array,
+  mediaType: string
+): Promise<{ base64: string; mediaType: string }> {
+  try {
+    const resized = await sharp(Buffer.from(photoBytes))
+      .rotate() // respect EXIF orientation before resizing
+      .resize({
+        width: MAX_TAGGING_DIMENSION,
+        height: MAX_TAGGING_DIMENSION,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: TAGGING_JPEG_QUALITY })
+      .toBuffer();
+
+    return { base64: resized.toString("base64"), mediaType: "image/jpeg" };
+  } catch (error) {
+    console.error(
+      "tagPhoto: couldn't downscale photo before tagging, falling back to original",
+      error
+    );
+    return {
+      base64: Buffer.from(photoBytes).toString("base64"),
+      mediaType,
+    };
+  }
+}
+
+/**
  * Analyzes a photo and returns lowercase tags, or [] if tagging isn't
  * configured or fails for any reason. `mediaType` should be the file's
  * content type (e.g. "image/jpeg").
@@ -89,7 +137,10 @@ export async function tagPhoto(
   }
 
   try {
-    const base64 = Buffer.from(photoBytes).toString("base64");
+    const { base64, mediaType: taggingMediaType } = await prepareForTagging(
+      photoBytes,
+      mediaType
+    );
 
     const response = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
@@ -107,7 +158,11 @@ export async function tagPhoto(
             content: [
               {
                 type: "image",
-                source: { type: "base64", media_type: mediaType, data: base64 },
+                source: {
+                  type: "base64",
+                  media_type: taggingMediaType,
+                  data: base64,
+                },
               },
               { type: "text", text: TAGGING_PROMPT },
             ],
