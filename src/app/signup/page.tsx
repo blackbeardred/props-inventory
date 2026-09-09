@@ -66,6 +66,14 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
                 minLength={8}
                 required
               />
+              <TextField
+                label="Confirm password"
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
               <SubmitButton pendingText="Creating account…">Create account</SubmitButton>
             </form>
             <p className="mt-6 font-body text-sm text-muted">

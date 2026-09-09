@@ -6,10 +6,17 @@ import { createClient } from "@/lib/supabase/server";
 export async function signup(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
   if (!email || !password) {
     return redirect(
       `/signup?error=${encodeURIComponent("Email and password are required.")}`
+    );
+  }
+
+  if (password !== confirmPassword) {
+    return redirect(
+      `/signup?error=${encodeURIComponent("Passwords don’t match.")}`
     );
   }
 

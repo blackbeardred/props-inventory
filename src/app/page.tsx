@@ -17,13 +17,19 @@ export default async function Home() {
 
   return (
     <main className="flex-1 flex flex-col">
-      <div className="mx-auto flex w-full max-w-3xl items-center justify-end gap-5 px-6 pt-8">
+      <div
+        className={`mx-auto flex w-full max-w-3xl px-6 pt-8 ${
+          user
+            ? "items-center justify-center"
+            : "items-center justify-end gap-5"
+        }`}
+      >
         {user ? (
           <Link
             href="/locations"
-            className="font-body text-sm text-accent hover:underline"
+            className="font-display text-3xl sm:text-4xl text-accent hover:underline"
           >
-            Go to your inventory
+            Explore my Inventory
           </Link>
         ) : (
           <>
