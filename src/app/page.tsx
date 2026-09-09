@@ -17,37 +17,22 @@ export default async function Home() {
 
   return (
     <main className="flex-1 flex flex-col">
-      <div
-        className={`mx-auto flex w-full max-w-3xl px-6 pt-8 ${
-          user
-            ? "items-center justify-center"
-            : "items-center justify-end gap-5"
-        }`}
-      >
-        {user ? (
+      {user ? null : (
+        <div className="mx-auto flex w-full max-w-3xl items-center justify-end gap-5 px-6 pt-8">
           <Link
-            href="/locations"
-            className="font-display text-3xl sm:text-4xl text-accent hover:underline"
+            href="/login"
+            className="font-body text-sm text-muted hover:text-foreground"
           >
-            Explore my Inventory
+            Log in
           </Link>
-        ) : (
-          <>
-            <Link
-              href="/login"
-              className="font-body text-sm text-muted hover:text-foreground"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/signup"
-              className="font-body text-sm text-accent hover:underline"
-            >
-              Sign up
-            </Link>
-          </>
-        )}
-      </div>
+          <Link
+            href="/signup"
+            className="font-body text-sm text-accent hover:underline"
+          >
+            Sign up
+          </Link>
+        </div>
+      )}
 
       <div className="flex flex-1 items-center">
         <div className="w-full max-w-3xl mx-auto px-6 py-20">
@@ -83,6 +68,17 @@ export default async function Home() {
               </li>
             ))}
           </ol>
+
+          {user ? (
+            <div className="mt-12 text-center">
+              <Link
+                href="/locations"
+                className="font-display text-3xl sm:text-4xl text-accent hover:underline"
+              >
+                Explore my Inventory
+              </Link>
+            </div>
+          ) : null}
 
           <p className="font-body text-sm text-muted mt-10">
             Day 2 is live &mdash;{" "}
