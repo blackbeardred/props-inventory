@@ -51,7 +51,7 @@ export default async function EditItemPage({
     supabase
       .from("items")
       .select(
-        "id, name, category, description, photo_url, quantity, condition, location_id, created_at, auto_tags"
+        "id, name, category, description, photo_url, quantity, condition, location_id, created_at, auto_tags, manual_tags"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -193,7 +193,20 @@ export default async function EditItemPage({
           Comma-separated. Guessed from the photo (material, color, style) and
           never shown on the items or search list — they only affect what a
           text search matches, so fix anything the AI got wrong. Uploading a
-          new photo replaces these with a fresh guess.
+          new photo, or regenerating below, replaces these with a fresh
+          guess.
+        </p>
+
+        <TextField
+          label="Your tags"
+          name="manualTags"
+          defaultValue={(typedItem.manual_tags ?? []).join(", ")}
+        />
+        <p className="-mt-3 font-body text-xs text-muted">
+          Comma-separated. Anything you add here stays as-is — never touched
+          by a new photo, a removed photo, or regenerating the auto-detected
+          tags above. Also folded into search, also never shown on the items
+          or search list.
         </p>
 
         <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
@@ -206,9 +219,10 @@ export default async function EditItemPage({
             Regenerate tags from photo
           </SubmitButton>
           <p className="mt-1 font-body text-xs text-muted">
-            Re-runs AI detection on the current photo without re-uploading it.
-            Replaces the tags above (including any manual edits) — save
-            afterward if you also want to tweak the result.
+            Re-runs AI detection on the current photo without re-uploading
+            it. Only replaces the auto-detected tags above — your own tags
+            are left alone. Save afterward if you also want to tweak the
+            result.
           </p>
         </form>
       ) : null}

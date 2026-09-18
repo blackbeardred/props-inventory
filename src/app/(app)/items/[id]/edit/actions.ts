@@ -106,12 +106,17 @@ export async function updateItem(formData: FormData) {
 
   const oldPhotoPath: string | null = existingItem.photo_url;
   let photoPath: string | null = oldPhotoPath;
-  // Tags describe the photo, so they only change when the photo does: a new
-  // upload gets freshly detected tags (overriding whatever was in the form's
-  // tags field, since that was showing the *old* photo's tags), removing the
-  // photo clears them, and otherwise whatever the user typed in the tags
-  // field wins — that's the only case where it reflects a deliberate edit.
+  // auto_tags describes the photo, so it only changes when the photo does: a
+  // new upload gets freshly detected tags (overriding whatever was in the
+  // form's "Auto-detected tags" field, since that was showing the *old*
+  // photo's tags), removing the photo clears them, and otherwise whatever
+  // the user typed in that field wins — that's the only case where it
+  // reflects a deliberate edit.
   let autoTags: string[] = (existingItem.auto_tags as string[] | null) ?? [];
+  // manual_tags (Day 11) is independent of the photo entirely — always just
+  // whatever's currently in the "Your tags" field, regardless of whether the
+  // photo was uploaded, replaced, or removed this save.
+  const manualTags = parseManualTags(String(formData.get("manualTags") ?? ""));
 
   if (photoFile) {
     const ext = ALLOWED_PHOTO_TYPES[photoFile.type];
@@ -147,6 +152,7 @@ export async function updateItem(formData: FormData) {
       location_id: locationId || null,
       photo_url: photoPath,
       auto_tags: autoTags,
+      manual_tags: manualTags,
     })
     .eq("id", itemId);
 
@@ -164,9 +170,11 @@ export async function updateItem(formData: FormData) {
 
 /**
  * Re-runs AI tag detection on an item's existing photo, without requiring a
- * fresh upload. Discards whatever is currently in auto_tags (including any
- * manual edits) in favor of a new guess from the current photo — same
- * "tags always describe the current photo" rule the upload path follows.
+ * fresh upload. Overwrites auto_tags with a fresh guess from the current
+ * photo — same "auto_tags always describes the current photo" rule the
+ * upload path follows. Only touches auto_tags: manual_tags (Day 11) lives in
+ * its own column and is never read or written here, so anything typed in by
+ * hand survives a regenerate untouched.
  */
 export async function regenerateTags(formData: FormData) {
   const itemId = String(formData.get("itemId") ?? "");

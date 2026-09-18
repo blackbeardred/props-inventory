@@ -52,8 +52,16 @@ create table items (
   -- AI-generated tags from the item's photo (material, color, style — e.g.
   -- "wood", "brown"), Day 9. Deliberately never shown in item lists or
   -- search results — only affects which items a text search matches.
-  -- Editable on the item edit page, since the AI can guess wrong.
+  -- Editable on the item edit page, since the AI can guess wrong. Fully
+  -- overwritten whenever a photo is (re-)tagged — see manual_tags below for
+  -- the tags that survive that.
   auto_tags text[] not null default '{}',
+  -- User-typed tags (Day 11), kept separate from auto_tags specifically so
+  -- that uploading a new photo or clicking "Regenerate tags from photo"
+  -- never wipes out a tag someone added by hand. Folded into search
+  -- alongside auto_tags (see items_search_document below) but, like
+  -- auto_tags, never shown in item lists or search results.
+  manual_tags text[] not null default '{}',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -69,19 +77,23 @@ create index items_location_id_idx on items(location_id);
 create or replace function items_search_document(
   p_name text,
   p_description text,
-  p_auto_tags text[]
+  p_auto_tags text[],
+  p_manual_tags text[]
 )
 returns text
 language sql
 immutable
 as $$
-  select coalesce(p_name, '') || ' ' || coalesce(p_description, '') || ' ' || coalesce(array_to_string(p_auto_tags, ' '), '')
+  select coalesce(p_name, '') || ' ' || coalesce(p_description, '') || ' '
+    || coalesce(array_to_string(p_auto_tags, ' '), '') || ' '
+    || coalesce(array_to_string(p_manual_tags, ' '), '')
 $$;
 
--- Full-text search over name + description + auto_tags (Day 9), used by the
--- search page. auto_tags is never shown in the UI but still affects matches.
+-- Full-text search over name + description + auto_tags + manual_tags
+-- (Day 9, extended Day 11 for manual_tags). Neither tag column is ever
+-- shown in the UI but both affect matches.
 create index items_search_idx on items using gin (
-  to_tsvector('english', items_search_document(name, description, auto_tags))
+  to_tsvector('english', items_search_document(name, description, auto_tags, manual_tags))
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -282,7 +294,7 @@ stable
 as $$
   select *
   from items
-  where to_tsvector('english', items_search_document(name, description, auto_tags))
+  where to_tsvector('english', items_search_document(name, description, auto_tags, manual_tags))
         @@ websearch_to_tsquery('english', search_query)
   order by name
 $$;
@@ -439,7 +451,7 @@ begin
   select *
   from items
   where
-    (prefix_query is null or to_tsvector('english', items_search_document(name, description, auto_tags)) @@ prefix_query)
+    (prefix_query is null or to_tsvector('english', items_search_document(name, description, auto_tags, manual_tags)) @@ prefix_query)
     and (location_ids is null or location_id = any(location_ids))
   order by name;
 end;

@@ -25,7 +25,13 @@ export type ItemRow = {
   created_at: string;
   // AI-detected tags from the item's photo (Day 9) — never rendered in list
   // or search-result views, only affects which items a text search matches.
+  // Fully overwritten on every (re-)tagging; see manual_tags for the tags
+  // that survive that.
   auto_tags: string[];
+  // User-typed tags (Day 11), kept separate from auto_tags so a new photo
+  // or a "Regenerate tags" click never wipes out a manually-added tag.
+  // Also folded into search, also never rendered in list/search views.
+  manual_tags: string[];
 };
 
 export type PullListItemStatus = "pending" | "pulled" | "returned";
