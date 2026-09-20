@@ -13,15 +13,37 @@ create table organizations (
 );
 
 -- ─────────────────────────────────────────────────────────────
--- Profiles (one row per Supabase auth user, linked to an org)
+-- Profiles (one row per Supabase auth user — the person, not their
+-- membership). A person can belong to several organizations; which ones
+-- lives in `memberships` below, and which one they're currently looking
+-- at lives in active_org_id here.
 -- ─────────────────────────────────────────────────────────────
 create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  org_id uuid not null references organizations(id) on delete cascade,
   full_name text,
-  role text not null default 'member' check (role in ('owner', 'member')),
+  -- The organization this person is currently working in. Every RLS policy
+  -- in this file resolves through auth_org_id(), which reads this column
+  -- but only honours it while a matching memberships row exists.
+  active_org_id uuid references organizations(id) on delete set null,
+  -- Private `avatars` bucket, object at `${id}/${filename}`.
+  avatar_url text,
   created_at timestamptz not null default now()
 );
+
+-- ─────────────────────────────────────────────────────────────
+-- Memberships (which people belong to which organizations, and their
+-- role in each). Splitting this from profiles is what allows one person
+-- to work across several theatres.
+-- ─────────────────────────────────────────────────────────────
+create table memberships (
+  user_id uuid not null references profiles(id) on delete cascade,
+  org_id uuid not null references organizations(id) on delete cascade,
+  role text not null default 'member' check (role in ('owner', 'member')),
+  created_at timestamptz not null default now(),
+  primary key (user_id, org_id)
+);
+
+create index memberships_org_id_idx on memberships(org_id);
 
 -- ─────────────────────────────────────────────────────────────
 -- Locations (storage rooms, shelves, bins — self-referencing for nesting)
@@ -133,11 +155,35 @@ create table pull_list_items (
 -- ─────────────────────────────────────────────────────────────
 alter table organizations enable row level security;
 alter table profiles enable row level security;
+alter table memberships enable row level security;
 alter table locations enable row level security;
 alter table items enable row level security;
 alter table productions enable row level security;
 alter table pull_lists enable row level security;
 alter table pull_list_items enable row level security;
+
+create or replace function auth_org_ids()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select org_id from memberships where user_id = auth.uid()
+$$;
+
+create or replace function auth_peer_ids()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select distinct m2.user_id
+  from memberships m1
+  join memberships m2 on m2.org_id = m1.org_id
+  where m1.user_id = auth.uid()
+$$;
 
 create or replace function auth_org_id()
 returns uuid
@@ -146,14 +192,42 @@ stable
 security definer
 set search_path = public
 as $$
-  select org_id from profiles where id = auth.uid()
+  select p.active_org_id
+  from profiles p
+  join memberships m on m.user_id = p.id and m.org_id = p.active_org_id
+  where p.id = auth.uid()
 $$;
 
-create policy "org members can read their org" on organizations
-  for select using (id = auth_org_id());
+create or replace function auth_org_role()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select m.role
+  from profiles p
+  join memberships m on m.user_id = p.id and m.org_id = p.active_org_id
+  where p.id = auth.uid()
+$$;
 
-create policy "org members can read profiles in their org" on profiles
-  for select using (org_id = auth_org_id());
+create policy "org members can read their orgs" on organizations
+  for select using (id in (select auth_org_ids()));
+
+create policy "members can read profiles they share an org with" on profiles
+  for select using (id = auth.uid() or id in (select auth_peer_ids()));
+
+-- The account page edits your own name, avatar and active organization
+-- directly, so this one write policy exists. Scoped to your own row, and
+-- pointing active_org_id somewhere you don't belong grants nothing, since
+-- auth_org_id() joins through memberships before honouring it.
+create policy "members can update their own profile" on profiles
+  for update using (id = auth.uid()) with check (id = auth.uid());
+
+-- No insert/update/delete policy on memberships, by design: the only way
+-- to write one is a security definer function with a role check inside.
+create policy "members can read memberships in their orgs" on memberships
+  for select using (org_id in (select auth_org_ids()));
 
 create policy "org members can manage their locations" on locations
   for all using (org_id = auth_org_id()) with check (org_id = auth_org_id());
@@ -196,16 +270,18 @@ declare
   new_org_id uuid;
   new_invite_code text;
 begin
-  if exists (select 1 from profiles where id = auth.uid()) then
-    raise exception 'Profile already exists for this user';
-  end if;
-
   new_invite_code := upper(substr(md5(random()::text || clock_timestamp()::text), 1, 8));
 
-  insert into organizations (name, invite_code) values (org_name, new_invite_code) returning id into new_org_id;
+  insert into organizations (name, invite_code)
+  values (org_name, new_invite_code)
+  returning id into new_org_id;
 
-  insert into profiles (id, org_id, full_name, role)
-  values (auth.uid(), new_org_id, member_name, 'owner');
+  insert into profiles (id, full_name, active_org_id)
+  values (auth.uid(), member_name, new_org_id)
+  on conflict (id) do update set active_org_id = new_org_id;
+
+  insert into memberships (user_id, org_id, role)
+  values (auth.uid(), new_org_id, 'owner');
 
   return new_org_id;
 end;
@@ -224,20 +300,86 @@ as $$
 declare
   target_org_id uuid;
 begin
-  if exists (select 1 from profiles where id = auth.uid()) then
-    raise exception 'Profile already exists for this user';
-  end if;
-
-  select id into target_org_id from organizations where invite_code = upper(p_invite_code);
+  select id into target_org_id from organizations
+  where invite_code = upper(p_invite_code);
 
   if target_org_id is null then
     raise exception 'Invite code not found';
   end if;
 
-  insert into profiles (id, org_id, full_name, role)
-  values (auth.uid(), target_org_id, member_name, 'member');
+  if exists (
+    select 1 from memberships where user_id = auth.uid() and org_id = target_org_id
+  ) then
+    raise exception 'You are already a member of that organization';
+  end if;
+
+  insert into profiles (id, full_name, active_org_id)
+  values (auth.uid(), member_name, target_org_id)
+  on conflict (id) do update set active_org_id = target_org_id;
+
+  insert into memberships (user_id, org_id, role)
+  values (auth.uid(), target_org_id, 'member');
 
   return target_org_id;
+end;
+$$;
+
+create or replace function leave_organization(p_org_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  caller_role text;
+  owner_count int;
+  next_org_id uuid;
+begin
+  select role into caller_role from memberships
+  where user_id = auth.uid() and org_id = p_org_id;
+
+  if caller_role is null then
+    raise exception 'You are not a member of that organization';
+  end if;
+
+  -- An organization with no owner can never be administered again: nobody
+  -- could manage members or regenerate the invite code, and the inventory
+  -- would be stranded. Hand it over before walking out.
+  if caller_role = 'owner' then
+    select count(*) into owner_count from memberships
+    where org_id = p_org_id and role = 'owner';
+
+    if owner_count <= 1 then
+      raise exception 'You are the only owner. Promote someone else to owner before leaving.';
+    end if;
+  end if;
+
+  delete from memberships where user_id = auth.uid() and org_id = p_org_id;
+
+  -- Land on another organization, or nowhere if that was the last one.
+  select org_id into next_org_id from memberships
+  where user_id = auth.uid()
+  order by created_at
+  limit 1;
+
+  update profiles set active_org_id = next_org_id where id = auth.uid();
+end;
+$$;
+
+create or replace function switch_organization(p_org_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from memberships where user_id = auth.uid() and org_id = p_org_id
+  ) then
+    raise exception 'You are not a member of that organization';
+  end if;
+
+  update profiles set active_org_id = p_org_id where id = auth.uid();
 end;
 $$;
 
@@ -282,6 +424,49 @@ using (
 
 
 -- ─────────────────────────────────────────────────────────────
+-- Storage: avatars. Private bucket, objects at `${user_id}/${filename}`.
+-- Readable by anyone you share an organization with, writable only by
+-- you. Private rather than public so a volunteer's face isn't sitting on
+-- a guessable URL.
+-- ─────────────────────────────────────────────────────────────
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', false)
+on conflict (id) do nothing;
+
+create policy "members can read avatars from their orgs"
+on storage.objects for select
+using (
+  bucket_id = 'avatars'
+  and (
+    -- Always your own, even while you belong to no organization.
+    (storage.foldername(name))[1]::uuid = auth.uid()
+    or (storage.foldername(name))[1]::uuid in (select auth_peer_ids())
+  )
+);
+
+create policy "users can upload their own avatar"
+on storage.objects for insert
+with check (
+  bucket_id = 'avatars'
+  and (storage.foldername(name))[1]::uuid = auth.uid()
+);
+
+create policy "users can update their own avatar"
+on storage.objects for update
+using (
+  bucket_id = 'avatars'
+  and (storage.foldername(name))[1]::uuid = auth.uid()
+);
+
+create policy "users can delete their own avatar"
+on storage.objects for delete
+using (
+  bucket_id = 'avatars'
+  and (storage.foldername(name))[1]::uuid = auth.uid()
+);
+
+
+-- ─────────────────────────────────────────────────────────────
 -- Search (Day 5). Reuses the items_search_idx GIN index created above.
 -- Plain (non security definer) function — RLS on `items` still applies to
 -- the query inside it, so results stay scoped to the caller's org exactly
@@ -314,13 +499,14 @@ security definer
 set search_path = public
 as $$
 declare
-  caller_org_id uuid;
-  caller_role text;
+  caller_org_id uuid := auth_org_id();
   new_code text;
 begin
-  select org_id, role into caller_org_id, caller_role from profiles where id = auth.uid();
+  if caller_org_id is null then
+    raise exception 'You have no active organization';
+  end if;
 
-  if caller_role is distinct from 'owner' then
+  if auth_org_role() is distinct from 'owner' then
     raise exception 'Only an organization owner can regenerate the invite code';
   end if;
 
@@ -338,9 +524,7 @@ security definer
 set search_path = public
 as $$
 declare
-  caller_org_id uuid;
-  caller_role text;
-  target_org_id uuid;
+  caller_org_id uuid := auth_org_id();
   target_role text;
   owner_count int;
 begin
@@ -348,26 +532,32 @@ begin
     raise exception 'Invalid role: %', new_role;
   end if;
 
-  select org_id, role into caller_org_id, caller_role from profiles where id = auth.uid();
+  if caller_org_id is null then
+    raise exception 'You have no active organization';
+  end if;
 
-  if caller_role is distinct from 'owner' then
+  if auth_org_role() is distinct from 'owner' then
     raise exception 'Only an organization owner can change member roles';
   end if;
 
-  select org_id, role into target_org_id, target_role from profiles where id = target_profile_id;
+  select role into target_role from memberships
+  where user_id = target_profile_id and org_id = caller_org_id;
 
-  if target_org_id is null or target_org_id is distinct from caller_org_id then
+  if target_role is null then
     raise exception 'That member is not in your organization';
   end if;
 
   if target_role = 'owner' and new_role = 'member' then
-    select count(*) into owner_count from profiles where org_id = caller_org_id and role = 'owner';
+    select count(*) into owner_count from memberships
+    where org_id = caller_org_id and role = 'owner';
+
     if owner_count <= 1 then
       raise exception 'An organization must keep at least one owner';
     end if;
   end if;
 
-  update profiles set role = new_role where id = target_profile_id;
+  update memberships set role = new_role
+  where user_id = target_profile_id and org_id = caller_org_id;
 end;
 $$;
 
@@ -378,36 +568,50 @@ security definer
 set search_path = public
 as $$
 declare
-  caller_org_id uuid;
-  caller_role text;
-  target_org_id uuid;
+  caller_org_id uuid := auth_org_id();
   target_role text;
   owner_count int;
 begin
-  select org_id, role into caller_org_id, caller_role from profiles where id = auth.uid();
+  if caller_org_id is null then
+    raise exception 'You have no active organization';
+  end if;
 
-  if caller_role is distinct from 'owner' then
+  if auth_org_role() is distinct from 'owner' then
     raise exception 'Only an organization owner can remove a member';
   end if;
 
   if target_profile_id = auth.uid() then
-    raise exception 'You can''t remove yourself. Have another owner do it, or leave from your account settings instead.';
+    raise exception 'You can''t remove yourself. Leave the organization from your account page instead.';
   end if;
 
-  select org_id, role into target_org_id, target_role from profiles where id = target_profile_id;
+  select role into target_role from memberships
+  where user_id = target_profile_id and org_id = caller_org_id;
 
-  if target_org_id is null or target_org_id is distinct from caller_org_id then
+  if target_role is null then
     raise exception 'That member is not in your organization';
   end if;
 
   if target_role = 'owner' then
-    select count(*) into owner_count from profiles where org_id = caller_org_id and role = 'owner';
+    select count(*) into owner_count from memberships
+    where org_id = caller_org_id and role = 'owner';
+
     if owner_count <= 1 then
       raise exception 'An organization must keep at least one owner';
     end if;
   end if;
 
-  delete from profiles where id = target_profile_id;
+  delete from memberships
+  where user_id = target_profile_id and org_id = caller_org_id;
+
+  -- If that was the org they were looking at, move them somewhere valid.
+  update profiles
+  set active_org_id = (
+    select org_id from memberships
+    where user_id = target_profile_id
+    order by created_at
+    limit 1
+  )
+  where id = target_profile_id and active_org_id = caller_org_id;
 end;
 $$;
 

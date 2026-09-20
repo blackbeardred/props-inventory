@@ -18,11 +18,13 @@ export const metadata: Metadata = {
   title: "Organization · Props & Costume Inventory",
 };
 
+// A member of *this* organization. The person lives in profiles; their
+// role here lives in memberships, so the list reads the join.
 type MemberRow = {
-  id: string;
-  full_name: string | null;
+  user_id: string;
   role: "owner" | "member";
   created_at: string;
+  profiles: { full_name: string | null } | null;
 };
 
 type OrganizationPageProps = {
@@ -49,8 +51,9 @@ export default async function OrganizationPage({
 
   const supabase = await createClient();
   const { data: members, error: membersError } = await supabase
-    .from("profiles")
-    .select("id, full_name, role, created_at")
+    .from("memberships")
+    .select("user_id, role, created_at, profiles(full_name)")
+    .eq("org_id", profile.active_org_id ?? "")
     .order("created_at");
 
   const rows = (members ?? []) as unknown as MemberRow[];
@@ -105,12 +108,12 @@ export default async function OrganizationPage({
           }
         >
           {rows.map((member) => {
-            const isSelf = member.id === user.id;
+            const isSelf = member.user_id === user.id;
             const isLastOwner = member.role === "owner" && ownerCount <= 1;
             return (
-              <tr key={member.id} className="border-b border-rule align-top">
+              <tr key={member.user_id} className="border-b border-rule align-top">
                 <td className="px-3 py-3 font-body text-sm text-foreground">
-                  {member.full_name || "Unnamed member"}
+                  {member.profiles?.full_name || "Unnamed member"}
                   {isSelf ? (
                     <span className="ml-1.5 text-muted">(you)</span>
                   ) : null}
@@ -135,7 +138,7 @@ export default async function OrganizationPage({
                           <input
                             type="hidden"
                             name="targetProfileId"
-                            value={member.id}
+                            value={member.user_id}
                           />
                           <input
                             type="hidden"
@@ -156,10 +159,10 @@ export default async function OrganizationPage({
                             <input
                               type="hidden"
                               name="targetProfileId"
-                              value={member.id}
+                              value={member.user_id}
                             />
                             <DeleteButton
-                              confirmMessage={`Remove ${member.full_name || "this member"} from your organization?`}
+                              confirmMessage={`Remove ${member.profiles?.full_name || "this member"} from your organization?`}
                             >
                               Remove
                             </DeleteButton>

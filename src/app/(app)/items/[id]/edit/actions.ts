@@ -86,11 +86,11 @@ export async function updateItem(formData: FormData) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("org_id")
+    .select("active_org_id")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile) {
+  if (!profile?.active_org_id) {
     redirect("/onboarding");
   }
 
@@ -120,7 +120,7 @@ export async function updateItem(formData: FormData) {
 
   if (photoFile) {
     const ext = ALLOWED_PHOTO_TYPES[photoFile.type];
-    photoPath = `${profile.org_id}/${itemId}/${randomUUID()}.${ext}`;
+    photoPath = `${profile.active_org_id}/${itemId}/${randomUUID()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from(PHOTOS_BUCKET)

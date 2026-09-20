@@ -29,16 +29,16 @@ export async function createLocation(formData: FormData) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("org_id")
+    .select("active_org_id")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile) {
+  if (!profile?.active_org_id) {
     redirect("/onboarding");
   }
 
   const { error } = await supabase.from("locations").insert({
-    org_id: profile.org_id,
+    org_id: profile.active_org_id,
     name,
     description: description || null,
     parent_location_id: parentLocationId || null,

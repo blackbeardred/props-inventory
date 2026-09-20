@@ -36,18 +36,18 @@ export async function createProduction(formData: FormData) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("org_id")
+    .select("active_org_id")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile) {
+  if (!profile?.active_org_id) {
     redirect("/onboarding");
   }
 
   const { data: production, error } = await supabase
     .from("productions")
     .insert({
-      org_id: profile.org_id,
+      org_id: profile.active_org_id,
       name,
       status,
       start_date: startDate || null,
