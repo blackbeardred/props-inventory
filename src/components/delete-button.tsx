@@ -25,7 +25,7 @@ export function DeleteButton({
           event.preventDefault();
         }
       }}
-      className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-muted transition-colors hover:border-danger/50 hover:text-danger-ink disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? "Deleting…" : children}
     </button>

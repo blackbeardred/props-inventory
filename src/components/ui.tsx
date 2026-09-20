@@ -22,10 +22,17 @@ export function PageHeading({
   );
 }
 
+// Tinted fills rather than outlines: a status colour only reads as status
+// when its hue is actually present as a ground. Each tone pairs a light wash
+// of its hue with that hue's darkened ink, every pair clearing WCAG AA on
+// the card white (see the -ink values in globals.css).
 const BADGE_TONES = {
-  neutral: "border-rule text-foreground",
-  muted: "border-rule text-muted",
-  accent: "border-accent/40 text-accent",
+  neutral: "bg-foreground/[0.06] text-foreground",
+  muted: "bg-foreground/[0.05] text-muted",
+  accent: "bg-accent-soft/15 text-accent",
+  success: "bg-success/15 text-success-ink",
+  warning: "bg-warning/20 text-warning-ink",
+  danger: "bg-danger/15 text-danger-ink",
 } as const;
 
 export function Badge({
@@ -37,7 +44,7 @@ export function Badge({
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 font-body text-xs whitespace-nowrap ${BADGE_TONES[tone]}`}
+      className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-xs font-medium whitespace-nowrap ${BADGE_TONES[tone]}`}
     >
       {children}
     </span>

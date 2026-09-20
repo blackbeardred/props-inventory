@@ -26,7 +26,7 @@ export function AppNav() {
             aria-current={active ? "page" : undefined}
             className={`rounded-md px-3 py-1.5 font-body text-sm transition-colors ${
               active
-                ? "bg-surface text-foreground"
+                ? "bg-accent-soft/15 font-medium text-accent"
                 : "text-muted hover:text-foreground"
             }`}
           >

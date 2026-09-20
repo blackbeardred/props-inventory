@@ -73,6 +73,18 @@ export const CONDITION_LABELS: Record<Condition, string> = {
   needs_repair: "Needs repair",
 };
 
+/**
+ * Which Badge tone each condition reads as. Semantic colour: new and good are
+ * healthy, fair is a heads-up, needs_repair wants attention. Shared by the
+ * items list and the search results so the two can't drift apart.
+ */
+export const CONDITION_TONE: Record<Condition, "success" | "warning" | "danger"> = {
+  new: "success",
+  good: "success",
+  fair: "warning",
+  needs_repair: "danger",
+};
+
 export const PRODUCTION_STATUS_LABELS: Record<ProductionStatus, string> = {
   planning: "Planning",
   in_run: "In run",

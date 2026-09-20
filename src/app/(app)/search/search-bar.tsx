@@ -12,6 +12,7 @@ import {
 import {
   CATEGORY_LABELS,
   CONDITION_LABELS,
+  CONDITION_TONE,
   pluralize,
 } from "@/lib/inventory";
 import { searchItemsLive, type SearchResultItem } from "./actions";
@@ -321,9 +322,7 @@ export function SearchBar({
                   </td>
                   <td className="px-3 py-3">
                     {item.condition ? (
-                      <Badge
-                        tone={item.condition === "needs_repair" ? "accent" : "muted"}
-                      >
+                      <Badge tone={CONDITION_TONE[item.condition] ?? "muted"}>
                         {CONDITION_LABELS[item.condition] ?? item.condition}
                       </Badge>
                     ) : (

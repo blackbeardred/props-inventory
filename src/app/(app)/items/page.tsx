@@ -13,6 +13,7 @@ import {
 import {
   CATEGORY_LABELS,
   CONDITION_LABELS,
+  CONDITION_TONE,
   formatDateRange,
   pluralize,
   type ItemRow,
@@ -290,7 +291,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
                 </td>
                 <td className="px-3 py-3">
                   {item.condition ? (
-                    <Badge tone={item.condition === "needs_repair" ? "accent" : "muted"}>
+                    <Badge tone={CONDITION_TONE[item.condition] ?? "muted"}>
                       {CONDITION_LABELS[item.condition] ?? item.condition}
                     </Badge>
                   ) : (
@@ -348,6 +349,12 @@ function InUseCell({
 
   return (
     <span className="text-foreground">
+      {/* Teal state dot, so the column can be scanned for what's physically
+          out without reading any of it. */}
+      <span
+        aria-hidden="true"
+        className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-in-use align-[1px]"
+      />
       {item.quantity > 1 ? `${quantityInUse}/${item.quantity} in use in ` : "In use in "}
       <Link
         href={`/productions/${production.id}`}

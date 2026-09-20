@@ -1,12 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --background: #1c1b1a;
-  --surface: #262422;
-  --foreground: #ede6da;
-  --muted: #a89e8f;
-  --accent: #c9a227;
-  --rule: #3a3733;
+  /* Ground and ink */
+  --background: #FAFBFC;
+  --surface: #FFFFFF;
+  --foreground: #253046;
+  --muted: #5A6A83;
+  --rule: #E5EAF0;
+
+  /* Brand purple, split in two. The palette's #8B7CF8 is a fill colour: at
+     3.20:1 against the page ground it can't legally carry text, and the
+     "Add item" button renders near-white type *on* the accent. So --accent
+     is that same hue darkened until white on it clears WCAG AA (6.14:1),
+     and --accent-soft keeps the original for tints, fills and borders.
+     Every bright hue below is split the same way. */
+  --accent: #5B4BD6;
+  --accent-soft: #8B7CF8;
+
+  /* Status. The -ink value is for type, the bare one for fills and dots. */
+  --in-use: #2EC4B6;
+  --in-use-ink: #0C6A61;
+  --danger: #FF7F73;
+  --danger-ink: #C0392B;
+  --success: #6BCB77;
+  --success-ink: #267432;
+  --warning: #FFC857;
+  --warning-ink: #8A6410;
 }
 
 @theme inline {
@@ -15,7 +34,16 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-rule: var(--rule);
+  --color-in-use: var(--in-use);
+  --color-in-use-ink: var(--in-use-ink);
+  --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
+  --color-success: var(--success);
+  --color-success-ink: var(--success-ink);
+  --color-warning: var(--warning);
+  --color-warning-ink: var(--warning-ink);
   --font-display: var(--font-display);
   --font-body: var(--font-body);
 }
