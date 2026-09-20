@@ -35,9 +35,6 @@ alter table profiles add column if not exists avatar_url text;
 
 update profiles set active_org_id = org_id where active_org_id is null;
 
-alter table profiles drop column if exists org_id;
-alter table profiles drop column if exists role;
-
 -- ── 3. The security functions everything resolves through ─────────────
 
 -- Every organization the caller belongs to. security definer specifically
@@ -125,6 +122,13 @@ create policy "members can read profiles they share an org with" on profiles
 drop policy if exists "members can update their own profile" on profiles;
 create policy "members can update their own profile" on profiles
   for update using (id = auth.uid()) with check (id = auth.uid());
+
+-- Only now can the single-org columns go: the policy that referenced
+-- profiles.org_id has just been dropped, and auth_org_id() was rewritten
+-- above to stop reading it. Dropping them any earlier fails with
+-- "cannot drop column org_id ... policy ... depends on it".
+alter table profiles drop column if exists org_id;
+alter table profiles drop column if exists role;
 
 -- ── 5. Onboarding and joining, now additive rather than once-only ─────
 -- Both functions used to raise if a profile already existed. That rejection
