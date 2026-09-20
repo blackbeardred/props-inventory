@@ -1,8 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════
 -- Multi-organization membership + account page
 --
--- Run once, in the Supabase SQL Editor, against a database still in the
--- single-org shape (profiles.org_id NOT NULL).
+-- Run in the Supabase SQL Editor. Safe to run more than once: the two
+-- statements that read the old profiles.org_id column are guarded, so a
+-- re-run after a partial or completed run is a no-op rather than an error.
 --
 -- The idea: membership (which organizations you belong to) is split from
 -- the active choice (which one you are looking at right now). auth_org_id()
@@ -24,16 +25,34 @@ create index if not exists memberships_org_id_idx on memberships(org_id);
 
 -- Backfill from the existing one-org-per-person rows. Lossless, and must
 -- run before the columns it reads are dropped below.
-insert into memberships (user_id, org_id, role, created_at)
-select id, org_id, role, created_at from profiles
-on conflict (user_id, org_id) do nothing;
+do $mig$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles' and column_name = 'org_id'
+  ) then
+    insert into memberships (user_id, org_id, role, created_at)
+    select id, org_id, role, created_at from profiles
+    on conflict (user_id, org_id) do nothing;
+  end if;
+end
+$mig$;
 
 -- ── 2. profiles becomes the person, not the membership ────────────────
 alter table profiles add column if not exists active_org_id uuid
   references organizations(id) on delete set null;
 alter table profiles add column if not exists avatar_url text;
 
-update profiles set active_org_id = org_id where active_org_id is null;
+do $mig$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles' and column_name = 'org_id'
+  ) then
+    update profiles set active_org_id = org_id where active_org_id is null;
+  end if;
+end
+$mig$;
 
 -- ── 3. The security functions everything resolves through ─────────────
 
@@ -107,11 +126,13 @@ create policy "members can read memberships in their orgs" on memberships
 -- You can now belong to several organizations, so reading "your org"
 -- becomes reading any of them.
 drop policy if exists "org members can read their org" on organizations;
+drop policy if exists "org members can read their orgs" on organizations;
 create policy "org members can read their orgs" on organizations
   for select using (id in (select auth_org_ids()));
 
 -- The old profiles policy keyed on profiles.org_id, which no longer exists.
 drop policy if exists "org members can read profiles in their org" on profiles;
+drop policy if exists "members can read profiles they share an org with" on profiles;
 create policy "members can read profiles they share an org with" on profiles
   for select using (id = auth.uid() or id in (select auth_peer_ids()));
 
