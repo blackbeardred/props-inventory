@@ -124,6 +124,17 @@ export function formatDate(value: string | null | undefined): string {
   return DATE_FORMAT.format(parsed);
 }
 
+const DATE_FORMAT_NO_YEAR = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+function yearOf(value: string): number | null {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getUTCFullYear();
+}
+
 export function formatDateRange(
   start: string | null | undefined,
   end: string | null | undefined,
@@ -131,6 +142,17 @@ export function formatDateRange(
   if (!start && !end) return "Dates TBD";
   if (start && !end) return `${formatDate(start)} onward`;
   if (!start && end) return `through ${formatDate(end)}`;
+
+  // A run almost always starts and ends in the same year, and printing that
+  // year twice on every row of the items list is a lot of noise for no
+  // information: "Mar 1 – Mar 20, 2026" rather than "Mar 1, 2026 – Mar 20, 2026".
+  const startYear = yearOf(start!);
+  const endYear = yearOf(end!);
+  if (startYear !== null && startYear === endYear) {
+    const parsedStart = new Date(start!);
+    return `${DATE_FORMAT_NO_YEAR.format(parsedStart)} – ${formatDate(end)}`;
+  }
+
   return `${formatDate(start)} – ${formatDate(end)}`;
 }
 

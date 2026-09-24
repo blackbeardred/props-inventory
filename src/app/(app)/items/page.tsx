@@ -384,22 +384,26 @@ function InUseCell({
   const { production, quantityInUse } = inUse;
 
   return (
-    <span className="text-foreground">
-      {/* Teal state dot, so the column can be scanned for what's physically
-          out without reading any of it. */}
-      <span
-        aria-hidden="true"
-        className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-in-use align-[1px]"
-      />
-      {item.quantity > 1 ? `${quantityInUse}/${item.quantity} in use in ` : "In use in "}
-      <Link
-        href={`/productions/${production.id}`}
-        className="text-accent hover:underline"
-      >
-        {production.name}
-      </Link>{" "}
-      <span className="text-muted">
-        from {formatDateRange(production.start_date, production.end_date)}
+    <span className="block">
+      <span className="block text-foreground">
+        {/* Teal state dot, so the column can be scanned for what's physically
+            out without reading any of it. */}
+        <span
+          aria-hidden="true"
+          className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-in-use align-[1px]"
+        />
+        {item.quantity > 1 ? `${quantityInUse}/${item.quantity} in ` : "In "}
+        <Link
+          href={`/productions/${production.id}`}
+          className="text-accent hover:underline"
+        >
+          {production.name}
+        </Link>
+      </span>
+      {/* The run's dates matter less than which show has it, so they sit
+          underneath rather than stretching the column across the table. */}
+      <span className="mt-0.5 block font-body text-xs text-muted">
+        {formatDateRange(production.start_date, production.end_date)}
       </span>
     </span>
   );

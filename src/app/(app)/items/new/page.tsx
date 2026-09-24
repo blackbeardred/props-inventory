@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import {
-  FileField,
   Notice,
   PageHeading,
   SelectField,
@@ -9,6 +8,7 @@ import {
   TextareaField,
 } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { PhotoField } from "@/components/photo-field";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@/lib/inventory";
@@ -57,6 +57,13 @@ export default async function NewItemPage({
       <form action={createItem} className="max-w-lg space-y-5">
         <TextField label="Name" name="name" required />
 
+        <PhotoField
+          label="Photo"
+          name="photo"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          helpText="JPG, PNG, GIF, or WEBP — up to 8MB. Crop it square so it matches how it’s shown in your lists."
+        />
+
         <div className="grid grid-cols-2 gap-4">
           <SelectField label="Category" name="category" defaultValue="prop">
             {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
@@ -99,13 +106,6 @@ export default async function NewItemPage({
             ))}
           </SelectField>
         </div>
-
-        <FileField
-          label="Photo"
-          name="photo"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          helpText="JPG, PNG, GIF, or WEBP — up to 8MB."
-        />
 
         <SubmitButton pendingText="Adding item…">Add item</SubmitButton>
       </form>

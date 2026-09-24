@@ -15,7 +15,7 @@ export function AppNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex items-center gap-1">
+    <nav className="flex flex-wrap items-center gap-1">
       {LINKS.map((link) => {
         const active =
           pathname === link.href || pathname.startsWith(`${link.href}/`);

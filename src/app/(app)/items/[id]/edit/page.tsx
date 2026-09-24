@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import {
-  FileField,
   Notice,
   PageHeading,
   SelectField,
@@ -9,6 +8,7 @@ import {
   TextareaField,
 } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { PhotoField } from "@/components/photo-field";
 import { DeleteButton } from "@/components/delete-button";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
@@ -106,6 +106,21 @@ export default async function EditItemPage({
           required
         />
 
+        <PhotoField
+          label={currentPhotoUrl ? "Photo" : "Photo"}
+          name="photo"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          helpText="JPG, PNG, GIF, or WEBP — up to 8MB. Choosing a new one replaces what’s there."
+          existingUrl={currentPhotoUrl}
+        />
+
+        {currentPhotoUrl ? (
+          <label className="flex items-center gap-2 font-body text-sm text-muted">
+            <input type="checkbox" name="removePhoto" />
+            Remove current photo
+          </label>
+        ) : null}
+
         <div className="grid grid-cols-2 gap-4">
           <SelectField
             label="Category"
@@ -161,28 +176,6 @@ export default async function EditItemPage({
             ))}
           </SelectField>
         </div>
-
-        {currentPhotoUrl ? (
-          <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element -- signed URL, see items/page.tsx */}
-            <img
-              src={currentPhotoUrl}
-              alt=""
-              className="h-16 w-16 rounded object-cover"
-            />
-            <label className="flex items-center gap-2 font-body text-sm text-muted">
-              <input type="checkbox" name="removePhoto" />
-              Remove current photo
-            </label>
-          </div>
-        ) : null}
-
-        <FileField
-          label={currentPhotoUrl ? "Replace photo" : "Photo"}
-          name="photo"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          helpText="JPG, PNG, GIF, or WEBP — up to 8MB."
-        />
 
         <TextField
           label="Auto-detected tags"
