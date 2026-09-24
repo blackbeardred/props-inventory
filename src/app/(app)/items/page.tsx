@@ -114,7 +114,13 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 export default async function ItemsPage({ searchParams }: ItemsPageProps) {
-  const locationId = first((await searchParams).location);
+  const params = await searchParams;
+  const locationId = first(params.location);
+  // Set by the CSV import on its way back here.
+  const importedCount = Number.parseInt(first(params.imported) ?? "", 10);
+  const skippedCount = Number.parseInt(first(params.skipped) ?? "", 10);
+  const locationsCreated = Number.parseInt(first(params.locations) ?? "", 10);
+  const unmatchedLocations = Number.parseInt(first(params.unmatched) ?? "", 10);
 
   if (!supabaseConfigured) {
     return (
@@ -196,14 +202,44 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
               : "Every prop and costume, with the shelf it lives on."
         }
         action={
-          <Link
-            href="/items/new"
-            className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
-          >
-            Add item
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/items/import"
+              className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+            >
+              Import CSV
+            </Link>
+            <Link
+              href="/items/new"
+              className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
+            >
+              Add item
+            </Link>
+          </div>
         }
       />
+
+      {Number.isFinite(importedCount) && importedCount > 0 ? (
+        <div className="mb-6">
+          <Notice
+            title={`Imported ${importedCount.toLocaleString()} item${importedCount === 1 ? "" : "s"}`}
+          >
+            {[
+              Number.isFinite(locationsCreated) && locationsCreated > 0
+                ? `Created ${locationsCreated} new location${locationsCreated === 1 ? "" : "s"}.`
+                : null,
+              Number.isFinite(unmatchedLocations) && unmatchedLocations > 0
+                ? `${unmatchedLocations} item${unmatchedLocations === 1 ? " came" : "s came"} in unassigned, because the location named in the file doesn’t exist.`
+                : null,
+              Number.isFinite(skippedCount) && skippedCount > 0
+                ? `Skipped ${skippedCount} row${skippedCount === 1 ? "" : "s"} that couldn’t be read.`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" ") || "Everything in the file came through."}
+          </Notice>
+        </div>
+      ) : null}
 
       {locations.length > 0 ? (
         <div className="mb-6 flex flex-wrap items-center gap-2">

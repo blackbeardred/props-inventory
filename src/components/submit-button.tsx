@@ -20,16 +20,19 @@ export function SubmitButton({
   children,
   pendingText,
   variant = "primary",
+  disabled = false,
 }: {
   children: string;
   pendingText?: string;
   variant?: keyof typeof VARIANTS;
+  /** Disable for a reason of the caller's own, e.g. nothing to submit yet. */
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       aria-busy={pending}
       className={`inline-flex items-center justify-center rounded-md px-4 py-2 font-body text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${VARIANTS[variant]}`}
     >
