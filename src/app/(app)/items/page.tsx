@@ -285,81 +285,202 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
           )}
         </EmptyState>
       ) : (
-        <DataTable columns={["Photo", "Item", "Category", "Qty", "In use", "Condition", "Location", ""]}>
-          {items.map((item) => {
-            const photoUrl = item.photo_url
-              ? photoUrlByPath.get(item.photo_url)
-              : undefined;
-            return (
-              <tr key={item.id} className="border-b border-rule align-top">
-                <td className="px-3 py-3">
-                  {photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- signed URLs are short-lived and per-request, not worth Next/Image's remote-pattern config for a Day 4 thumbnail.
-                    <img
-                      src={photoUrl}
-                      alt=""
-                      className="h-10 w-10 rounded object-cover"
-                    />
-                  ) : (
-                    <div className="h-10 w-10 rounded border border-dashed border-rule" />
-                  )}
-                </td>
-                <td className="px-3 py-3">
-                  <span className="font-body text-sm text-foreground">
-                    {item.name}
-                  </span>
-                  {item.description ? (
-                    <p className="mt-0.5 line-clamp-1 font-body text-xs text-muted">
-                      {item.description}
-                    </p>
-                  ) : null}
-                </td>
-                <td className="px-3 py-3">
-                  <Badge tone={item.category === "costume" ? "accent" : "neutral"}>
-                    {CATEGORY_LABELS[item.category] ?? item.category}
-                  </Badge>
-                </td>
-                <td className="px-3 py-3 font-body text-sm text-muted">
-                  {item.quantity}
-                </td>
-                <td className="px-3 py-3 font-body text-sm">
-                  <InUseCell item={item} inUse={inUseByItem.get(item.id)} />
-                </td>
-                <td className="px-3 py-3">
-                  {item.condition ? (
-                    <Badge tone={CONDITION_TONE[item.condition] ?? "muted"}>
-                      {CONDITION_LABELS[item.condition] ?? item.condition}
+        <>
+        {/* Eight columns can't work at phone width — below md the same rows
+            are cards instead, keeping the photo, the name, and the few things
+            worth knowing while standing in a storage room. */}
+        <ul className="space-y-3 md:hidden">
+          {items.map((item) => (
+            <ItemCard
+              key={item.id}
+              item={item}
+              photoUrl={item.photo_url ? photoUrlByPath.get(item.photo_url) : undefined}
+              inUse={inUseByItem.get(item.id)}
+            />
+          ))}
+        </ul>
+
+        <div className="hidden md:block">
+          <DataTable columns={["Photo", "Item", "Category", "Qty", "In use", "Condition", "Location", ""]}>
+            {items.map((item) => {
+              const photoUrl = item.photo_url
+                ? photoUrlByPath.get(item.photo_url)
+                : undefined;
+              return (
+                <tr key={item.id} className="border-b border-rule align-top">
+                  <td className="px-3 py-3">
+                    {photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- signed URLs are short-lived and per-request, not worth Next/Image's remote-pattern config for a Day 4 thumbnail.
+                      <img
+                        src={photoUrl}
+                        alt=""
+                        className="h-10 w-10 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded border border-dashed border-rule" />
+                    )}
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className="font-body text-sm text-foreground">
+                      {item.name}
+                    </span>
+                    {item.description ? (
+                      <p className="mt-0.5 line-clamp-1 font-body text-xs text-muted">
+                        {item.description}
+                      </p>
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-3">
+                    <Badge tone={item.category === "costume" ? "accent" : "neutral"}>
+                      {CATEGORY_LABELS[item.category] ?? item.category}
                     </Badge>
-                  ) : (
-                    <span className="font-body text-sm text-muted">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-3 font-body text-sm">
-                  {item.location_id ? (
+                  </td>
+                  <td className="px-3 py-3 font-body text-sm text-muted">
+                    {item.quantity}
+                  </td>
+                  <td className="px-3 py-3 font-body text-sm">
+                    <InUseCell item={item} inUse={inUseByItem.get(item.id)} />
+                  </td>
+                  <td className="px-3 py-3">
+                    {item.condition ? (
+                      <Badge tone={CONDITION_TONE[item.condition] ?? "muted"}>
+                        {CONDITION_LABELS[item.condition] ?? item.condition}
+                      </Badge>
+                    ) : (
+                      <span className="font-body text-sm text-muted">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 font-body text-sm">
+                    {item.location_id ? (
+                      <Link
+                        href={`/items?location=${item.location_id}`}
+                        className="text-muted underline-offset-2 hover:text-foreground hover:underline"
+                      >
+                        {item.locations?.name ?? "Unknown location"}
+                      </Link>
+                    ) : (
+                      <span className="text-muted">Unassigned</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 font-body text-sm text-right">
                     <Link
-                      href={`/items?location=${item.location_id}`}
+                      href={`/items/${item.id}/edit`}
                       className="text-muted underline-offset-2 hover:text-foreground hover:underline"
                     >
-                      {item.locations?.name ?? "Unknown location"}
+                      Edit
                     </Link>
-                  ) : (
-                    <span className="text-muted">Unassigned</span>
-                  )}
-                </td>
-                <td className="px-3 py-3 font-body text-sm text-right">
-                  <Link
-                    href={`/items/${item.id}/edit`}
-                    className="text-muted underline-offset-2 hover:text-foreground hover:underline"
-                  >
-                    Edit
-                  </Link>
-                </td>
-              </tr>
-            );
-          })}
-        </DataTable>
+                  </td>
+                </tr>
+              );
+            })}
+          </DataTable>
+        </div>
+        </>
       )}
     </>
+  );
+}
+
+/**
+ * One item as a card, for phone width. Shows what someone standing in front
+ * of a shelf needs — what it is, what condition it's in, whether it's out on
+ * a show, and where it lives — and drops the rest.
+ */
+function ItemCard({
+  item,
+  photoUrl,
+  inUse,
+}: {
+  item: ItemListRow;
+  photoUrl?: string;
+  inUse?: InUseInfo;
+}) {
+  return (
+    <li className="rounded-lg border border-rule bg-surface p-3">
+      <div className="flex gap-3">
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- signed URL, see above
+          <img
+            src={photoUrl}
+            alt=""
+            className="h-16 w-16 shrink-0 rounded object-cover"
+          />
+        ) : (
+          <div className="h-16 w-16 shrink-0 rounded border border-dashed border-rule" />
+        )}
+
+        <div className="min-w-0 flex-1">
+          <Link
+            href={`/items/${item.id}/edit`}
+            className="block font-body text-sm font-medium text-foreground underline-offset-2 hover:underline"
+          >
+            {item.name}
+          </Link>
+
+          {item.description ? (
+            <p className="mt-0.5 line-clamp-1 font-body text-xs text-muted">
+              {item.description}
+            </p>
+          ) : null}
+
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <Badge tone={item.category === "costume" ? "accent" : "neutral"}>
+              {CATEGORY_LABELS[item.category] ?? item.category}
+            </Badge>
+            {item.condition ? (
+              <Badge tone={CONDITION_TONE[item.condition] ?? "muted"}>
+                {CONDITION_LABELS[item.condition] ?? item.condition}
+              </Badge>
+            ) : null}
+            {item.quantity > 1 ? (
+              <span className="font-body text-xs text-muted">
+                {item.quantity} in stock
+              </span>
+            ) : null}
+          </div>
+
+          {inUse ? (
+            <p className="mt-2 font-body text-xs">
+              <span
+                aria-hidden="true"
+                className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-in-use align-[1px]"
+              />
+              <span className="text-foreground">
+                {item.quantity > 1
+                  ? `${inUse.quantityInUse}/${item.quantity} in `
+                  : "In "}
+              </span>
+              <Link
+                href={`/productions/${inUse.production.id}`}
+                className="text-accent hover:underline"
+              >
+                {inUse.production.name}
+              </Link>
+              <span className="text-muted">
+                {" · "}
+                {formatDateRange(
+                  inUse.production.start_date,
+                  inUse.production.end_date
+                )}
+              </span>
+            </p>
+          ) : null}
+
+          <p className="mt-2 font-body text-xs text-muted">
+            {item.location_id ? (
+              <Link
+                href={`/items?location=${item.location_id}`}
+                className="underline-offset-2 hover:text-foreground hover:underline"
+              >
+                {item.locations?.name ?? "Unknown location"}
+              </Link>
+            ) : (
+              "Unassigned"
+            )}
+          </p>
+        </div>
+      </div>
+    </li>
   );
 }
 

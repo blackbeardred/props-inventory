@@ -251,20 +251,31 @@ export function PhotoField({
           into this input, which means it has to still exist while the cropper
           is open. Unmounting it here left the crop button doing nothing. */}
       <div className={cropping ? "hidden" : "flex flex-wrap items-start gap-4"}>
-          {shown ? (
-            // eslint-disable-next-line @next/next/no-img-element -- blob or signed URL
-            <img
-              src={shown}
-              alt=""
-              className="h-36 w-36 shrink-0 rounded-lg border border-rule object-cover"
-            />
-          ) : (
-            <div className="flex h-36 w-36 shrink-0 items-center justify-center rounded-lg border border-dashed border-rule">
-              <span className="px-3 text-center font-body text-xs text-muted">
-                No photo yet
+          {/* The picture itself opens the file picker — the placeholder is the
+              biggest, most obvious target on the field, and it would be odd
+              for the one thing that looks like a photo slot to do nothing. */}
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            aria-label={shown ? "Choose a different photo" : "Choose a photo"}
+            className="shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            {shown ? (
+              // eslint-disable-next-line @next/next/no-img-element -- blob or signed URL
+              <img
+                src={shown}
+                alt=""
+                className="h-36 w-36 rounded-lg border border-rule object-cover transition-opacity hover:opacity-90"
+              />
+            ) : (
+              <span className="flex h-36 w-36 items-center justify-center rounded-lg border border-dashed border-rule transition-colors hover:border-accent/50 hover:bg-accent-soft/10">
+                <span className="px-3 text-center font-body text-xs text-muted">
+                  No photo yet
+                  <span className="mt-1 block text-accent">Choose a file</span>
+                </span>
               </span>
-            </div>
-          )}
+            )}
+          </button>
 
           <div className="min-w-[12rem] flex-1">
             <input
