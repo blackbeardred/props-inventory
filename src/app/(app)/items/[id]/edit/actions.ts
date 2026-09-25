@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
-import { tagPhoto } from "@/lib/ai/tag-photo";
+import { generateTags } from "@/lib/ai/tag-item";
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
@@ -17,20 +17,6 @@ const ALLOWED_PHOTO_TYPES: Record<string, string> = {
 
 function fail(itemId: string, message: string): never {
   redirect(`/items/${itemId}/edit?error=${encodeURIComponent(message)}`);
-}
-
-/** Comma-separated manual tag edits from the form, deduped and capped. */
-function parseManualTags(raw: string): string[] {
-  const seen = new Set<string>();
-  const tags: string[] = [];
-  for (const entry of raw.split(",")) {
-    const tag = entry.trim().toLowerCase();
-    if (!tag || tag.length > 40 || seen.has(tag)) continue;
-    seen.add(tag);
-    tags.push(tag);
-    if (tags.length >= 20) break;
-  }
-  return tags;
 }
 
 export async function updateItem(formData: FormData) {
@@ -96,7 +82,7 @@ export async function updateItem(formData: FormData) {
 
   const { data: existingItem } = await supabase
     .from("items")
-    .select("photo_url, auto_tags")
+    .select("photo_url, auto_tags, name, description, category")
     .eq("id", itemId)
     .maybeSingle();
 
@@ -106,17 +92,20 @@ export async function updateItem(formData: FormData) {
 
   const oldPhotoPath: string | null = existingItem.photo_url;
   let photoPath: string | null = oldPhotoPath;
-  // auto_tags describes the photo, so it only changes when the photo does: a
-  // new upload gets freshly detected tags (overriding whatever was in the
-  // form's "Auto-detected tags" field, since that was showing the *old*
-  // photo's tags), removing the photo clears them, and otherwise whatever
-  // the user typed in that field wins — that's the only case where it
-  // reflects a deliberate edit.
   let autoTags: string[] = (existingItem.auto_tags as string[] | null) ?? [];
-  // manual_tags (Day 11) is independent of the photo entirely — always just
-  // whatever's currently in the "Your tags" field, regardless of whether the
-  // photo was uploaded, replaced, or removed this save.
-  const manualTags = parseManualTags(String(formData.get("manualTags") ?? ""));
+
+  // Tags describe the item, so they're regenerated when the item's own
+  // description of itself changes — its words or its photo — and left alone
+  // when someone is only correcting a quantity or moving a shelf, which
+  // would otherwise cost an API call for nothing.
+  const wordsChanged =
+    name !== existingItem.name ||
+    (description || null) !== (existingItem.description ?? null) ||
+    category !== existingItem.category;
+
+  // Items that arrived through the CSV import have never been tagged, so the
+  // first save of one tags it even if nothing about it changed.
+  const neverTagged = autoTags.length === 0;
 
   if (photoFile) {
     const ext = ALLOWED_PHOTO_TYPES[photoFile.type];
@@ -129,16 +118,22 @@ export async function updateItem(formData: FormData) {
     if (uploadError) {
       fail(itemId, `Couldn\u2019t upload the photo: ${uploadError.message}`);
     }
-
-    autoTags = await tagPhoto(
-      new Uint8Array(await photoFile.arrayBuffer()),
-      photoFile.type
-    );
   } else if (removePhoto) {
     photoPath = null;
-    autoTags = [];
-  } else {
-    autoTags = parseManualTags(String(formData.get("autoTags") ?? ""));
+  }
+
+  if (photoFile || removePhoto || wordsChanged || neverTagged) {
+    autoTags = await generateTags({
+      name,
+      category,
+      description,
+      photo: photoFile
+        ? {
+            bytes: new Uint8Array(await photoFile.arrayBuffer()),
+            mediaType: photoFile.type,
+          }
+        : null,
+    });
   }
 
   const { error: updateError } = await supabase
@@ -152,7 +147,6 @@ export async function updateItem(formData: FormData) {
       location_id: locationId || null,
       photo_url: photoPath,
       auto_tags: autoTags,
-      manual_tags: manualTags,
     })
     .eq("id", itemId);
 
@@ -169,12 +163,10 @@ export async function updateItem(formData: FormData) {
 }
 
 /**
- * Re-runs AI tag detection on an item's existing photo, without requiring a
- * fresh upload. Overwrites auto_tags with a fresh guess from the current
- * photo — same "auto_tags always describes the current photo" rule the
- * upload path follows. Only touches auto_tags: manual_tags (Day 11) lives in
- * its own column and is never read or written here, so anything typed in by
- * hand survives a regenerate untouched.
+ * Regenerates an item's search tags on demand, from its current name,
+ * category, description and photo. Useful after editing a description, or
+ * when the tags simply came out wrong — and, unlike the version this
+ * replaced, it works for items that have no photo at all.
  */
 export async function regenerateTags(formData: FormData) {
   const itemId = String(formData.get("itemId") ?? "");
@@ -193,7 +185,7 @@ export async function regenerateTags(formData: FormData) {
 
   const { data: existingItem } = await supabase
     .from("items")
-    .select("photo_url")
+    .select("name, category, description, photo_url")
     .eq("id", itemId)
     .maybeSingle();
 
@@ -201,25 +193,31 @@ export async function regenerateTags(formData: FormData) {
     redirect("/items");
   }
 
+  let photo: { bytes: Uint8Array; mediaType: string } | null = null;
   const photoPath: string | null = existingItem.photo_url;
-  if (!photoPath) {
-    fail(itemId, "This item doesn\u2019t have a photo to tag.");
+
+  if (photoPath) {
+    const { data: photoBlob, error: downloadError } = await supabase.storage
+      .from(PHOTOS_BUCKET)
+      .download(photoPath);
+
+    if (downloadError || !photoBlob) {
+      // A missing photo isn't fatal any more: tag from the words instead.
+      console.error("regenerateTags: couldn't fetch the photo", downloadError);
+    } else {
+      photo = {
+        bytes: new Uint8Array(await photoBlob.arrayBuffer()),
+        mediaType: photoBlob.type || "image/jpeg",
+      };
+    }
   }
 
-  const { data: photoBlob, error: downloadError } = await supabase.storage
-    .from(PHOTOS_BUCKET)
-    .download(photoPath);
-
-  if (downloadError || !photoBlob) {
-    fail(
-      itemId,
-      `Couldn\u2019t re-tag: ${downloadError?.message ?? "photo not found in storage"}`
-    );
-  }
-
-  const mediaType = photoBlob.type || "image/jpeg";
-  const photoBytes = new Uint8Array(await photoBlob.arrayBuffer());
-  const autoTags = await tagPhoto(photoBytes, mediaType);
+  const autoTags = await generateTags({
+    name: existingItem.name,
+    category: existingItem.category,
+    description: existingItem.description,
+    photo,
+  });
 
   const { error: updateError } = await supabase
     .from("items")

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
-import { tagPhoto } from "@/lib/ai/tag-photo";
+import { generateTags } from "@/lib/ai/tag-item";
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
@@ -91,11 +91,21 @@ export async function createItem(formData: FormData) {
     if (uploadError) {
       fail(`Couldn\u2019t upload the photo: ${uploadError.message}`);
     }
-
-    // Best-effort: never blocks or fails the save if this doesn't work.
-    const photoBytes = new Uint8Array(await photoFile.arrayBuffer());
-    autoTags = await tagPhoto(photoBytes, photoFile.type);
   }
+
+  // Tags come from what the item *is*, so every item gets them — a photo
+  // just gives the model more to go on. Best-effort: never blocks the save.
+  autoTags = await generateTags({
+    name,
+    category,
+    description,
+    photo: photoFile
+      ? {
+          bytes: new Uint8Array(await photoFile.arrayBuffer()),
+          mediaType: photoFile.type,
+        }
+      : null,
+  });
 
   const { error: insertError } = await supabase.from("items").insert({
     id: itemId,

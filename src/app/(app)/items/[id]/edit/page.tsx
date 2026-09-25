@@ -51,7 +51,7 @@ export default async function EditItemPage({
     supabase
       .from("items")
       .select(
-        "id, name, category, description, photo_url, quantity, condition, location_id, created_at, auto_tags, manual_tags"
+        "id, name, category, description, photo_url, quantity, condition, location_id, created_at, auto_tags"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -177,48 +177,37 @@ export default async function EditItemPage({
           </SelectField>
         </div>
 
-        <TextField
-          label="Auto-detected tags"
-          name="autoTags"
-          defaultValue={(typedItem.auto_tags ?? []).join(", ")}
-        />
-        <p className="-mt-3 font-body text-xs text-muted">
-          Comma-separated. Guessed from the photo (material, color, style) and
-          never shown on the items or search list — they only affect what a
-          text search matches, so fix anything the AI got wrong. Uploading a
-          new photo, or regenerating below, replaces these with a fresh
-          guess.
-        </p>
-
-        <TextField
-          label="Your tags"
-          name="manualTags"
-          defaultValue={(typedItem.manual_tags ?? []).join(", ")}
-        />
-        <p className="-mt-3 font-body text-xs text-muted">
-          Comma-separated. Anything you add here stays as-is — never touched
-          by a new photo, a removed photo, or regenerating the auto-detected
-          tags above. Also folded into search, also never shown on the items
-          or search list.
-        </p>
-
         <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
       </form>
 
-      {currentPhotoUrl ? (
-        <form action={regenerateTags} className="mt-4 max-w-lg">
+      <div className="mt-8 max-w-lg border-t border-rule pt-6">
+        <h2 className="font-body text-sm font-medium text-foreground">
+          Search tags
+        </h2>
+        <p className="mt-1 font-body text-xs text-muted">
+          Generated from this item’s name, description and photo, and used
+          only to decide what a search matches — they’re never shown in the
+          items list or in search results. They’re what lets someone find
+          this by searching “wood” when nothing here says “wood”.
+        </p>
+
+        {(typedItem.auto_tags ?? []).length > 0 ? (
+          <p className="mt-3 font-body text-sm text-foreground">
+            {(typedItem.auto_tags ?? []).join(", ")}
+          </p>
+        ) : (
+          <p className="mt-3 font-body text-sm text-muted">
+            None yet — save this item, or regenerate, to tag it.
+          </p>
+        )}
+
+        <form action={regenerateTags} className="mt-3">
           <input type="hidden" name="itemId" value={typedItem.id} />
           <SubmitButton pendingText="Regenerating…" variant="ghost">
-            Regenerate tags from photo
+            Regenerate tags
           </SubmitButton>
-          <p className="mt-1 font-body text-xs text-muted">
-            Re-runs AI detection on the current photo without re-uploading
-            it. Only replaces the auto-detected tags above — your own tags
-            are left alone. Save afterward if you also want to tweak the
-            result.
-          </p>
         </form>
-      ) : null}
+      </div>
 
       <form action={deleteItem} className="mt-10 border-t border-rule pt-6">
         <input type="hidden" name="itemId" value={typedItem.id} />

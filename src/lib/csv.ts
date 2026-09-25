@@ -110,7 +110,7 @@ export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
   quantity: "Quantity",
   condition: "Condition",
   location: "Location",
-  tags: "Your tags",
+  tags: "Search tags",
 };
 
 // Header spellings a theatre's own spreadsheet is likely to use. Matched

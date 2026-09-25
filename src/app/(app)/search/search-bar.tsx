@@ -22,6 +22,25 @@ type LocationOption = {
   name: string;
 };
 
+/**
+ * A search is built out of chips that stack, each narrowing the last: "wood"
+ * then "table" finds the wooden table, not everything wooden and everything
+ * table-ish. Word chips match against the item's name, description and its
+ * generated tags — which is how "wood" finds a guitar. Location chips filter
+ * to a shelf. Both kinds sit in one row and both can be x'd out.
+ */
+type Chip =
+  | { kind: "term"; value: string }
+  | { kind: "location"; id: string; name: string };
+
+function chipKey(chip: Chip, index: number): string {
+  return chip.kind === "location" ? `loc-${chip.id}` : `term-${index}-${chip.value}`;
+}
+
+function chipLabel(chip: Chip): string {
+  return chip.kind === "location" ? chip.name : chip.value;
+}
+
 const DEBOUNCE_MS = 200;
 
 /**
@@ -48,7 +67,8 @@ function matchScore(name: string, needle: string): number | null {
   return null;
 }
 
-function syncUrl(text: string, locationIds: string[]) {
+function syncUrl(terms: string[], locationIds: string[]) {
+  const text = terms.join(" ");
   if (typeof window === "undefined") return;
   const params = new URLSearchParams();
   if (text) params.set("q", text);
@@ -77,8 +97,20 @@ export function SearchBar({
   initialItems: SearchResultItem[];
   initialError: string | null;
 }) {
-  const [chips, setChips] = useState<LocationOption[]>(initialChips);
-  const [text, setText] = useState(initialText);
+  // Anything already in the URL arrives as chips, so a reloaded or shared
+  // search looks exactly like one you built by typing.
+  const [chips, setChips] = useState<Chip[]>(() => [
+    ...initialChips.map<Chip>((location) => ({
+      kind: "location",
+      id: location.id,
+      name: location.name,
+    })),
+    ...initialText
+      .split(/\s+/)
+      .filter(Boolean)
+      .map<Chip>((value) => ({ kind: "term", value })),
+  ]);
+  const [text, setText] = useState("");
   const [items, setItems] = useState<SearchResultItem[]>(initialItems);
   const [searchError, setSearchError] = useState<string | null>(initialError);
   const [highlighted, setHighlighted] = useState(0);
@@ -86,9 +118,17 @@ export function SearchBar({
   const requestIdRef = useRef(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const chipIds = useMemo(() => new Set(chips.map((chip) => chip.id)), [chips]);
+  const chipIds = useMemo(
+    () =>
+      new Set(
+        chips
+          .filter((chip): chip is Extract<Chip, { kind: "location" }> => chip.kind === "location")
+          .map((chip) => chip.id)
+      ),
+    [chips]
+  );
 
-  const suggestions = useMemo(() => {
+  const locationSuggestions = useMemo(() => {
     const needle = text.trim().toLowerCase();
     if (!needle) return [];
     return locations
@@ -108,16 +148,46 @@ export function SearchBar({
       .map((entry) => entry.location);
   }, [text, chipIds, locations]);
 
-  function scheduleSearch(nextText: string, nextChips: LocationOption[]) {
+  /**
+   * The word you typed always comes first, so pressing enter searches for it
+   * rather than jumping to a location that happens to look similar — typing
+   * "wood" shouldn't silently filter you to the Woodshed. Locations are one
+   * arrow key away.
+   */
+  const suggestions = useMemo(() => {
+    const trimmed = text.trim();
+    if (!trimmed) return [];
+    return [
+      { kind: "term" as const, value: trimmed },
+      ...locationSuggestions.map((location) => ({
+        kind: "location" as const,
+        location,
+      })),
+    ];
+  }, [text, locationSuggestions]);
+
+  function queryFor(nextChips: Chip[], nextText: string) {
+    const terms = nextChips
+      .filter((chip): chip is Extract<Chip, { kind: "term" }> => chip.kind === "term")
+      .map((chip) => chip.value);
+    const ids = nextChips
+      .filter((chip): chip is Extract<Chip, { kind: "location" }> => chip.kind === "location")
+      .map((chip) => chip.id);
+    // Whatever is still being typed counts too, so results narrow with each
+    // keystroke rather than only once a chip is committed.
+    const live = nextText.trim();
+    return { terms, ids, query: [...terms, live].filter(Boolean).join(" ") };
+  }
+
+  function scheduleSearch(nextText: string, nextChips: Chip[]) {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
-    const trimmed = nextText.trim();
-    const ids = nextChips.map((chip) => chip.id);
-    syncUrl(trimmed, ids);
+    const { terms, ids, query } = queryFor(nextChips, nextText);
+    syncUrl(nextText.trim() ? [...terms, nextText.trim()] : terms, ids);
 
-    if (!trimmed && ids.length === 0) {
+    if (!query && ids.length === 0) {
       requestIdRef.current += 1;
       setItems([]);
       setSearchError(null);
@@ -128,7 +198,7 @@ export function SearchBar({
     const requestId = ++requestIdRef.current;
     setIsSearching(true);
     debounceTimerRef.current = setTimeout(() => {
-      searchItemsLive(trimmed, ids).then((result) => {
+      searchItemsLive(query, ids).then((result) => {
         if (requestIdRef.current !== requestId) return;
         setItems(result.items);
         setSearchError(result.error);
@@ -144,19 +214,32 @@ export function SearchBar({
     scheduleSearch(value, chips);
   }
 
-  function addChip(location: LocationOption) {
+  function addChip(chip: Chip) {
     setText("");
     setHighlighted(0);
-    if (chips.some((chip) => chip.id === location.id)) {
+    if (
+      chip.kind === "location" &&
+      chips.some((existing) => existing.kind === "location" && existing.id === chip.id)
+    ) {
       return;
     }
-    const nextChips = [...chips, location];
+    if (
+      chip.kind === "term" &&
+      chips.some(
+        (existing) =>
+          existing.kind === "term" &&
+          existing.value.toLowerCase() === chip.value.toLowerCase()
+      )
+    ) {
+      return;
+    }
+    const nextChips = [...chips, chip];
     setChips(nextChips);
     scheduleSearch("", nextChips);
   }
 
-  function removeChip(id: string) {
-    const nextChips = chips.filter((chip) => chip.id !== id);
+  function removeChipAt(index: number) {
+    const nextChips = chips.filter((_, i) => i !== index);
     setChips(nextChips);
     scheduleSearch(text, nextChips);
   }
@@ -165,7 +248,16 @@ export function SearchBar({
     if (event.key === "Enter") {
       if (suggestions.length > 0) {
         event.preventDefault();
-        addChip(suggestions[highlighted] ?? suggestions[0]);
+        const picked = suggestions[highlighted] ?? suggestions[0];
+        addChip(
+          picked.kind === "term"
+            ? { kind: "term", value: picked.value }
+            : {
+                kind: "location",
+                id: picked.location.id,
+                name: picked.location.name,
+              }
+        );
       }
       return;
     }
@@ -182,16 +274,21 @@ export function SearchBar({
       return;
     }
     if (event.key === "Backspace" && text === "" && chips.length > 0) {
-      const nextChips = chips.slice(0, -1);
-      setChips(nextChips);
-      scheduleSearch(text, nextChips);
+      removeChipAt(chips.length - 1);
     }
   }
 
   const hasQuery = Boolean(text.trim()) || chips.length > 0;
+  const termLabels = chips
+    .filter((chip): chip is Extract<Chip, { kind: "term" }> => chip.kind === "term")
+    .map((chip) => chip.value);
+  const locationLabels = chips
+    .filter((chip): chip is Extract<Chip, { kind: "location" }> => chip.kind === "location")
+    .map((chip) => chip.name);
+  const searchWords = text.trim() ? [...termLabels, text.trim()] : termLabels;
   const resultsLabel = [
-    text.trim() ? `“${text.trim()}”` : null,
-    chips.length > 0 ? `in ${chips.map((chip) => chip.name).join(", ")}` : null,
+    searchWords.length > 0 ? `“${searchWords.join("” + “")}”` : null,
+    locationLabels.length > 0 ? `in ${locationLabels.join(", ")}` : null,
   ]
     .filter(Boolean)
     .join(" ");
@@ -200,17 +297,28 @@ export function SearchBar({
     <div className="mb-8 max-w-2xl">
       <div className="relative">
         <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-rule bg-surface px-3 py-2 transition-colors focus-within:border-accent">
-          {chips.map((chip) => (
+          {chips.map((chip, index) => (
             <span
-              key={chip.id}
-              className="inline-flex items-center gap-1 rounded-full bg-accent/15 py-1 pl-2.5 pr-1.5 font-body text-xs text-accent"
+              key={chipKey(chip, index)}
+              className={`inline-flex items-center gap-1 rounded-full py-1 pl-2.5 pr-1.5 font-body text-xs ${
+                chip.kind === "location"
+                  ? "bg-accent/15 text-accent"
+                  : "bg-foreground/[0.07] text-foreground"
+              }`}
             >
-              {chip.name}
+              {chip.kind === "location" ? (
+                <span className="text-accent/70">in</span>
+              ) : null}
+              {chipLabel(chip)}
               <button
                 type="button"
-                onClick={() => removeChip(chip.id)}
-                aria-label={`Remove ${chip.name} filter`}
-                className="rounded-full text-accent/70 transition-colors hover:text-accent"
+                onClick={() => removeChipAt(index)}
+                aria-label={`Remove ${chipLabel(chip)} filter`}
+                className={`rounded-full transition-colors ${
+                  chip.kind === "location"
+                    ? "text-accent/70 hover:text-accent"
+                    : "text-muted hover:text-foreground"
+                }`}
               >
                 ×
               </button>
@@ -223,8 +331,8 @@ export function SearchBar({
             onKeyDown={handleKeyDown}
             placeholder={
               chips.length === 0
-                ? "Search by name, description, or a location…"
-                : "Add more…"
+                ? "Search for anything — wood, table, red…"
+                : "Add another word to narrow it…"
             }
             autoFocus
             className="min-w-[10rem] flex-1 bg-transparent font-body text-sm text-foreground outline-none placeholder:text-muted"
@@ -235,18 +343,41 @@ export function SearchBar({
           <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-rule bg-surface shadow-lg">
             {suggestions.map((suggestion, index) => (
               <button
-                key={suggestion.id}
+                key={
+                  suggestion.kind === "term"
+                    ? `term-${suggestion.value}`
+                    : `loc-${suggestion.location.id}`
+                }
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => addChip(suggestion)}
+                onClick={() =>
+                  addChip(
+                    suggestion.kind === "term"
+                      ? { kind: "term", value: suggestion.value }
+                      : {
+                          kind: "location",
+                          id: suggestion.location.id,
+                          name: suggestion.location.name,
+                        }
+                  )
+                }
                 className={`block w-full px-3 py-2 text-left font-body text-sm transition-colors ${
                   index === highlighted
                     ? "bg-accent/10 text-accent"
                     : "text-foreground hover:bg-rule/40"
                 }`}
               >
-                {suggestion.name}{" "}
-                <span className="text-muted">— location</span>
+                {suggestion.kind === "term" ? (
+                  <>
+                    {suggestion.value}{" "}
+                    <span className="text-muted">— add as a search word</span>
+                  </>
+                ) : (
+                  <>
+                    {suggestion.location.name}{" "}
+                    <span className="text-muted">— location</span>
+                  </>
+                )}
               </button>
             ))}
           </div>
@@ -260,9 +391,12 @@ export function SearchBar({
       <div className="mt-6">
         {!hasQuery ? (
           <EmptyState title="Search your inventory">
-            Start typing a name or description — matches narrow as you keep
-            typing. Type a location name and pick it from the list to filter
-            to that location. Your search stays in the address bar, so you
+            Type a word and press enter to pin it as a filter, then add
+            another to narrow further — “wood” then “table” finds the wooden
+            table. Items are matched on what they are and what they’re made
+            of, not just their name, so “wood” finds a guitar too. Pick a
+            location from the list to limit it to one shelf. Your search
+            stays in the address bar, so you
             can bookmark or share it.
           </EmptyState>
         ) : searchError ? (

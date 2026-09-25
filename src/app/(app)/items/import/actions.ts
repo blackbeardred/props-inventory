@@ -206,9 +206,11 @@ export async function importItems(formData: FormData) {
         quantity: row.quantity,
         condition: row.condition,
         location_id: locationId,
-        // No photo, so no AI tags to detect; anything from a "tags" column is
-        // the user's own writing and belongs in manual_tags.
-        manual_tags: row.tags,
+        // Importing doesn't call the tagging model — a few hundred API calls
+        // would make an import crawl — so anything in a "tags" column seeds
+        // the search tags, and the item gets properly tagged the first time
+        // someone saves it.
+        auto_tags: row.tags,
       };
     });
 
