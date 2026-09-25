@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui";
-import { SubmitButton } from "@/components/submit-button";
 import {
   CSV_TEMPLATE,
   IMPORT_FIELDS,
@@ -13,7 +13,7 @@ import {
   type ParsedFile,
 } from "@/lib/csv";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@/lib/inventory";
-import { importItems } from "./actions";
+import { attachPhotos, importItems } from "./actions";
 
 const PREVIEW_LIMIT = 15;
 
@@ -22,7 +22,12 @@ export function ImportWizard({
 }: {
   locationNames: string[];
 }) {
+  const router = useRouter();
   const [fileName, setFileName] = useState<string | null>(null);
+  const [createLocations, setCreateLocations] = useState(true);
+  const [phase, setPhase] = useState<"idle" | "importing" | "photos">("idle");
+  const [photoProgress, setPhotoProgress] = useState({ done: 0, total: 0, failed: 0 });
+  const [importError, setImportError] = useState<string | null>(null);
   const [text, setText] = useState<string | null>(null);
   const [mapping, setMapping] = useState<(ImportField | null)[] | null>(null);
   const [readError, setReadError] = useState<string | null>(null);
@@ -64,6 +69,65 @@ export function ImportWizard({
       setReadError("Couldn’t read that file. Is it a plain .csv?");
       setText(null);
     }
+  }
+
+  const photoCount = valid.filter((row) => row.photoUrl).length;
+
+  /**
+   * Creates the items, then fetches any linked photos in small batches. The
+   * photos can't go in the same request — a hundred downloads would exceed
+   * any serverless time limit — so the browser drives them, which also gives
+   * an honest progress count instead of a page that looks hung.
+   */
+  async function runImport() {
+    setImportError(null);
+    setPhase("importing");
+
+    const payload = JSON.stringify(
+      valid.map(({ errors: _errors, warnings: _warnings, ...row }) => row)
+    );
+
+    const outcome = await importItems(payload, createLocations);
+
+    if (!outcome.ok) {
+      setImportError(outcome.error);
+      setPhase("idle");
+      return;
+    }
+
+    let failed = 0;
+    if (outcome.photoJobs.length > 0) {
+      setPhase("photos");
+      setPhotoProgress({ done: 0, total: outcome.photoJobs.length, failed: 0 });
+
+      const BATCH = 5;
+      for (let index = 0; index < outcome.photoJobs.length; index += BATCH) {
+        const results = await attachPhotos(
+          outcome.photoJobs.slice(index, index + BATCH)
+        );
+        failed += results.filter((result) => !result.ok).length;
+        setPhotoProgress({
+          done: Math.min(index + BATCH, outcome.photoJobs.length),
+          total: outcome.photoJobs.length,
+          failed,
+        });
+      }
+    }
+
+    const params = new URLSearchParams({ imported: String(outcome.imported) });
+    if (outcome.skipped > 0) params.set("skipped", String(outcome.skipped));
+    if (outcome.locationsCreated > 0) {
+      params.set("locations", String(outcome.locationsCreated));
+    }
+    if (outcome.unmatchedLocations > 0) {
+      params.set("unmatched", String(outcome.unmatchedLocations));
+    }
+    if (outcome.photoJobs.length > 0) {
+      params.set("photos", String(outcome.photoJobs.length - failed));
+      if (failed > 0) params.set("photosFailed", String(failed));
+    }
+
+    router.push(`/items?${params.toString()}`);
   }
 
   const templateHref = `data:text/csv;charset=utf-8,${encodeURIComponent(CSV_TEMPLATE)}`;
@@ -168,7 +232,7 @@ export function ImportWizard({
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="border-b border-rule">
-                      {["Line", "Name", "Category", "Qty", "Condition", "Location", "Tags"].map(
+                      {["Line", "Name", "Category", "Qty", "Condition", "Location", "Tags", "Photo"].map(
                         (heading) => (
                           <th
                             key={heading}
@@ -215,6 +279,13 @@ export function ImportWizard({
                         <td className="px-3 py-2 font-body text-sm text-muted">
                           {row.tags.length > 0 ? row.tags.join(", ") : "—"}
                         </td>
+                        <td className="px-3 py-2 font-body text-sm text-muted">
+                          {row.photoUrl ? (
+                            <span className="text-success-ink">Will fetch</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -229,25 +300,14 @@ export function ImportWizard({
             ) : null}
           </section>
 
-          <form action={importItems} className="space-y-4">
-            {/* errors and warnings are for this screen only — dropping them keeps a
-                two-thousand-row payload comfortably inside the server action
-                body limit. */}
-            <input
-              type="hidden"
-              name="rows"
-              value={JSON.stringify(
-                valid.map(({ errors: _errors, warnings: _warnings, ...row }) => row)
-              )}
-            />
-
+          <div className="space-y-4">
             {missingLocations.length > 0 ? (
               <div className="rounded-lg border border-rule bg-surface px-4 py-3">
                 <label className="flex items-start gap-2 font-body text-sm text-foreground">
                   <input
                     type="checkbox"
-                    name="createLocations"
-                    defaultChecked
+                    checked={createLocations}
+                    onChange={(event) => setCreateLocations(event.target.checked)}
                     className="mt-1"
                   />
                   <span>
@@ -266,17 +326,39 @@ export function ImportWizard({
               </div>
             ) : null}
 
-            <SubmitButton pendingText="Importing…" disabled={valid.length === 0}>
-              {valid.length === 0
-                ? "Nothing to import"
-                : `Import ${valid.length.toLocaleString()} item${valid.length === 1 ? "" : "s"}`}
-            </SubmitButton>
+            {photoCount > 0 ? (
+              <p className="font-body text-sm text-muted">
+                {photoCount} row{photoCount === 1 ? "" : "s"} link to a picture.
+                Those are fetched after the items are created, a few at a time —
+                it takes a moment, so leave this page open until it finishes.
+              </p>
+            ) : null}
+
+            {importError ? (
+              <p className="font-body text-sm text-danger-ink">{importError}</p>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={runImport}
+              disabled={valid.length === 0 || phase !== "idle"}
+              className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {phase === "importing"
+                ? "Importing…"
+                : phase === "photos"
+                  ? `Fetching photos… ${photoProgress.done} of ${photoProgress.total}`
+                  : valid.length === 0
+                    ? "Nothing to import"
+                    : `Import ${valid.length.toLocaleString()} item${valid.length === 1 ? "" : "s"}`}
+            </button>
+
             <p className="font-body text-xs text-muted">
               {fileName ? `From ${fileName}. ` : ""}
               Items are added, never merged — importing the same file twice
               gives you two copies of everything.
             </p>
-          </form>
+          </div>
         </>
       ) : null}
     </div>

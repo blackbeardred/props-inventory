@@ -99,6 +99,7 @@ export const IMPORT_FIELDS = [
   "condition",
   "location",
   "tags",
+  "photo",
 ] as const;
 
 export type ImportField = (typeof IMPORT_FIELDS)[number];
@@ -111,6 +112,7 @@ export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
   condition: "Condition",
   location: "Location",
   tags: "Search tags",
+  photo: "Photo URL",
 };
 
 // Header spellings a theatre's own spreadsheet is likely to use. Matched
@@ -146,10 +148,51 @@ const HEADER_ALIASES: Record<string, ImportField> = {
   tags: "tags",
   keywords: "tags",
   labels: "tags",
+  photo: "photo",
+  photos: "photo",
+  image: "photo",
+  images: "photo",
+  picture: "photo",
+  thumbnail: "photo",
+  imageurl: "photo",
+  photourl: "photo",
+  imagelink: "photo",
+  url: "photo",
+  link: "photo",
 };
 
 function normaliseHeader(header: string): string {
   return header.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Column headings that identify a row rather than describe it. A sheet's
+// first column is very often "Item #" or "Inventory No.", which normalises
+// to "item" and would otherwise be taken for the name — pushing the real
+// Name column out, since a field can only be filled once.
+const IDENTIFIER_TOKENS = new Set([
+  "no",
+  "nos",
+  "num",
+  "number",
+  "id",
+  "ids",
+  "sku",
+  "code",
+  "ref",
+  "reference",
+  "barcode",
+  "qr",
+  "inv",
+  "index",
+]);
+
+function isIdentifierHeader(header: string): boolean {
+  if (header.includes("#")) return true;
+  return header
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .some((token) => IDENTIFIER_TOKENS.has(token));
 }
 
 // Longest first, so "storagelocation" resolves to location rather than
@@ -177,13 +220,51 @@ function matchHeader(header: string): ImportField | undefined {
  * silently drop one on top of the other.
  */
 export function guessMapping(headers: string[]): (ImportField | null)[] {
-  const taken = new Set<ImportField>();
-  return headers.map((header) => {
-    const field = matchHeader(header);
-    if (!field || taken.has(field)) return null;
-    taken.add(field);
-    return field;
+  // Every column proposes what it might be and how sure it is, then the
+  // strongest proposals are honoured first. Assigning left to right instead
+  // let a weak early guess ("Item #" → name) take a field that a later
+  // column matched exactly ("Name" → name).
+  type Candidate = { column: number; field: ImportField; strength: number };
+  const candidates: Candidate[] = [];
+
+  headers.forEach((header, column) => {
+    if (isIdentifierHeader(header)) return;
+
+    const normalised = normaliseHeader(header);
+    if (!normalised) return;
+
+    const exact = HEADER_ALIASES[normalised];
+    if (exact) {
+      candidates.push({ column, field: exact, strength: 2 });
+      return;
+    }
+
+    const contained = ALIASES_BY_LENGTH.find(
+      (alias) => alias.length >= 3 && normalised.includes(alias)
+    );
+    if (contained) {
+      candidates.push({ column, field: HEADER_ALIASES[contained], strength: 1 });
+    }
   });
+
+  candidates.sort(
+    (a, b) => b.strength - a.strength || a.column - b.column
+  );
+
+  const mapping: (ImportField | null)[] = headers.map(() => null);
+  const takenFields = new Set<ImportField>();
+  const takenColumns = new Set<number>();
+
+  for (const candidate of candidates) {
+    if (takenFields.has(candidate.field) || takenColumns.has(candidate.column)) {
+      continue;
+    }
+    mapping[candidate.column] = candidate.field;
+    takenFields.add(candidate.field);
+    takenColumns.add(candidate.column);
+  }
+
+  return mapping;
 }
 
 const CATEGORY_WORDS: Record<string, Category> = {
@@ -197,17 +278,54 @@ const CATEGORY_WORDS: Record<string, Category> = {
   garment: "costume",
 };
 
+// Nobody writes the four words this app stores. A spreadsheet says
+// "excellent", "like new", "well used", "needs work" — and "excellent" is
+// plainly better than good, so it belongs in new rather than being dropped
+// on the floor with a warning.
 const CONDITION_WORDS: Record<string, Condition> = {
   new: "new",
+  brandnew: "new",
+  likenew: "new",
+  asnew: "new",
+  unused: "new",
+  excellent: "new",
+  mint: "new",
+  pristine: "new",
+  perfect: "new",
+  immaculate: "new",
+
   good: "good",
+  verygood: "good",
+  great: "good",
   fine: "good",
+  solid: "good",
+  serviceable: "good",
+  sound: "good",
+
   fair: "fair",
   ok: "fair",
+  okay: "fair",
+  average: "fair",
+  used: "fair",
+  wellused: "fair",
+  worn: "fair",
+  usable: "fair",
+  acceptable: "fair",
+  tatty: "fair",
+  scuffed: "fair",
+
   poor: "needs_repair",
+  bad: "needs_repair",
   needsrepair: "needs_repair",
+  needswork: "needs_repair",
+  needsattention: "needs_repair",
   repair: "needs_repair",
   broken: "needs_repair",
   damaged: "needs_repair",
+  torn: "needs_repair",
+  cracked: "needs_repair",
+  unusable: "needs_repair",
+  unsafe: "needs_repair",
 };
 
 export type ParsedRow = {
@@ -221,6 +339,8 @@ export type ParsedRow = {
   /** As written in the file; resolved to a real location on the server. */
   locationName: string | null;
   tags: string[];
+  /** An http(s) link to a picture, fetched and stored during the import. */
+  photoUrl: string | null;
   /** Blocking problems. A row with any of these is not imported. */
   errors: string[];
   /** Non-blocking: the row imports, but something was assumed. */
@@ -305,6 +425,18 @@ export function validateRow(
   const locationName = valueOf("location") || null;
   const tags = parseTags(valueOf("tags"));
 
+  // A bad link shouldn't cost you the row — the item imports, just without
+  // its picture, and the warning says which line to go and fix.
+  const photoRaw = valueOf("photo");
+  let photoUrl: string | null = null;
+  if (photoRaw) {
+    if (/^https?:\/\/\S+$/i.test(photoRaw)) {
+      photoUrl = photoRaw;
+    } else {
+      warnings.push(`“${photoRaw}” isn’t a web link, so no photo was fetched`);
+    }
+  }
+
   return {
     line,
     name,
@@ -314,6 +446,7 @@ export function validateRow(
     condition,
     locationName,
     tags,
+    photoUrl,
     errors,
     warnings,
   };
@@ -356,8 +489,8 @@ export function parseItemsCsv(
 
 /** The template offered on the import page, so a first-timer has a shape to copy. */
 export const CSV_TEMPLATE = [
-  "name,category,quantity,condition,location,description,tags",
-  'Yorick\'s skull,prop,1,fair,Shelf B,"Cast resin, aged finish",graveyard;hamlet',
-  "Brass candlestick,prop,6,good,Shelf C,Single taper 11in,brass;lighting",
-  'Crimson velvet cloak,costume,2,needs repair,Rack 3,"Floor length, gold frogging",velvet;red',
+  "name,category,quantity,condition,location,description,tags,photo",
+  'Yorick\'s skull,prop,1,fair,Shelf B,"Cast resin, aged finish",graveyard;hamlet,https://example.com/skull.jpg',
+  "Brass candlestick,prop,6,excellent,Shelf C,Single taper 11in,brass;lighting,",
+  'Crimson velvet cloak,costume,2,needs repair,Rack 3,"Floor length, gold frogging",velvet;red,https://example.com/cloak.jpg',
 ].join("\n");

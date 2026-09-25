@@ -121,6 +121,8 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const skippedCount = Number.parseInt(first(params.skipped) ?? "", 10);
   const locationsCreated = Number.parseInt(first(params.locations) ?? "", 10);
   const unmatchedLocations = Number.parseInt(first(params.unmatched) ?? "", 10);
+  const photosFetched = Number.parseInt(first(params.photos) ?? "", 10);
+  const photosFailed = Number.parseInt(first(params.photosFailed) ?? "", 10);
 
   if (!supabaseConfigured) {
     return (
@@ -233,6 +235,12 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
                 : null,
               Number.isFinite(skippedCount) && skippedCount > 0
                 ? `Skipped ${skippedCount} row${skippedCount === 1 ? "" : "s"} that couldn’t be read.`
+                : null,
+              Number.isFinite(photosFetched) && photosFetched > 0
+                ? `Fetched ${photosFetched} photo${photosFetched === 1 ? "" : "s"}.`
+                : null,
+              Number.isFinite(photosFailed) && photosFailed > 0
+                ? `${photosFailed} photo link${photosFailed === 1 ? " couldn’t" : "s couldn’t"} be fetched — those items came in without a picture.`
                 : null,
             ]
               .filter(Boolean)

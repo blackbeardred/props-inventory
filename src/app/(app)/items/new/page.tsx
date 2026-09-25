@@ -12,6 +12,8 @@ import { PhotoField } from "@/components/photo-field";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@/lib/inventory";
+import { buildLocationChoices, type LocationNode } from "@/lib/locations";
+import { LocationField } from "@/components/location-field";
 import { createItem } from "./actions";
 
 export const metadata: Metadata = {
@@ -38,8 +40,11 @@ export default async function NewItemPage({
   const supabase = await createClient();
   const { data: locations } = await supabase
     .from("locations")
-    .select("id, name")
+    .select("id, name, parent_location_id")
     .order("name");
+  const locationChoices = buildLocationChoices(
+    (locations ?? []) as unknown as LocationNode[]
+  );
 
   return (
     <>
@@ -93,18 +98,7 @@ export default async function NewItemPage({
             ))}
           </SelectField>
 
-          <SelectField
-            label="Shelf / location"
-            name="locationId"
-            defaultValue=""
-          >
-            <option value="">Unassigned</option>
-            {(locations ?? []).map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.name}
-              </option>
-            ))}
-          </SelectField>
+          <LocationField choices={locationChoices} />
         </div>
 
         <SubmitButton pendingText="Adding item…">Add item</SubmitButton>

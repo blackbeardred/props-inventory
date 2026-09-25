@@ -53,7 +53,7 @@ const messy = parseItemsCsv([
   "name,quantity,category,condition",
   ",3,prop,good",                    // no name -> error
   "Chair,zero,prop,good",            // bad quantity -> error
-  "Table,2,furniture,mint",          // unknown category + condition -> warnings only
+  "Table,2,furniture,gubbins",          // unknown category + condition -> warnings only
   "",                                 // blank line -> skipped entirely
   "Lamp,,,",                          // defaults
 ].join("\n"));
@@ -92,6 +92,40 @@ eq("Storage Location", guessMapping(["Storage Location"]), ["location"]);
 eq("Quantity on hand", guessMapping(["Quantity on hand"]), ["quantity"]);
 eq("Item Name / Costume or Prop", guessMapping(["Item Name","Costume or Prop"]), ["name","category"]);
 eq("still ignores nonsense", guessMapping(["Insurance value","Acquired"]), [null,null]);
+
+console.log("");
+console.log("── Reported bugs (100-prop import)");
+// An "Item #" column was stealing the name field from the real Name column.
+eq("Item # doesn't steal the name", guessMapping(["Item #","Name","Qty"]), [null,"name","quantity"]);
+eq("Inventory No. ignored", guessMapping(["Inventory No.","Name"]), [null,"name"]);
+eq("Item ID ignored", guessMapping(["Item ID","Item Name"]), [null,"name"]);
+eq("plain 'Item' is still a name", guessMapping(["Item","Qty"]), ["name","quantity"]);
+eq("exact beats contained", guessMapping(["Item Description","Name"]), ["description","name"]);
+
+const cond = parseItemsCsv([
+  "name,condition",
+  "A,excellent",
+  "B,Like New",
+  "C,very good",
+  "D,well used",
+  "E,needs work",
+  "F,mint",
+  "G,gubbins",
+].join("\n"));
+eq("condition words understood", cond.rows.map(r => r.condition),
+   ["new","new","good","fair","needs_repair","new",null]);
+eq("only the unknown one warns", cond.rows.filter(r => r.warnings.length > 0).map(r => r.name), ["G"]);
+
+const photos = parseItemsCsv([
+  "name,image url",
+  "A,https://example.com/a.jpg",
+  "B,not-a-link",
+  "C,",
+].join("\n"));
+eq("photo column recognised", photos.mapping, ["name","photo"]);
+eq("good link kept", photos.rows[0].photoUrl, "https://example.com/a.jpg");
+eq("bad link warns, doesn't fail the row", [photos.rows[1].photoUrl, photos.rows[1].errors.length, photos.rows[1].warnings.length], [null, 0, 1]);
+eq("no link is fine", [photos.rows[2].photoUrl, photos.rows[2].warnings.length], [null, 0]);
 
 console.log("");
 console.log(`════ ${pass} passed, ${fail} failed ════`);

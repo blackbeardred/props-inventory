@@ -9,6 +9,8 @@ import {
 } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { PhotoField } from "@/components/photo-field";
+import { LocationField } from "@/components/location-field";
+import { buildLocationChoices, type LocationNode } from "@/lib/locations";
 import { DeleteButton } from "@/components/delete-button";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
@@ -55,7 +57,7 @@ export default async function EditItemPage({
       )
       .eq("id", id)
       .maybeSingle(),
-    supabase.from("locations").select("id, name").order("name"),
+    supabase.from("locations").select("id, name, parent_location_id").order("name"),
   ]);
 
   if (!item) {
@@ -163,18 +165,12 @@ export default async function EditItemPage({
             ))}
           </SelectField>
 
-          <SelectField
-            label="Shelf / location"
-            name="locationId"
+          <LocationField
+            choices={buildLocationChoices(
+              (locations ?? []) as unknown as LocationNode[]
+            )}
             defaultValue={typedItem.location_id ?? ""}
-          >
-            <option value="">Unassigned</option>
-            {(locations ?? []).map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.name}
-              </option>
-            ))}
-          </SelectField>
+          />
         </div>
 
         <SubmitButton pendingText="Saving…">Save changes</SubmitButton>

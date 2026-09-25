@@ -21,6 +21,45 @@ function fail(message: string): never {
   redirect(`/items/new?error=${encodeURIComponent(message)}`);
 }
 
+
+/**
+ * Resolves which location an item should be filed under, creating one first
+ * when the form asked for a new one. Runs after the item's own fields have
+ * been validated, so a rejected save doesn't leave a stray shelf behind.
+ */
+async function resolveLocationId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string,
+  formData: FormData,
+  selectedId: string
+): Promise<string | null> {
+  const newName = String(formData.get("newLocationName") ?? "").trim();
+
+  if (!newName) {
+    // "__new__" without a name means the picker was opened and abandoned.
+    return selectedId && selectedId !== "__new__" ? selectedId : null;
+  }
+
+  const parentId = String(formData.get("newLocationParentId") ?? "").trim();
+  const { data: created, error } = await supabase
+    .from("locations")
+    .insert({
+      org_id: orgId,
+      name: newName,
+      parent_location_id: parentId || null,
+    })
+    .select("id")
+    .single();
+
+  if (error || !created) {
+    throw new Error(
+      `Couldn\u2019t create the location \u201c${newName}\u201d: ${error?.message ?? "unknown error"}`
+    );
+  }
+
+  return created.id as string;
+}
+
 export async function createItem(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const categoryRaw = String(formData.get("category") ?? "prop");
@@ -76,6 +115,22 @@ export async function createItem(formData: FormData) {
     redirect("/onboarding");
   }
 
+  let resolvedLocationId: string | null;
+  try {
+    resolvedLocationId = await resolveLocationId(
+      supabase,
+      profile.active_org_id,
+      formData,
+      locationId
+    );
+  } catch (locationError) {
+    fail(
+      locationError instanceof Error
+        ? locationError.message
+        : "Couldn\u2019t create that location."
+    );
+  }
+
   const itemId = randomUUID();
   let photoPath: string | null = null;
   let autoTags: string[] = [];
@@ -115,7 +170,7 @@ export async function createItem(formData: FormData) {
     description: description || null,
     quantity,
     condition,
-    location_id: locationId || null,
+    location_id: resolvedLocationId,
     photo_url: photoPath,
     auto_tags: autoTags,
   });
