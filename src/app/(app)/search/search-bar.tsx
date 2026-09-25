@@ -331,7 +331,7 @@ export function SearchBar({
             onKeyDown={handleKeyDown}
             placeholder={
               chips.length === 0
-                ? "Search for anything — wood, table, red…"
+                ? "Search for anything — wood, shed, shakespeare…"
                 : "Add another word to narrow it…"
             }
             autoFocus
@@ -393,9 +393,11 @@ export function SearchBar({
           <EmptyState title="Search your inventory">
             Type a word and press enter to pin it as a filter, then add
             another to narrow further — “wood” then “table” finds the wooden
-            table. Items are matched on what they are and what they’re made
-            of, not just their name, so “wood” finds a guitar too. Pick a
-            location from the list to limit it to one shelf. Your search
+            table. Items match on what they are and what they’re made of, not
+            just their name, so “wood” finds a guitar too. Where something is
+            kept counts as well: “shed” finds everything in the shed and every
+            box inside it, and “shed” plus “shakespeare” finds the Shakespeare
+            box in the shed rather than the one in the garage. Your search
             stays in the address bar, so you
             can bookmark or share it.
           </EmptyState>

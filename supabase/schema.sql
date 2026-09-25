@@ -465,16 +465,56 @@ using (
 -- the query inside it, so results stay scoped to the caller's org exactly
 -- like a normal select.
 -- ─────────────────────────────────────────────────────────────
+create or replace function location_search_paths()
+returns table (location_id uuid, path text)
+language sql
+stable
+as $$
+  with recursive chain as (
+    select id as leaf_id, id as node_id, name, parent_location_id
+    from locations
+    union all
+    select c.leaf_id, parent.id, parent.name, parent.parent_location_id
+    from chain c
+    join locations parent on parent.id = c.parent_location_id
+  )
+  select leaf_id, string_agg(name, ' ')
+  from chain
+  group by leaf_id
+$$;
+
+create or replace function location_descendants(p_ids uuid[])
+returns setof uuid
+language sql
+stable
+as $$
+  with recursive tree as (
+    select id from locations where id = any(p_ids)
+    union
+    select child.id
+    from locations child
+    join tree on child.parent_location_id = tree.id
+  )
+  select id from tree
+$$;
+
 create or replace function search_items(search_query text)
 returns setof items
 language sql
 stable
 as $$
-  select *
-  from items
-  where to_tsvector('english', items_search_document(name, description, auto_tags))
-        @@ websearch_to_tsquery('english', search_query)
-  order by name
+  with paths as (
+    select * from location_search_paths()
+  )
+  select i.*
+  from items i
+  left join paths p on p.location_id = i.location_id
+  where to_tsvector(
+          'english',
+          items_search_document(i.name, i.description, i.auto_tags)
+            || ' ' || coalesce(p.path, '')
+        ) @@ websearch_to_tsquery('english', search_query)
+  order by i.name
 $$;
 
 
@@ -640,12 +680,33 @@ begin
     end if;
   end if;
 
+  -- The location path is joined in rather than stored on the item, which
+  -- means this can't use the items_search_idx expression index and scans
+  -- instead. At a theatre's scale (thousands of items at the very most)
+  -- that is a few milliseconds; the alternative is denormalising the path
+  -- onto every item and keeping it correct through triggers whenever a
+  -- location is renamed or moved, which is a lot of machinery to maintain
+  -- for a table this size.
   return query
-  select *
-  from items
+  with paths as (
+    select * from location_search_paths()
+  )
+  select i.*
+  from items i
+  left join paths p on p.location_id = i.location_id
   where
-    (prefix_query is null or to_tsvector('english', items_search_document(name, description, auto_tags)) @@ prefix_query)
-    and (location_ids is null or location_id = any(location_ids))
-  order by name;
+    (
+      prefix_query is null
+      or to_tsvector(
+           'english',
+           items_search_document(i.name, i.description, i.auto_tags)
+             || ' ' || coalesce(p.path, '')
+         ) @@ prefix_query
+    )
+    and (
+      location_ids is null
+      or i.location_id in (select location_descendants(location_ids))
+    )
+  order by i.name;
 end;
 $$;
