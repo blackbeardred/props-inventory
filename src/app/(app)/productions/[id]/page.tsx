@@ -66,6 +66,7 @@ export default async function ProductionDetailPage({
 
   const { id } = await params;
   const error = first((await searchParams).error);
+  const marked = Number(first((await searchParams).marked) ?? "");
 
   const supabase = await createClient();
 
@@ -138,18 +139,35 @@ export default async function ProductionDetailPage({
           </span>
         }
         action={
-          <Link
-            href={`/productions/${typedProduction.id}/edit`}
-            className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
-          >
-            Edit production
-          </Link>
+          <span className="flex flex-wrap gap-2">
+            <Link
+              href={`/productions/${typedProduction.id}/photo`}
+              className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
+            >
+              Mark from a photo
+            </Link>
+            <Link
+              href={`/productions/${typedProduction.id}/edit`}
+              className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+            >
+              Edit production
+            </Link>
+          </span>
         }
       />
 
       {error ? (
         <div className="mb-6">
           <Notice title="That didn’t go through">{error}</Notice>
+        </div>
+      ) : null}
+
+      {Number.isFinite(marked) && marked > 0 ? (
+        <div className="mb-6">
+          <Notice title="Marked from your photo">
+            {marked} item{marked === 1 ? "" : "s"} added to this production’s
+            pull list.
+          </Notice>
         </div>
       ) : null}
 
