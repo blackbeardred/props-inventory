@@ -19,6 +19,11 @@ export type LocationRowData = {
   depth: number;
   parentName: string | null;
   created_at: string;
+  /** Ids of every location above this one, outermost first. */
+  ancestorIds: string[];
+  childCount: number;
+  /** Items in the boxes inside this one, however deep. */
+  descendantItemCount: number;
 };
 
 /**
@@ -35,10 +40,15 @@ export function LocationRow({
   row,
   items,
   columnCount,
+  expanded,
+  onToggleChildren,
 }: {
   row: LocationRowData;
   items: LocationItem[];
   columnCount: number;
+  /** Whether this location's contents are showing. Undefined = no children. */
+  expanded?: boolean;
+  onToggleChildren?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
@@ -50,9 +60,28 @@ export function LocationRow({
     <>
       <tr className="border-b border-rule align-top">
         <td className="px-3 py-3">
-          <div style={{ paddingLeft: `${row.depth * 1.25}rem` }}>
+          <div
+            className="flex items-start gap-1.5"
+            style={{ paddingLeft: `${row.depth * 1.25}rem` }}
+          >
+            {row.childCount > 0 ? (
+              <button
+                type="button"
+                onClick={onToggleChildren}
+                aria-expanded={expanded ?? false}
+                aria-label={`${expanded ? "Hide" : "Show"} what's inside ${row.name}`}
+                className="mt-0.5 shrink-0 rounded text-muted transition-colors hover:text-foreground"
+              >
+                <span aria-hidden="true" className="inline-block w-3 text-xs">
+                  {expanded ? "▾" : "▸"}
+                </span>
+              </button>
+            ) : (
+              // Keeps leaf names aligned with the ones that have a control.
+              <span aria-hidden="true" className="mt-0.5 w-3 shrink-0" />
+            )}
+            <div>
             <span className="font-body text-sm text-foreground">
-              {row.depth > 0 ? <span className="text-muted">└ </span> : null}
               {row.name}
             </span>
             {row.description ? (
@@ -60,6 +89,12 @@ export function LocationRow({
                 {row.description}
               </p>
             ) : null}
+            {row.childCount > 0 && !expanded ? (
+              <p className="mt-0.5 font-body text-xs text-muted">
+                {row.childCount} {row.childCount === 1 ? "container" : "containers"} inside
+              </p>
+            ) : null}
+            </div>
           </div>
         </td>
         <td className="px-3 py-3 font-body text-sm text-muted">
@@ -72,6 +107,12 @@ export function LocationRow({
           >
             {items.length}
           </Link>
+          {row.descendantItemCount > 0 ? (
+            // Otherwise a room reads as empty while holding six full boxes.
+            <span className="block font-body text-xs text-muted">
+              +{row.descendantItemCount} inside
+            </span>
+          ) : null}
         </td>
         <td className="px-3 py-3 font-body text-sm text-muted">
           {formatDate(row.created_at)}

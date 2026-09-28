@@ -9,10 +9,8 @@ import {
   PageHeading,
 } from "@/components/ui";
 import { pluralize, type LocationRow } from "@/lib/inventory";
-import {
-  LocationRow as LocationRowView,
-  type LocationItem,
-} from "@/components/location-row";
+import type { LocationItem } from "@/components/location-row";
+import { LocationTree } from "@/components/location-tree";
 
 export const metadata: Metadata = {
   title: "Locations · Props & Costume Inventory",
@@ -22,6 +20,9 @@ type LocationListRow = LocationRow & {
   depth: number;
   parentName: string | null;
   itemCount: number;
+  ancestorIds: string[];
+  childCount: number;
+  descendantItemCount: number;
 };
 
 /**
@@ -50,6 +51,29 @@ function toListRows(
     return path;
   };
 
+  const childCounts = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.parent_location_id) continue;
+    childCounts.set(
+      row.parent_location_id,
+      (childCounts.get(row.parent_location_id) ?? 0) + 1
+    );
+  }
+
+  // Items held anywhere below a location, so a closed room can say what's in
+  // it rather than reading as empty.
+  const descendantItemCounts = new Map<string, number>();
+  for (const row of rows) {
+    const own = itemCounts.get(row.id) ?? 0;
+    if (own === 0) continue;
+    for (const ancestor of ancestry(row).slice(0, -1)) {
+      descendantItemCounts.set(
+        ancestor.id,
+        (descendantItemCounts.get(ancestor.id) ?? 0) + own
+      );
+    }
+  }
+
   return rows
     .map((row) => {
       const path = ancestry(row);
@@ -62,6 +86,9 @@ function toListRows(
           depth: path.length - 1,
           parentName: parent?.name ?? null,
           itemCount: itemCounts.get(row.id) ?? 0,
+          ancestorIds: path.slice(0, -1).map((entry) => entry.id),
+          childCount: childCounts.get(row.id) ?? 0,
+          descendantItemCount: descendantItemCounts.get(row.id) ?? 0,
         } satisfies LocationListRow,
         sortKey: path.map((p) => p.name.toLocaleLowerCase()).join(" / "),
       };
@@ -159,14 +186,11 @@ export default async function LocationsPage() {
         </EmptyState>
       ) : (
         <DataTable columns={["Location", "Within", "Items", "Added", ""]}>
-          {rows.map((row) => (
-            <LocationRowView
-              key={row.id}
-              row={row}
-              items={itemsByLocation.get(row.id) ?? []}
-              columnCount={5}
-            />
-          ))}
+          <LocationTree
+            rows={rows}
+            itemsByLocation={Object.fromEntries(itemsByLocation)}
+            columnCount={5}
+          />
         </DataTable>
       )}
     </>
