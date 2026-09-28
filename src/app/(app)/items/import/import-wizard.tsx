@@ -8,10 +8,15 @@ import {
   IMPORT_FIELDS,
   IMPORT_FIELD_LABELS,
   MAX_IMPORT_ROWS,
-  parseItemsCsv,
+  parseItemsTable,
   type ImportField,
   type ParsedFile,
 } from "@/lib/csv";
+import {
+  readSpreadsheetFile,
+  SpreadsheetError,
+  unreadableSpreadsheetReason,
+} from "@/lib/xlsx";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@/lib/inventory";
 import { attachPhotos, importItems } from "./actions";
 
@@ -28,16 +33,18 @@ export function ImportWizard({
   const [phase, setPhase] = useState<"idle" | "importing" | "photos">("idle");
   const [photoProgress, setPhotoProgress] = useState({ done: 0, total: 0, failed: 0 });
   const [importError, setImportError] = useState<string | null>(null);
-  const [text, setText] = useState<string | null>(null);
+  const [table, setTable] = useState<string[][] | null>(null);
+  const [reading, setReading] = useState(false);
   const [mapping, setMapping] = useState<(ImportField | null)[] | null>(null);
   const [readError, setReadError] = useState<string | null>(null);
 
-  // Re-parsing on every mapping change keeps one source of truth: the file
-  // text. The same function runs again on the server after submitting.
+  // Re-parsing on every mapping change keeps one source of truth: the rows read
+  // out of the file. A CSV and a workbook both land here as the same table, so
+  // everything past this point is format-blind.
   const parsed: ParsedFile | null = useMemo(() => {
-    if (text === null) return null;
-    return parseItemsCsv(text, mapping ?? undefined);
-  }, [text, mapping]);
+    if (table === null) return null;
+    return parseItemsTable(table, mapping ?? undefined);
+  }, [table, mapping]);
 
   const knownLocations = useMemo(
     () => new Set(locationNames.map((name) => name.trim().toLowerCase())),
@@ -62,12 +69,28 @@ export function ImportWizard({
     setReadError(null);
     setMapping(null);
     setFileName(file.name);
+
+    // Spreadsheet formats this can't read are worth naming, since the fix is
+    // one Save As away and the alternative is a puzzling parse failure.
+    const refusal = unreadableSpreadsheetReason(file.name);
+    if (refusal) {
+      setReadError(refusal);
+      setTable(null);
+      return;
+    }
+
+    setReading(true);
     try {
-      const content = await file.text();
-      setText(content);
-    } catch {
-      setReadError("Couldn’t read that file. Is it a plain .csv?");
-      setText(null);
+      setTable(await readSpreadsheetFile(file));
+    } catch (error) {
+      setReadError(
+        error instanceof SpreadsheetError
+          ? error.message
+          : "Couldn’t read that file. Excel workbooks (.xlsx) and .csv both work."
+      );
+      setTable(null);
+    } finally {
+      setReading(false);
     }
   }
 
@@ -136,10 +159,11 @@ export function ImportWizard({
     <div className="space-y-8">
       <section>
         <label className="block font-body text-sm font-medium text-foreground">
-          Your spreadsheet, saved as CSV
+          Your spreadsheet
         </label>
         <p className="mt-1 font-body text-sm text-muted">
-          In Excel or Google Sheets, use File → Save as / Download → CSV. Up to{" "}
+          An Excel workbook (.xlsx) or a .csv — either way, the first sheet’s top
+          row should be your column headings. Up to{" "}
           {MAX_IMPORT_ROWS.toLocaleString()} rows at a time.{" "}
           <a href={templateHref} download="items-template.csv" className="text-accent hover:underline">
             Download a template
@@ -148,10 +172,13 @@ export function ImportWizard({
         </p>
         <input
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={(event) => onFile(event.target.files?.[0])}
           className="mt-3 block w-full font-body text-sm text-muted file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1.5 file:font-body file:text-sm file:text-foreground"
         />
+        {reading ? (
+          <p className="mt-2 font-body text-sm text-muted">Reading {fileName}…</p>
+        ) : null}
         {readError ? (
           <p className="mt-2 font-body text-sm text-danger-ink">{readError}</p>
         ) : null}

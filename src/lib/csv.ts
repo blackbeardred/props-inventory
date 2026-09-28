@@ -465,20 +465,64 @@ export function parseItemsCsv(
   text: string,
   mappingOverride?: (ImportField | null)[]
 ): ParsedFile {
-  const table = parseCsv(text);
+  return parseItemsTable(parseCsv(text), mappingOverride);
+}
 
-  if (table.length === 0) {
+const HEADER_SEARCH_DEPTH = 10;
+
+/**
+ * Finds the row holding the column headings. Usually that's the first row, but
+ * real spreadsheets open with a title ("Hamlet props — master list"), a blank
+ * line, or both, and treating a title as the headers makes every row below it
+ * fail for no name. So: of the first few non-empty rows, take whichever looks
+ * most like headings, and only prefer a later row when it recognises strictly
+ * more fields than the ones above it.
+ */
+function findHeaderRow(table: string[][]): number {
+  let best = -1;
+  let bestScore = -1;
+  let seen = 0;
+
+  for (let line = 0; line < table.length && seen < HEADER_SEARCH_DEPTH; line += 1) {
+    const cells = table[line] ?? [];
+    if (!cells.some((cell) => cell.trim() !== "")) continue;
+    seen += 1;
+
+    const score = guessMapping(cells.map((cell) => cell.trim())).filter(
+      (field) => field !== null
+    ).length;
+    if (score > bestScore) {
+      best = line;
+      bestScore = score;
+    }
+  }
+
+  return best;
+}
+
+/**
+ * The half of parsing that doesn't care where the table came from. CSV text and
+ * an .xlsx worksheet both reduce to rows of strings, and from there the header
+ * guessing, mapping and row validation are identical — which is the point: a
+ * workbook and a CSV export of that same workbook import the same way.
+ */
+export function parseItemsTable(
+  table: string[][],
+  mappingOverride?: (ImportField | null)[]
+): ParsedFile {
+  const headerLine = findHeaderRow(table);
+  if (headerLine === -1) {
     return { headers: [], mapping: [], rows: [] };
   }
 
-  const headers = table[0].map((h) => h.trim());
+  const headers = table[headerLine].map((h) => h.trim());
   const mapping = mappingOverride ?? guessMapping(headers);
 
   const rows = table
-    .slice(1, MAX_IMPORT_ROWS + 1)
+    .slice(headerLine + 1, headerLine + 1 + MAX_IMPORT_ROWS)
     // Pair each row with its line in the file *before* discarding blanks,
     // so "line 14" means line 14 of their spreadsheet.
-    .map((cells, index) => ({ cells, line: index + 2 }))
+    .map((cells, index) => ({ cells: cells ?? [], line: headerLine + index + 2 }))
     // Rows that are entirely empty aren't errors — a spreadsheet export
     // trailing a dozen blank lines shouldn't produce a dozen complaints.
     .filter(({ cells }) => cells.some((cell) => cell.trim() !== ""))
