@@ -79,6 +79,14 @@ create table items (
   -- search results; they only affect what a search matches. Fully replaced
   -- each time the item is retagged. See src/lib/ai/tag-item.ts.
   auto_tags text[] not null default '{}',
+  -- Columns from the spreadsheet an item was imported from that no field
+  -- matched — an inventory number, a donor, what it cost — keyed by the
+  -- heading they came from. Searchable and shown on the item's own page,
+  -- never in lists. Empty for items typed in by hand. Kept apart from
+  -- auto_tags on purpose: those are replaced wholesale on every retag, and
+  -- anything stored with them would vanish the first time someone edited a
+  -- description.
+  import_data jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -94,21 +102,37 @@ create index items_location_id_idx on items(location_id);
 create or replace function items_search_document(
   p_name text,
   p_description text,
-  p_auto_tags text[]
+  p_auto_tags text[],
+  p_import_data jsonb
 )
 returns text
 language sql
 immutable
 as $$
-  select coalesce(p_name, '') || ' ' || coalesce(p_description, '') || ' '
-    || coalesce(array_to_string(p_auto_tags, ' '), '')
+  -- The document is indexed twice: once as written, and once with
+  -- punctuation squeezed out of the middle of words. Search-as-you-type
+  -- strips punctuation from what the user types ("P-001" becomes the term
+  -- p001), and Postgres reads "P-001" as the two words p and 001, so without
+  -- the second copy an inventory number could never be typed back in.
+  select base || ' ' || regexp_replace(base, '[^[:alnum:][:space:]]+', '', 'g')
+  from (
+    select coalesce(p_name, '') || ' ' || coalesce(p_description, '') || ' '
+      || coalesce(array_to_string(p_auto_tags, ' '), '') || ' '
+      || coalesce(
+           (select string_agg(entry.value, ' ')
+            from jsonb_each_text(coalesce(p_import_data, '{}'::jsonb)) as entry),
+           ''
+         ) as base
+  ) as document
 $$;
 
--- Full-text search over name + description + the generated tags. The tags
--- are never shown in the UI; they exist so that a search for a material or
--- a category matches things whose name never mentions it.
+-- Full-text search over name + description + the generated tags + whatever
+-- an import kept from columns this app has no field for. None of those are
+-- shown in lists; they exist so that a search for a material, a category, an
+-- inventory number or a donor's name matches things whose name never
+-- mentions it.
 create index items_search_idx on items using gin (
-  to_tsvector('english', items_search_document(name, description, auto_tags))
+  to_tsvector('english', items_search_document(name, description, auto_tags, import_data))
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -511,7 +535,7 @@ as $$
   left join paths p on p.location_id = i.location_id
   where to_tsvector(
           'english',
-          items_search_document(i.name, i.description, i.auto_tags)
+          items_search_document(i.name, i.description, i.auto_tags, i.import_data)
             || ' ' || coalesce(p.path, '')
         ) @@ websearch_to_tsquery('english', search_query)
   order by i.name
@@ -699,7 +723,7 @@ begin
       prefix_query is null
       or to_tsvector(
            'english',
-           items_search_document(i.name, i.description, i.auto_tags)
+           items_search_document(i.name, i.description, i.auto_tags, i.import_data)
              || ' ' || coalesce(p.path, '')
          ) @@ prefix_query
     )

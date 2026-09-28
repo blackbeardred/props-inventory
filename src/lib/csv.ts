@@ -341,6 +341,12 @@ export type ParsedRow = {
   tags: string[];
   /** An http(s) link to a picture, fetched and stored during the import. */
   photoUrl: string | null;
+  /**
+   * The columns no field matched, keyed by their heading — an inventory
+   * number, a donor, what it cost. Kept on the item and searchable, so an
+   * old spreadsheet doesn't lose the details that made it worth keeping.
+   */
+  extra: Record<string, string>;
   /** Blocking problems. A row with any of these is not imported. */
   errors: string[];
   /** Non-blocking: the row imports, but something was assumed. */
@@ -349,6 +355,47 @@ export type ParsedRow = {
 
 const MAX_TAGS = 20;
 const MAX_TAG_LENGTH = 40;
+
+/** Generous enough for a real inventory sheet, bounded enough to be safe. */
+export const MAX_EXTRA_COLUMNS = 30;
+const MAX_EXTRA_HEADING = 60;
+const MAX_EXTRA_VALUE = 500;
+
+/**
+ * Collects the columns the mapping ignored. Blank cells are skipped — a
+ * column that's empty for this row says nothing about this item — and so are
+ * columns with no heading, since there'd be no way to label what was kept.
+ */
+function collectExtra(
+  cells: string[],
+  mapping: (ImportField | null)[],
+  headers: string[]
+): Record<string, string> {
+  const extra: Record<string, string> = {};
+  let kept = 0;
+
+  for (let index = 0; index < headers.length; index += 1) {
+    if (mapping[index]) continue;
+    if (kept >= MAX_EXTRA_COLUMNS) break;
+
+    const heading = (headers[index] ?? "").trim().slice(0, MAX_EXTRA_HEADING);
+    const value = (cells[index] ?? "").trim().slice(0, MAX_EXTRA_VALUE);
+    if (!heading || !value || heading in extra) continue;
+
+    extra[heading] = value;
+    kept += 1;
+  }
+
+  return extra;
+}
+
+/** The headings whose columns would be kept rather than dropped. */
+export function extraColumns(
+  headers: string[],
+  mapping: (ImportField | null)[]
+): string[] {
+  return headers.filter((heading, index) => !mapping[index] && heading.trim() !== "");
+}
 
 function parseTags(raw: string): string[] {
   const seen = new Set<string>();
@@ -370,7 +417,8 @@ function parseTags(raw: string): string[] {
 export function validateRow(
   cells: string[],
   mapping: (ImportField | null)[],
-  line: number
+  line: number,
+  headers: string[] = []
 ): ParsedRow {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -447,6 +495,7 @@ export function validateRow(
     locationName,
     tags,
     photoUrl,
+    extra: collectExtra(cells, mapping, headers),
     errors,
     warnings,
   };
@@ -526,7 +575,7 @@ export function parseItemsTable(
     // Rows that are entirely empty aren't errors — a spreadsheet export
     // trailing a dozen blank lines shouldn't produce a dozen complaints.
     .filter(({ cells }) => cells.some((cell) => cell.trim() !== ""))
-    .map(({ cells, line }) => validateRow(cells, mapping, line));
+    .map(({ cells, line }) => validateRow(cells, mapping, line, headers));
 
   return { headers, mapping, rows };
 }

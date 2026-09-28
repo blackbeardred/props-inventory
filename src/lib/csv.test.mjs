@@ -7,7 +7,7 @@
 // line numbers, multi-word headers like "Storage Location" never matching,
 // and a "Prop" alias hijacking the name column.
 
-import { parseCsv, guessMapping, parseItemsCsv, validateRow } from "./csv.ts";
+import { parseCsv, guessMapping, parseItemsCsv, validateRow, extraColumns } from "./csv.ts";
 
 let pass = 0, fail = 0;
 const eq = (label, actual, expected) => {
@@ -126,6 +126,53 @@ eq("photo column recognised", photos.mapping, ["name","photo"]);
 eq("good link kept", photos.rows[0].photoUrl, "https://example.com/a.jpg");
 eq("bad link warns, doesn't fail the row", [photos.rows[1].photoUrl, photos.rows[1].errors.length, photos.rows[1].warnings.length], [null, 0, 1]);
 eq("no link is fine", [photos.rows[2].photoUrl, photos.rows[2].warnings.length], [null, 0]);
+
+console.log("");
+console.log("── Columns no field matched");
+// Nothing in a spreadsheet gets dropped: whatever the mapping doesn't use is
+// kept on the item, keyed by its heading, and folded into what search matches.
+const leftovers = parseItemsCsv([
+  "Item #,Name,Qty,Donor,Acquired,Value,Notes",
+  "P-001,Yorick's skull,1,Jane Pemberton,2026-01-05,£40,Fragile — handle by the jaw",
+  "P-002,Brass candlestick,6,,,,",
+].join("\n"));
+
+// "Notes" is a description in disguise and gets mapped; the rest have no field.
+eq("only the real fields are mapped", leftovers.mapping, [null,"name","quantity",null,null,null,"description"]);
+eq("the rest are kept, keyed by heading", leftovers.rows[0].extra, {
+  "Item #": "P-001",
+  Donor: "Jane Pemberton",
+  Acquired: "2026-01-05",
+  Value: "£40",
+});
+eq("blank cells aren't kept as empty strings", leftovers.rows[1].extra, { "Item #": "P-002" });
+eq("mapped columns never leak into it", Object.keys(leftovers.rows[0].extra).includes("Name"), false);
+eq("the headings are listable for the preview", extraColumns(leftovers.headers, leftovers.mapping),
+   ["Item #","Donor","Acquired","Value"]);
+
+// A column with no heading can't be labelled, so it isn't kept.
+const headless = parseItemsCsv(["name,,qty", "Chair,orphan,2"].join("\n"));
+eq("an unheaded column is dropped", headless.rows[0].extra, {});
+
+// Overriding the mapping by hand has to move a column in and out of the kept set.
+const overridden = parseItemsCsv(
+  ["Item #,Name,Notes", "P-003,Lantern,tin"].join("\n"),
+  [null, "name", "description"]
+);
+eq("a column given a field stops being extra", overridden.rows[0].extra, { "Item #": "P-003" });
+eq("and its value lands in that field instead", overridden.rows[0].description, "tin");
+
+// Long values and runaway column counts are bounded before they reach jsonb.
+const wide = parseItemsCsv([
+  ["name", ...Array.from({ length: 40 }, (_, i) => `col${i}`)].join(","),
+  ["Wide", ...Array.from({ length: 40 }, () => "x")].join(","),
+].join("\n"));
+eq("at most 30 leftover columns are kept", Object.keys(wide.rows[0].extra).length, 30);
+
+const long = parseItemsCsv(["name,Provenance", `Long,${"y".repeat(900)}`].join("\n"));
+eq("a very long value is truncated", long.rows[0].extra.Provenance.length, 500);
+
+eq("validateRow without headers keeps nothing", validateRow(["Chair"], ["name"], 2).extra, {});
 
 console.log("");
 console.log(`════ ${pass} passed, ${fail} failed ════`);

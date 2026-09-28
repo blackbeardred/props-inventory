@@ -28,6 +28,11 @@ export type ItemRow = {
   // when it has one. Never rendered in list or search-result views; they
   // only affect what a text search matches.
   auto_tags: string[];
+  // Columns from the spreadsheet this item was imported from that no field
+  // matched — an inventory number, a donor, what it cost — keyed by the
+  // heading they came from. Searchable, and shown on the item's own page;
+  // never in lists. Empty for items typed in by hand.
+  import_data: Record<string, string>;
 };
 
 export type PullListItemStatus = "pending" | "pulled" | "returned";

@@ -5,7 +5,7 @@ import { lookup } from "node:dns/promises";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Category, Condition } from "@/lib/inventory";
-import { MAX_IMPORT_ROWS } from "@/lib/csv";
+import { MAX_EXTRA_COLUMNS, MAX_IMPORT_ROWS } from "@/lib/csv";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 
 const CATEGORIES: Category[] = ["prop", "costume"];
@@ -25,6 +25,7 @@ type IncomingRow = {
   locationName?: unknown;
   tags?: unknown;
   photoUrl?: unknown;
+  extra?: unknown;
 };
 
 type CleanRow = {
@@ -36,6 +37,7 @@ type CleanRow = {
   condition: Condition | null;
   locationName: string | null;
   tags: string[];
+  extra: Record<string, string>;
   photoUrl: string | null;
 };
 
@@ -100,7 +102,31 @@ function clean(raw: IncomingRow): CleanRow | null {
     locationName,
     tags,
     photoUrl,
+    extra: cleanExtra(raw.extra),
   };
+}
+
+/**
+ * The columns the mapping didn't use, on their way to `import_data`. Rebuilt
+ * from scratch rather than trusted: this arrives as JSON from the browser and
+ * goes straight into a jsonb column, so it has to be a flat object of short
+ * strings and nothing else.
+ */
+function cleanExtra(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+
+  const extra: Record<string, string> = {};
+  for (const [heading, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (Object.keys(extra).length >= MAX_EXTRA_COLUMNS) break;
+    if (typeof value !== "string") continue;
+
+    const key = heading.trim().slice(0, 60);
+    const text = value.trim().slice(0, 500);
+    if (!key || !text) continue;
+
+    extra[key] = text;
+  }
+  return extra;
 }
 
 export type ImportOutcome =
@@ -266,6 +292,10 @@ export async function importItems(
         // the search tags, and the item gets properly tagged the first time
         // someone saves it.
         auto_tags: row.tags,
+        // Columns this app has no field for. They don't show up in any list,
+        // but they're part of what a search matches, so an inventory number
+        // or a donor's name still finds the item.
+        import_data: row.extra,
       };
     });
 

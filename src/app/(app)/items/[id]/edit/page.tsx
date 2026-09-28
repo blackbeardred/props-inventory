@@ -12,6 +12,7 @@ import { PhotoField } from "@/components/photo-field";
 import { LocationField } from "@/components/location-field";
 import { buildLocationChoices, type LocationNode } from "@/lib/locations";
 import { DeleteButton } from "@/components/delete-button";
+import { ImportDataPanel } from "@/components/import-data-panel";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import {
@@ -53,7 +54,7 @@ export default async function EditItemPage({
     supabase
       .from("items")
       .select(
-        "id, name, category, description, photo_url, quantity, condition, location_id, created_at, auto_tags"
+        "id, name, category, description, photo_url, quantity, condition, location_id, created_at, auto_tags, import_data"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -204,6 +205,8 @@ export default async function EditItemPage({
           </SubmitButton>
         </form>
       </div>
+
+      <ImportDataPanel data={typedItem.import_data} />
 
       <form action={deleteItem} className="mt-10 border-t border-rule pt-6">
         <input type="hidden" name="itemId" value={typedItem.id} />

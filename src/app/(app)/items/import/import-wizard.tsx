@@ -7,6 +7,7 @@ import {
   CSV_TEMPLATE,
   IMPORT_FIELDS,
   IMPORT_FIELD_LABELS,
+  extraColumns,
   MAX_IMPORT_ROWS,
   parseItemsTable,
   type ImportField,
@@ -21,6 +22,15 @@ import { CATEGORY_LABELS, CONDITION_LABELS } from "@/lib/inventory";
 import { attachPhotos, importItems } from "./actions";
 
 const PREVIEW_LIMIT = 15;
+
+/** "Item #, Donor and Acquired" — an English list, not a comma soup. */
+function listColumns(names: string[]): string {
+  const shown = names.slice(0, 6).map((name) => `“${name}”`);
+  const rest = names.length - shown.length;
+  if (rest > 0) shown.push(`${rest} more`);
+  if (shown.length === 1) return shown[0];
+  return `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}`;
+}
 
 export function ImportWizard({
   locationNames,
@@ -95,6 +105,8 @@ export function ImportWizard({
   }
 
   const photoCount = valid.filter((row) => row.photoUrl).length;
+
+  const kept = parsed ? extraColumns(parsed.headers, parsed.mapping) : [];
 
   /**
    * Creates the items, then fetches any linked photos in small batches. The
@@ -190,9 +202,16 @@ export function ImportWizard({
             <h2 className="font-display text-lg">Which column is which</h2>
             <p className="mt-1 font-body text-sm text-muted">
               Guessed from your headers. Change anything it got wrong — only{" "}
-              <span className="text-foreground">Name</span> is required, and
-              columns set to “Ignore” are left out.
+              <span className="text-foreground">Name</span> is required.
             </p>
+            {kept.length > 0 ? (
+              <p className="mt-2 font-body text-sm text-muted">
+                Nothing is thrown away: {listColumns(kept)}{" "}
+                {kept.length === 1 ? "has" : "have"} no field of their own, so
+                they’re kept on each item and can be searched for — they just
+                don’t appear in the items list.
+              </p>
+            ) : null}
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {parsed.headers.map((header, index) => (
                 <label key={`${header}-${index}`} className="block">
@@ -215,7 +234,7 @@ export function ImportWizard({
                     }}
                     className="mt-1 w-full rounded-md border border-rule bg-background px-3 py-2 font-body text-sm text-foreground"
                   >
-                    <option value="">Ignore this column</option>
+                    <option value="">No field — keep for search</option>
                     {IMPORT_FIELDS.map((field) => (
                       <option key={field} value={field}>
                         {IMPORT_FIELD_LABELS[field]}
