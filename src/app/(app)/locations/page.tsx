@@ -8,7 +8,11 @@ import {
   Notice,
   PageHeading,
 } from "@/components/ui";
-import { formatDate, pluralize, type LocationRow } from "@/lib/inventory";
+import { pluralize, type LocationRow } from "@/lib/inventory";
+import {
+  LocationRow as LocationRowView,
+  type LocationItem,
+} from "@/components/location-row";
 
 export const metadata: Metadata = {
   title: "Locations · Props & Costume Inventory",
@@ -89,20 +93,33 @@ export default async function LocationsPage() {
       .from("locations")
       .select("id, name, description, parent_location_id, created_at")
       .order("name"),
-    supabase.from("items").select("location_id"),
+    // Newest first, so a location opens on what was just put in it.
+    supabase
+      .from("items")
+      .select("id, name, location_id, created_at")
+      .order("created_at", { ascending: false }),
   ]);
 
-  const itemCounts = new Map<string, number>();
+  const itemsByLocation = new Map<string, LocationItem[]>();
   for (const item of (itemLocationsResult.data ?? []) as unknown as {
+    id: string;
+    name: string;
     location_id: string | null;
+    created_at: string;
   }[]) {
-    if (item.location_id) {
-      itemCounts.set(
-        item.location_id,
-        (itemCounts.get(item.location_id) ?? 0) + 1,
-      );
+    if (!item.location_id) continue;
+    const list = itemsByLocation.get(item.location_id);
+    const entry = { id: item.id, name: item.name, created_at: item.created_at };
+    if (list) {
+      list.push(entry);
+    } else {
+      itemsByLocation.set(item.location_id, [entry]);
     }
   }
+
+  const itemCounts = new Map<string, number>(
+    [...itemsByLocation].map(([locationId, items]) => [locationId, items.length])
+  );
 
   const rows = toListRows(
     (locationsResult.data ?? []) as unknown as LocationRow[],
@@ -143,45 +160,12 @@ export default async function LocationsPage() {
       ) : (
         <DataTable columns={["Location", "Within", "Items", "Added", ""]}>
           {rows.map((row) => (
-            <tr key={row.id} className="border-b border-rule align-top">
-              <td className="px-3 py-3">
-                <div style={{ paddingLeft: `${row.depth * 1.25}rem` }}>
-                  <span className="font-body text-sm text-foreground">
-                    {row.depth > 0 ? (
-                      <span className="text-muted">└ </span>
-                    ) : null}
-                    {row.name}
-                  </span>
-                  {row.description ? (
-                    <p className="mt-0.5 line-clamp-1 font-body text-xs text-muted">
-                      {row.description}
-                    </p>
-                  ) : null}
-                </div>
-              </td>
-              <td className="px-3 py-3 font-body text-sm text-muted">
-                {row.parentName ?? "—"}
-              </td>
-              <td className="px-3 py-3 font-body text-sm">
-                <Link
-                  href={`/items?location=${row.id}`}
-                  className="text-muted underline-offset-2 hover:text-foreground hover:underline"
-                >
-                  {row.itemCount}
-                </Link>
-              </td>
-              <td className="px-3 py-3 font-body text-sm text-muted">
-                {formatDate(row.created_at)}
-              </td>
-              <td className="px-3 py-3 font-body text-sm text-right">
-                <Link
-                  href={`/locations/${row.id}/edit`}
-                  className="text-muted underline-offset-2 hover:text-foreground hover:underline"
-                >
-                  Edit
-                </Link>
-              </td>
-            </tr>
+            <LocationRowView
+              key={row.id}
+              row={row}
+              items={itemsByLocation.get(row.id) ?? []}
+              columnCount={5}
+            />
           ))}
         </DataTable>
       )}
