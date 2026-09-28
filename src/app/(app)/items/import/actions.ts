@@ -138,6 +138,14 @@ export type ImportOutcome =
       unmatchedLocations: number;
       /** Rows that named a picture, to be fetched in batches afterwards. */
       photoJobs: PhotoJob[];
+      /**
+       * Which item each imported line became, so the browser can attach the
+       * pictures a workbook carried inside it — those never passed through
+       * here, and matching them up needs the ids.
+       */
+      created: { line: number; itemId: string }[];
+      /** The folder every uploaded photo has to live under. */
+      orgId: string;
     }
   | { ok: false; error: string };
 
@@ -261,6 +269,7 @@ export async function importItems(
   let imported = 0;
   let unmatchedLocations = 0;
   const photoJobs: PhotoJob[] = [];
+  const created: { line: number; itemId: string }[] = [];
 
   for (let start = 0; start < rows.length; start += CHUNK_SIZE) {
     const chunk = rows.slice(start, start + CHUNK_SIZE);
@@ -276,6 +285,7 @@ export async function importItems(
       // still need fetching can be matched to their items without reading
       // them back.
       const id = randomUUID();
+      created.push({ line: row.line, itemId: id });
       if (row.photoUrl) photoJobs.push({ itemId: id, url: row.photoUrl });
 
       return {
@@ -320,6 +330,8 @@ export async function importItems(
     locationsCreated,
     unmatchedLocations,
     photoJobs,
+    created,
+    orgId,
   };
 }
 

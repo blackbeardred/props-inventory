@@ -44,7 +44,7 @@ function ok(label, condition) {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const bytes = await readFile(join(here, "fixtures", "import-sample.xlsx"));
-const table = await parseXlsx(
+const { table } = await parseXlsx(
   bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
 );
 
@@ -149,7 +149,7 @@ const inlineSheet = `<worksheet><sheetData>
   <row r="2"><c r="A2" t="inlineStr"><is><t>Lantern</t></is></c><c r="B2"><v>2</v></c></row>
 </sheetData></worksheet>`;
 
-const inline = await parseXlsx(
+const { table: inline } = await parseXlsx(
   zip([
     ["xl/workbook.xml", WORKBOOK],
     ["xl/_rels/workbook.xml.rels", RELS("worksheets/oddly-named.xml")],
@@ -158,7 +158,7 @@ const inline = await parseXlsx(
 );
 eq("inline strings read", inline, [["name", "quantity"], ["Lantern", "2"]]);
 
-const stored = await parseXlsx(
+const { table: stored } = await parseXlsx(
   zip([
     ["xl/workbook.xml", WORKBOOK, true],
     ["xl/_rels/workbook.xml.rels", RELS("/xl/worksheets/sheet1.xml"), true],
@@ -167,7 +167,7 @@ const stored = await parseXlsx(
 );
 eq("uncompressed entries read", stored[1], ["Lantern", "2"]);
 
-const shared = await parseXlsx(
+const { table: shared } = await parseXlsx(
   zip([
     ["xl/workbook.xml", WORKBOOK],
     // No rels at all: fall back to the conventional worksheet path.
@@ -248,19 +248,19 @@ const workbookBytes = Buffer.from(
 
 eq(
   "a csv is read as text",
-  await readSpreadsheetFile(fakeFile("items.csv", "text/csv", "name,quantity\nLantern,2\n")),
+  (await readSpreadsheetFile(fakeFile("items.csv", "text/csv", "name,quantity\nLantern,2\n"))).table,
   [["name", "quantity"], ["Lantern", "2"]]
 );
 eq(
   "a workbook is unzipped",
-  await readSpreadsheetFile(fakeFile("items.xlsx", "", workbookBytes)),
+  (await readSpreadsheetFile(fakeFile("items.xlsx", "", workbookBytes))).table,
   [["name", "quantity"], ["Lantern", "2"]]
 );
 // Some systems export a CSV under a .xlsx name. Refusing that would be pedantic
 // when the bytes say plainly what it is.
 eq(
   "a csv wearing a .xlsx name still comes in",
-  await readSpreadsheetFile(fakeFile("items.xlsx", "", "name,quantity\nLantern,2\n")),
+  (await readSpreadsheetFile(fakeFile("items.xlsx", "", "name,quantity\nLantern,2\n"))).table,
   [["name", "quantity"], ["Lantern", "2"]]
 );
 
@@ -271,6 +271,34 @@ try {
   binaryRefusal = error;
 }
 ok("but actual binary junk is refused", binaryRefusal instanceof SpreadsheetError);
+
+console.log("");
+console.log("── Pictures inside the sheet");
+
+// A props inventory usually carries its photos in the workbook rather than as
+// links, so these have to come out with the cell they're anchored to.
+const withImages = await readFile(join(here, "fixtures", "embedded-images.xlsx"));
+const workbook = await parseXlsx(
+  withImages.buffer.slice(withImages.byteOffset, withImages.byteOffset + withImages.byteLength)
+);
+
+eq("one picture per row", workbook.images.length, 5);
+eq("anchored to the rows the items are on", workbook.images.map((image) => image.line), [2, 3, 4, 5, 6]);
+eq("and to the photo column", [...new Set(workbook.images.map((image) => image.column))], [8]);
+eq("read as real image bytes", workbook.images.every((image) => image.contentType === "image/png"), true);
+eq("that aren't empty", workbook.images.every((image) => image.bytes.byteLength > 100), true);
+eq("PNG magic number intact", [...workbook.images[0].bytes.slice(0, 4)], [0x89, 0x50, 0x4e, 0x47]);
+eq("the cells themselves still read normally", workbook.table[1][1], "Rapier, basket hilt");
+eq("the photo column's cells are empty text", workbook.table[1][8], undefined);
+
+// A workbook with no drawing at all mustn't trip over the missing parts.
+eq("no pictures is not an error", (await parseXlsx(
+  zip([
+    ["xl/workbook.xml", WORKBOOK],
+    ["xl/_rels/workbook.xml.rels", RELS("worksheets/sheet1.xml")],
+    ["xl/worksheets/sheet1.xml", inlineSheet],
+  ])
+)).images, []);
 
 console.log("");
 console.log(`════ ${passed} passed, ${failed} failed ════`);

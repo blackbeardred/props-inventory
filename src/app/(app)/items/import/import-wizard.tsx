@@ -17,7 +17,9 @@ import {
   readSpreadsheetFile,
   SpreadsheetError,
   unreadableSpreadsheetReason,
+  type SheetImage,
 } from "@/lib/xlsx";
+import { uploadImportedPhotos, type PhotoUpload } from "@/lib/photo-upload";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@/lib/inventory";
 import { attachPhotos, importItems } from "./actions";
 
@@ -44,6 +46,7 @@ export function ImportWizard({
   const [photoProgress, setPhotoProgress] = useState({ done: 0, total: 0, failed: 0 });
   const [importError, setImportError] = useState<string | null>(null);
   const [table, setTable] = useState<string[][] | null>(null);
+  const [images, setImages] = useState<SheetImage[]>([]);
   const [reading, setReading] = useState(false);
   const [mapping, setMapping] = useState<(ImportField | null)[] | null>(null);
   const [readError, setReadError] = useState<string | null>(null);
@@ -86,12 +89,15 @@ export function ImportWizard({
     if (refusal) {
       setReadError(refusal);
       setTable(null);
+      setImages([]);
       return;
     }
 
     setReading(true);
     try {
-      setTable(await readSpreadsheetFile(file));
+      const workbook = await readSpreadsheetFile(file);
+      setTable(workbook.table);
+      setImages(workbook.images);
     } catch (error) {
       setReadError(
         error instanceof SpreadsheetError
@@ -99,12 +105,27 @@ export function ImportWizard({
           : "Couldn’t read that file. Excel workbooks (.xlsx) and .csv both work."
       );
       setTable(null);
+      setImages([]);
     } finally {
       setReading(false);
     }
   }
 
   const photoCount = valid.filter((row) => row.photoUrl).length;
+
+  // A picture belongs to the row it sits in. Where a row has more than one —
+  // a thumbnail and a logo, say — the leftmost wins, which in practice is the
+  // photo column rather than something decorative off to the side.
+  const imageByLine = useMemo(() => {
+    const byLine = new Map<number, SheetImage>();
+    for (const image of images) {
+      const existing = byLine.get(image.line);
+      if (!existing || image.column < existing.column) byLine.set(image.line, image);
+    }
+    return byLine;
+  }, [images]);
+
+  const embeddedCount = valid.filter((row) => imageByLine.has(row.line)).length;
 
   const kept = parsed ? extraColumns(parsed.headers, parsed.mapping) : [];
 
@@ -131,9 +152,38 @@ export function ImportWizard({
     }
 
     let failed = 0;
+    let attached = 0;
+
+    // Pictures the workbook carried inside it. The browser already has the
+    // bytes, so these go straight to storage rather than back through the
+    // server — which is also why a hundred of them is no slower than ten.
+    const uploads: PhotoUpload[] = [];
+    for (const { line, itemId } of outcome.created) {
+      const image = imageByLine.get(line);
+      if (image) {
+        uploads.push({ itemId, bytes: image.bytes, contentType: image.contentType });
+      }
+    }
+
+    const totalPhotos = outcome.photoJobs.length + uploads.length;
+
+    if (uploads.length > 0) {
+      setPhase("photos");
+      setPhotoProgress({ done: 0, total: totalPhotos, failed: 0 });
+
+      const results = await uploadImportedPhotos(
+        outcome.orgId,
+        uploads,
+        (done, failedSoFar) =>
+          setPhotoProgress({ done, total: totalPhotos, failed: failedSoFar })
+      );
+      failed += results.filter((result) => !result.ok).length;
+      attached += results.filter((result) => result.ok).length;
+    }
+
     if (outcome.photoJobs.length > 0) {
       setPhase("photos");
-      setPhotoProgress({ done: 0, total: outcome.photoJobs.length, failed: 0 });
+      setPhotoProgress({ done: uploads.length, total: totalPhotos, failed });
 
       const BATCH = 5;
       for (let index = 0; index < outcome.photoJobs.length; index += BATCH) {
@@ -141,9 +191,10 @@ export function ImportWizard({
           outcome.photoJobs.slice(index, index + BATCH)
         );
         failed += results.filter((result) => !result.ok).length;
+        attached += results.filter((result) => result.ok).length;
         setPhotoProgress({
-          done: Math.min(index + BATCH, outcome.photoJobs.length),
-          total: outcome.photoJobs.length,
+          done: uploads.length + Math.min(index + BATCH, outcome.photoJobs.length),
+          total: totalPhotos,
           failed,
         });
       }
@@ -157,10 +208,8 @@ export function ImportWizard({
     if (outcome.unmatchedLocations > 0) {
       params.set("unmatched", String(outcome.unmatchedLocations));
     }
-    if (outcome.photoJobs.length > 0) {
-      params.set("photos", String(outcome.photoJobs.length - failed));
-      if (failed > 0) params.set("photosFailed", String(failed));
-    }
+    if (attached > 0) params.set("photos", String(attached));
+    if (failed > 0) params.set("photosFailed", String(failed));
 
     router.push(`/items?${params.toString()}`);
   }
@@ -326,7 +375,9 @@ export function ImportWizard({
                           {row.tags.length > 0 ? row.tags.join(", ") : "—"}
                         </td>
                         <td className="px-3 py-2 font-body text-sm text-muted">
-                          {row.photoUrl ? (
+                          {imageByLine.has(row.line) ? (
+                            <span className="text-success-ink">In the sheet</span>
+                          ) : row.photoUrl ? (
                             <span className="text-success-ink">Will fetch</span>
                           ) : (
                             "—"
@@ -372,11 +423,18 @@ export function ImportWizard({
               </div>
             ) : null}
 
-            {photoCount > 0 ? (
+            {embeddedCount > 0 || photoCount > 0 ? (
               <p className="font-body text-sm text-muted">
-                {photoCount} row{photoCount === 1 ? "" : "s"} link to a picture.
-                Those are fetched after the items are created, a few at a time —
-                it takes a moment, so leave this page open until it finishes.
+                {embeddedCount > 0
+                  ? `${embeddedCount} row${embeddedCount === 1 ? " has a picture" : "s have pictures"} in the sheet itself`
+                  : ""}
+                {embeddedCount > 0 && photoCount > 0 ? ", and " : ""}
+                {photoCount > 0
+                  ? `${photoCount} row${photoCount === 1 ? "" : "s"} link${photoCount === 1 ? "s" : ""} to one`
+                  : ""}
+                . Pictures are attached after the items are created, a few at a
+                time — it takes a moment, so leave this page open until it
+                finishes.
               </p>
             ) : null}
 
@@ -393,7 +451,7 @@ export function ImportWizard({
               {phase === "importing"
                 ? "Importing…"
                 : phase === "photos"
-                  ? `Fetching photos… ${photoProgress.done} of ${photoProgress.total}`
+                  ? `Attaching pictures… ${photoProgress.done} of ${photoProgress.total}`
                   : valid.length === 0
                     ? "Nothing to import"
                     : `Import ${valid.length.toLocaleString()} item${valid.length === 1 ? "" : "s"}`}

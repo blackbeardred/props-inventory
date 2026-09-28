@@ -393,10 +393,123 @@ function resolvePath(from: string, target: string): string {
 }
 
 /**
- * Reads the first worksheet of an .xlsx file as rows of strings — the same
- * shape parseCsv returns, so everything downstream is shared.
+ * A picture sitting on the sheet, anchored to a cell. Spreadsheets of props
+ * usually carry their photos this way rather than as links, so these are the
+ * item photos in all but name.
  */
-export async function parseXlsx(buffer: ArrayBuffer): Promise<string[][]> {
+export type SheetImage = {
+  /** 1-based row the picture's top-left corner sits in, as the sheet counts. */
+  line: number;
+  /** 0-based column, for telling a photo column from a decorative logo. */
+  column: number;
+  bytes: Uint8Array;
+  contentType: string;
+};
+
+export type Workbook = {
+  table: string[][];
+  images: SheetImage[];
+};
+
+const IMAGE_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+};
+
+/** Beyond this a picture isn't a thumbnail any more, and won't upload either. */
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_IMAGES = 2000;
+
+/**
+ * Pulls the pictures out of a worksheet, each tagged with the cell it's
+ * anchored to.
+ *
+ * Three files are involved, which is why this looks long for what it does:
+ * the sheet points at a drawing, the drawing says which cell each picture
+ * sits in and names it by relationship id, and the drawing's own
+ * relationships turn that id into a file in xl/media. Element names may or
+ * may not carry the `xdr:` prefix depending on which program wrote the file.
+ */
+async function readSheetImages(
+  buffer: ArrayBuffer,
+  entries: Map<string, ZipEntry>,
+  sheetPath: string,
+  text: (path: string) => Promise<string>
+): Promise<SheetImage[]> {
+  const sheetName = sheetPath.split("/").pop() ?? "";
+  const sheetRels = await text(resolvePath(sheetPath, `_rels/${sheetName}.rels`));
+  if (!sheetRels) return [];
+
+  let drawingPath: string | undefined;
+  const relationships = /<Relationship\b[^>]*>/g;
+  for (let match = relationships.exec(sheetRels); match; match = relationships.exec(sheetRels)) {
+    if ((attribute(match[0], "Type") ?? "").endsWith("/drawing")) {
+      const target = attribute(match[0], "Target");
+      if (target) drawingPath = resolvePath(sheetPath, target);
+      break;
+    }
+  }
+  if (!drawingPath || !entries.has(drawingPath)) return [];
+
+  const drawingName = drawingPath.split("/").pop() ?? "";
+  const drawingRels = await text(resolvePath(drawingPath, `_rels/${drawingName}.rels`));
+
+  const mediaById = new Map<string, string>();
+  const drawingRelationships = /<Relationship\b[^>]*>/g;
+  for (
+    let match = drawingRelationships.exec(drawingRels);
+    match;
+    match = drawingRelationships.exec(drawingRels)
+  ) {
+    const id = attribute(match[0], "Id");
+    const target = attribute(match[0], "Target");
+    if (id && target) mediaById.set(id, resolvePath(drawingPath, target));
+  }
+
+  const drawing = await text(drawingPath);
+  const images: SheetImage[] = [];
+
+  // A picture is anchored to one cell or stretched between two; either way
+  // its <from> corner is the cell it belongs to. Pictures placed at absolute
+  // coordinates belong to no cell and are left alone — a logo, usually.
+  const anchors = /<(?:xdr:)?(one|two)CellAnchor\b[^>]*>([\s\S]*?)<\/(?:xdr:)?\1CellAnchor>/g;
+  for (let match = anchors.exec(drawing); match; match = anchors.exec(drawing)) {
+    if (images.length >= MAX_IMAGES) break;
+    const body = match[2];
+
+    const from = /<(?:xdr:)?from\b[^>]*>([\s\S]*?)<\/(?:xdr:)?from>/.exec(body)?.[1];
+    if (!from) continue;
+    const column = Number(/<(?:xdr:)?col>(\d+)<\/(?:xdr:)?col>/.exec(from)?.[1]);
+    const row = Number(/<(?:xdr:)?row>(\d+)<\/(?:xdr:)?row>/.exec(from)?.[1]);
+    if (!Number.isFinite(column) || !Number.isFinite(row)) continue;
+
+    const embedId = /<a:blip\b[^>]*r:embed\s*=\s*"([^"]+)"/.exec(body)?.[1];
+    const mediaPath = embedId ? mediaById.get(embedId) : undefined;
+    const entry = mediaPath ? entries.get(mediaPath) : undefined;
+    if (!entry || !mediaPath) continue;
+
+    const extension = mediaPath.slice(mediaPath.lastIndexOf(".") + 1).toLowerCase();
+    const contentType = IMAGE_TYPES[extension];
+    if (!contentType) continue;
+
+    const bytes = await readEntry(buffer, entry);
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_IMAGE_BYTES) continue;
+
+    images.push({ line: row + 1, column, bytes, contentType });
+  }
+
+  return images;
+}
+
+/**
+ * Reads the first worksheet of an .xlsx file: its cells as rows of strings —
+ * the same shape parseCsv returns, so everything downstream is shared — and
+ * any pictures sitting on it.
+ */
+export async function parseXlsx(buffer: ArrayBuffer): Promise<Workbook> {
   const entries = readZipEntries(buffer);
 
   const workbookPath = ["xl/workbook.xml", "xl/workbook.bin"].find((path) => entries.has(path));
@@ -446,13 +559,17 @@ export async function parseXlsx(buffer: ArrayBuffer): Promise<string[][]> {
   }
   if (!sheetPath) throw new SpreadsheetError("That workbook has no sheets in it.");
 
-  const [sheetXml, stringsXml, stylesXml] = await Promise.all([
+  const [sheetXml, stringsXml, stylesXml, images] = await Promise.all([
     text(sheetPath),
     text("xl/sharedStrings.xml"),
     text("xl/styles.xml"),
+    readSheetImages(buffer, entries, sheetPath, text),
   ]);
 
-  return readSheet(sheetXml, sharedStrings(stringsXml), dateStyles(stylesXml), epoch1904);
+  return {
+    table: readSheet(sheetXml, sharedStrings(stringsXml), dateStyles(stylesXml), epoch1904),
+    images,
+  };
 }
 
 /** Every .xlsx is a zip, so its first two bytes are always "PK". */
@@ -481,14 +598,16 @@ function looksLikeText(buffer: ArrayBuffer): boolean {
  * entry point the import wizard needs: the decision between workbook and text
  * is made on the bytes, so a mislabelled file still comes in.
  */
-export async function readSpreadsheetFile(file: File): Promise<string[][]> {
+export async function readSpreadsheetFile(file: File): Promise<Workbook> {
   if (!looksLikeWorkbook(file)) {
-    return parseCsv(await file.text());
+    return { table: parseCsv(await file.text()), images: [] };
   }
 
   const buffer = await file.arrayBuffer();
   if (looksLikeZip(buffer)) return parseXlsx(buffer);
-  if (looksLikeText(buffer)) return parseCsv(new TextDecoder("utf-8").decode(buffer));
+  if (looksLikeText(buffer)) {
+    return { table: parseCsv(new TextDecoder("utf-8").decode(buffer)), images: [] };
+  }
 
   throw new SpreadsheetError(
     "That file is named like a workbook but isn’t one. Re-save it as .xlsx or CSV and try again."
