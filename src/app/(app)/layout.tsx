@@ -41,7 +41,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b border-rule">
-        <div className="mx-auto flex h-14 w-full max-w-5xl flex-wrap items-center justify-between gap-2 px-6">
+        {/* The shell widens only from xl up. Below that nothing changes: a
+            phone is already edge to edge, and a tablet reads better narrow.
+            The header tracks the same widths so the nav stays in line with
+            the content underneath it. */}
+        <div className="mx-auto flex h-14 w-full max-w-5xl flex-wrap items-center justify-between gap-2 px-6 xl:max-w-7xl xl:px-8 2xl:max-w-[96rem]">
           <OrgSwitcher
             memberships={profile.memberships}
             activeOrgId={profile.active_org_id}
@@ -73,7 +77,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main className="flex-1">
-        <div className="mx-auto w-full max-w-5xl px-6 py-12">{children}</div>
+        <div className="mx-auto w-full max-w-5xl px-6 py-12 xl:max-w-7xl xl:px-8 2xl:max-w-[96rem]">
+          {children}
+        </div>
       </main>
     </div>
   );

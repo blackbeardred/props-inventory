@@ -331,7 +331,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
         /* Pictures first. Names in a props store are approximate — "the small
            urn", "the good candlestick" — so a wall of photographs is often
            the faster way to find a thing than a column of text. */
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {items.map((item) => (
             <ItemTile
               key={item.id}
