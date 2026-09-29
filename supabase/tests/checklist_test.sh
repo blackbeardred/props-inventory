@@ -28,6 +28,11 @@ psql -h /tmp -p "$PORT" -U postgres -qc "drop database if exists $DB;" -c "creat
 psql -h /tmp -p "$PORT" -U postgres -d $DB -q >/dev/null 2>&1 <<'SQL'
 create schema if not exists auth;
 create schema if not exists storage;
+-- schema.sql declares a pgvector column (migration 006), so the extension has
+-- to exist before it loads. Supabase provides both; a bare Postgres needs
+-- postgresql-<version>-pgvector installed.
+create schema if not exists extensions;
+create extension if not exists vector with schema extensions;
 create table auth.users (id uuid primary key);
 create or replace function auth.uid() returns uuid language sql stable as $fn$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $fn$;

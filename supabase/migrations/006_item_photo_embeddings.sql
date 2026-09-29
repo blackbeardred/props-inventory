@@ -21,7 +21,7 @@
 -- pgvector is for.
 --
 -- Nothing existing changes. No table, column, policy or function defined in
--- 001–004 is touched.
+-- 001–005 is touched.
 -- ═══════════════════════════════════════════════════════════════════════
 
 -- ─────────────────────────────────────────────────────────────

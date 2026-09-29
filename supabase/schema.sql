@@ -2,6 +2,10 @@
 -- Scope: organizations, locations, items (props/costumes), productions, pull lists.
 -- Deliberately excludes: AI classification, OCR, QR codes, marketplace, billing.
 
+-- pgvector, for the visual fingerprints in item_photo_embeddings below.
+-- Into `extensions`, which is where Supabase keeps extensions. Migration 006.
+create extension if not exists vector with schema extensions;
+
 -- ─────────────────────────────────────────────────────────────
 -- Organizations (a theatre company, school program, etc.)
 -- ─────────────────────────────────────────────────────────────
@@ -176,6 +180,36 @@ create table pull_list_items (
 );
 
 -- ─────────────────────────────────────────────────────────────
+-- Visual fingerprints of item photos (migration 006)
+--
+-- One row per item, so a crop from a photo of the prop table can be compared
+-- against pictures of the things this theatre actually owns — which is what
+-- turns "a brass globe" into "your brass globe, P-014, Shelf 3B". Produced in
+-- the browser by CLIP ViT-B/32 (512 numbers per image); no API key involved.
+--
+-- photo_url and model are what distinguish a current fingerprint from one
+-- left behind by a replaced photo or a different model. A stale fingerprint
+-- doesn't fail loudly — it quietly matches the wrong prop.
+--
+-- org_id is denormalised from items so the RLS policy is a column comparison
+-- rather than a subquery on every row of every search.
+-- ─────────────────────────────────────────────────────────────
+create table item_photo_embeddings (
+  item_id uuid primary key references items(id) on delete cascade,
+  org_id uuid not null references organizations(id) on delete cascade,
+  photo_url text not null,
+  model text not null default 'clip-vit-base-patch32',
+  embedding extensions.vector(512) not null,
+  created_at timestamptz not null default now()
+);
+
+create index item_photo_embeddings_org_idx on item_photo_embeddings (org_id);
+
+-- No similarity index on purpose: at a few thousand items an exact scan is a
+-- few milliseconds, and an approximate index would trade exactness for speed
+-- that isn't needed.
+
+-- ─────────────────────────────────────────────────────────────
 -- Row Level Security: every table is scoped to the caller's org.
 -- ─────────────────────────────────────────────────────────────
 alter table organizations enable row level security;
@@ -186,6 +220,7 @@ alter table items enable row level security;
 alter table productions enable row level security;
 alter table pull_lists enable row level security;
 alter table pull_list_items enable row level security;
+alter table item_photo_embeddings enable row level security;
 
 create or replace function auth_org_ids()
 returns setof uuid
@@ -259,6 +294,23 @@ create policy "org members can manage their locations" on locations
 
 create policy "org members can manage their items" on items
   for all using (org_id = auth_org_id()) with check (org_id = auth_org_id());
+
+-- The `exists` check on write is the part worth reading twice: without it, a
+-- caller could attach a fingerprint carrying their own org_id to another
+-- theatre's item_id, then read that item's name back out of a match result.
+create policy "org members can read their item embeddings" on item_photo_embeddings
+  for select using (org_id = auth_org_id());
+
+create policy "org members can manage their item embeddings" on item_photo_embeddings
+  for all
+  using (org_id = auth_org_id())
+  with check (
+    org_id = auth_org_id()
+    and exists (
+      select 1 from items i
+      where i.id = item_id and i.org_id = auth_org_id()
+    )
+  );
 
 create policy "org members can manage their productions" on productions
   for all using (org_id = auth_org_id()) with check (org_id = auth_org_id());
@@ -741,4 +793,34 @@ begin
     )
   order by i.name;
 end;
+$$;
+
+
+-- ─────────────────────────────────────────────────────────────
+-- Finding the items whose photo looks most like a given one (migration 006)
+--
+-- Deliberately NOT security definer — the same choice as search_items. It
+-- runs with the caller's own permissions, so the item_photo_embeddings policy
+-- is what limits it to one theatre's fingerprints.
+--
+-- Returns ids and scores rather than rows, so "may I see this item" stays
+-- decided in exactly one place: the items policy, when the caller fetches
+-- them. similarity runs 0..1, higher being closer. Cosine distance is the
+-- right measure for CLIP vectors, which carry direction rather than
+-- magnitude.
+-- ─────────────────────────────────────────────────────────────
+create or replace function match_items(
+  query_embedding extensions.vector(512),
+  match_count int default 5
+)
+returns table (item_id uuid, similarity float)
+language sql
+stable
+set search_path = public, extensions
+as $$
+  select e.item_id, 1 - (e.embedding <=> query_embedding) as similarity
+  from item_photo_embeddings e
+  where e.model = 'clip-vit-base-patch32'
+  order by e.embedding <=> query_embedding
+  limit least(greatest(coalesce(match_count, 5), 1), 50)
 $$;

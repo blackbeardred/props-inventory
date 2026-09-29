@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests migration 005 against a real Postgres: that it applies to a database
-# already carrying 001-004, that it applies twice without complaining, and that
+# Tests migration 006 against a real Postgres: that it applies to a database
+# already carrying 001-005, that it applies twice without complaining, and that
 # the pieces it adds behave — a fingerprint tied to one photo and one model,
 # a match that ranks by how alike two pictures are, and a table that empties
 # itself when its items go.
@@ -63,21 +63,21 @@ if ! psql -h /tmp -p "$PORT" -U postgres -d $DB -qc "create extension if not exi
   exit 1
 fi
 
-echo "── Applying schema and migrations 001-004"
+echo "── Applying schema and migrations 001-005"
 # Counted, because an unmatched glob would otherwise skip a migration in
 # silence and let the checks below pass against a database that never had it.
-found=$(ls "$HERE"/../migrations/00[1234]_*.sql 2>/dev/null | wc -l)
-check "all four earlier migrations are present" "4" "$found"
-for file in "$HERE/../schema.sql" "$HERE"/../migrations/00[1234]_*.sql; do
+found=$(ls "$HERE"/../migrations/00[12345]_*.sql 2>/dev/null | wc -l)
+check "all five earlier migrations are present" "5" "$found"
+for file in "$HERE/../schema.sql" "$HERE"/../migrations/00[12345]_*.sql; do
   out=$(apply "$file")
   if [ -n "$out" ]; then echo "  FAIL  $(basename "$file"): $out"; FAIL=$((FAIL+1));
   else echo "  ok    $(basename "$file")"; fi
 done
 
 echo ""
-echo "── Migration 005"
-check "applies cleanly"                     "" "$(apply "$HERE/../migrations/005_item_photo_embeddings.sql")"
-check "applies a second time (re-runnable)" "" "$(apply "$HERE/../migrations/005_item_photo_embeddings.sql")"
+echo "── Migration 006"
+check "applies cleanly"                     "" "$(apply "$HERE/../migrations/006_item_photo_embeddings.sql")"
+check "applies a second time (re-runnable)" "" "$(apply "$HERE/../migrations/006_item_photo_embeddings.sql")"
 
 check "pgvector is installed"          "1" "$(q "select count(*) from pg_extension where extname='vector'")"
 check "the fingerprint table exists"   "1" "$(q "select count(*) from pg_tables where tablename='item_photo_embeddings'")"
@@ -89,7 +89,7 @@ check "match_items is not security definer" "f" \
   "$(q "select prosecdef from pg_proc where proname='match_items'")"
 check "the org index exists"           "1" \
   "$(q "select count(*) from pg_indexes where indexname='item_photo_embeddings_org_idx'")"
-check "nothing in 001-004 was disturbed" "8" \
+check "nothing in 001-005 was disturbed" "8" \
   "$(q "select count(*) from pg_tables where schemaname='public' and tablename in
         ('organizations','profiles','memberships','locations','items','productions','pull_lists','pull_list_items')")"
 
