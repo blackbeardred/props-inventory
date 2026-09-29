@@ -6,10 +6,10 @@ import {
   EmptyState,
   Notice,
   PageHeading,
-  SelectField,
   TextField,
 } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { ItemPicker } from "@/components/item-picker";
 import { DeleteButton } from "@/components/delete-button";
 import { createClient } from "@/lib/supabase/server";
 import { findPullIssues } from "@/lib/checklist";
@@ -72,7 +72,7 @@ export default async function ProductionDetailPage({
 
   const supabase = await createClient();
 
-  const [{ data: production }, { data: pullLists }, { data: orgItems }] =
+  const [{ data: production }, { data: pullLists }, { count: itemCount }] =
     await Promise.all([
       supabase
         .from("productions")
@@ -84,7 +84,9 @@ export default async function ProductionDetailPage({
         .select("id, production_id, name, created_at")
         .eq("production_id", id)
         .order("created_at"),
-      supabase.from("items").select("id, name").order("name"),
+      // Only whether there is anything to add: the picker searches for itself
+      // rather than being handed every item in the inventory.
+      supabase.from("items").select("id", { count: "exact", head: true }),
     ]);
 
   if (!production) {
@@ -100,7 +102,6 @@ export default async function ProductionDetailPage({
 
   const typedProduction = production as unknown as ProductionRow;
   const lists = (pullLists ?? []) as unknown as PullListRow[];
-  const items = (orgItems ?? []) as unknown as { id: string; name: string }[];
 
   const pullListIds = lists.map((list) => list.id);
 
@@ -304,24 +305,17 @@ export default async function ProductionDetailPage({
                   </ul>
                 )}
 
-                {items.length > 0 ? (
+                {(itemCount ?? 0) > 0 ? (
                   <form
                     action={addPullListItem}
                     className="mt-4 flex flex-wrap items-end gap-3 border-t border-rule pt-4"
                   >
                     <input type="hidden" name="productionId" value={typedProduction.id} />
                     <input type="hidden" name="pullListId" value={list.id} />
-                    <div className="w-56">
-                      <SelectField label="Item" name="itemId" defaultValue="">
-                        <option value="" disabled>
-                          Choose an item
-                        </option>
-                        {items.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </SelectField>
+                    <div className="w-full sm:w-72">
+                      <ItemPicker
+                        alreadyListed={listItems.map((row) => row.item_id)}
+                      />
                     </div>
                     <div className="w-24">
                       <TextField
