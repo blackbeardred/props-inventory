@@ -60,14 +60,13 @@ export default async function EditItemPage({
       .eq("id", id)
       .maybeSingle(),
     supabase.from("locations").select("id, name, parent_location_id").order("name"),
-    // On a pull list and nobody has stood in front of it yet. Shown here as
-    // well as on the list itself, because this is the page someone opens when
-    // they're wondering where a prop has got to.
+    // Every list this item is on. Two different facts come out of it: whether
+    // it's out on a show, and whether anyone has actually stood in front of it
+    // — and this is the page someone opens when a prop has gone missing.
     supabase
       .from("pull_list_items")
-      .select("id, check_state, pull_lists(name, productions(id, name))")
-      .eq("item_id", id)
-      .eq("check_state", "open"),
+      .select("id, status, check_state, quantity_needed, pull_lists(name, productions(id, name))")
+      .eq("item_id", id),
   ]);
 
   if (!item) {
@@ -83,10 +82,17 @@ export default async function EditItemPage({
 
   const typedItem = item as unknown as ItemRow;
 
-  const unchecked = ((openChecks ?? []) as unknown as {
+  const listRows = ((openChecks ?? []) as unknown as {
     id: string;
+    status: string;
+    check_state: string | null;
+    quantity_needed: number;
     pull_lists: { name: string; productions: { id: string; name: string } | null } | null;
   }[]).filter((row) => row.pull_lists?.productions);
+
+  const pulled = listRows.filter((row) => row.status === "pulled");
+  const pulledQuantity = pulled.reduce((total, row) => total + row.quantity_needed, 0);
+  const unchecked = listRows.filter((row) => (row.check_state ?? "open") === "open");
 
   let currentPhotoUrl: string | null = null;
   if (typedItem.photo_url) {
@@ -99,6 +105,34 @@ export default async function EditItemPage({
   return (
     <>
       <PageHeading title="Edit item" intro={typedItem.name} />
+
+      {pulled.length > 0 ? (
+        <div className="mb-6 rounded-lg border border-rule bg-surface px-4 py-3">
+          <p className="font-body text-sm">
+            <span
+              aria-hidden="true"
+              className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-in-use align-[1px]"
+            />
+            <span className="text-foreground">
+              {typedItem.quantity > 1
+                ? `${pulledQuantity} of ${typedItem.quantity} pulled for `
+                : "Pulled for "}
+            </span>
+            {pulled.map((row, index) => (
+              <span key={row.id}>
+                {index > 0 ? ", " : ""}
+                <Link
+                  href={`/productions/${row.pull_lists!.productions!.id}`}
+                  className="text-accent hover:underline"
+                >
+                  {row.pull_lists!.productions!.name}
+                </Link>
+              </span>
+            ))}
+            <span className="text-muted"> — out of storage.</span>
+          </p>
+        </div>
+      ) : null}
 
       {unchecked.length > 0 ? (
         <div className="mb-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3">

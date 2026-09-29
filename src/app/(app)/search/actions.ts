@@ -4,9 +4,17 @@ import { createClient } from "@/lib/supabase/server";
 import { PHOTOS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
 import type { ItemRow } from "@/lib/inventory";
 
+export type PulledFor = {
+  productionId: string;
+  productionName: string;
+  quantity: number;
+};
+
 export type SearchResultItem = ItemRow & {
   locationName: string | null;
   photoUrl: string | null;
+  /** The production it's out on, when it's out on one. */
+  pulledFor: PulledFor | null;
 };
 
 export type SearchItemsResult = {
@@ -94,12 +102,42 @@ export async function searchItemsLive(
     }
   }
 
+  // Whether each one is out on a show. Resolved here rather than in the
+  // client so a result carries everything it needs to be shown.
+  const pulledByItem = new Map<string, PulledFor>();
+  if (rows.length > 0) {
+    const { data: pulled } = await supabase
+      .from("pull_list_items")
+      .select("item_id, quantity_needed, pull_lists(productions(id, name))")
+      .eq("status", "pulled")
+      .in("item_id", rows.map((row) => row.id));
+
+    for (const entry of (pulled ?? []) as unknown as {
+      item_id: string;
+      quantity_needed: number;
+      pull_lists: { productions: { id: string; name: string } | null } | null;
+    }[]) {
+      const production = entry.pull_lists?.productions;
+      if (!production) continue;
+      const existing = pulledByItem.get(entry.item_id);
+      // Two productions at once is rare and already handled this way on the
+      // items list: show one, and count what's out for it.
+      if (existing && existing.productionId !== production.id) continue;
+      pulledByItem.set(entry.item_id, {
+        productionId: production.id,
+        productionName: production.name,
+        quantity: (existing?.quantity ?? 0) + entry.quantity_needed,
+      });
+    }
+  }
+
   const items: SearchResultItem[] = rows.map((row) => ({
     ...row,
     locationName: row.location_id
       ? (locationNameById.get(row.location_id) ?? null)
       : null,
     photoUrl: row.photo_url ? (photoUrlByPath.get(row.photo_url) ?? null) : null,
+    pulledFor: pulledByItem.get(row.id) ?? null,
   }));
 
   return { items, error: null };

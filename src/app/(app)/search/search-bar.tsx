@@ -5,7 +5,6 @@ import type { ChangeEvent, KeyboardEvent } from "react";
 import Link from "next/link";
 import {
   Badge,
-  DataTable,
   EmptyState,
   Notice,
 } from "@/components/ui";
@@ -84,6 +83,138 @@ function syncUrl(terms: string[], locationIds: string[]) {
   window.history.replaceState(null, "", url);
 }
 
+
+/**
+ * One result, compact enough to sit in a column beside a detail pane — or
+ * inside somebody else's form when the bar is being used to pick.
+ */
+function ResultRow({
+  item,
+  selected,
+  onSelect,
+}: {
+  item: SearchResultItem;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <li className="border-b border-rule last:border-b-0">
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-current={selected ? "true" : undefined}
+        className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
+          selected ? "bg-accent-soft/15" : "bg-surface hover:bg-background"
+        }`}
+      >
+        {item.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- signed URL, see items/page.tsx
+          <img src={item.photoUrl} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />
+        ) : (
+          <div className="h-10 w-10 shrink-0 rounded border border-dashed border-rule" />
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-body text-sm text-foreground">
+            {item.name}
+            {item.quantity > 1 ? ` ×${item.quantity}` : ""}
+          </span>
+          <span className="block truncate font-body text-xs text-muted">
+            {item.locationName ?? "Unassigned"}
+          </span>
+        </span>
+        {item.pulledFor ? (
+          <span
+            title={`Out on ${item.pulledFor.productionName}`}
+            aria-hidden="true"
+            className="h-[7px] w-[7px] shrink-0 rounded-full bg-in-use"
+          />
+        ) : null}
+        <Badge tone={item.category === "costume" ? "accent" : "neutral"}>
+          {CATEGORY_LABELS[item.category] ?? item.category}
+        </Badge>
+      </button>
+    </li>
+  );
+}
+
+/**
+ * The result you're looking at, given the room the old table wasted: the
+ * photograph first, because that's what identifies a prop, then everything
+ * written down about it.
+ */
+function ItemDetail({ item }: { item: SearchResultItem }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-rule bg-surface">
+      {item.photoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- signed URL, see items/page.tsx
+        <img src={item.photoUrl} alt="" className="aspect-square w-full object-cover" />
+      ) : (
+        <div className="flex aspect-square w-full items-center justify-center border-b border-rule bg-background font-body text-sm text-muted">
+          No photo
+        </div>
+      )}
+
+      <div className="space-y-3 p-4">
+        <div>
+          <h3 className="font-display text-lg">{item.name}</h3>
+          <p className="mt-0.5 font-body text-sm text-muted">
+            {item.locationName ?? "Unassigned"}
+          </p>
+        </div>
+
+        {item.pulledFor ? (
+          <p className="font-body text-sm">
+            <span
+              aria-hidden="true"
+              className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-in-use align-[1px]"
+            />
+            <span className="text-foreground">
+              {item.quantity > 1
+                ? `${item.pulledFor.quantity}/${item.quantity} pulled for `
+                : "Pulled for "}
+            </span>
+            <Link
+              href={`/productions/${item.pulledFor.productionId}`}
+              className="text-accent hover:underline"
+            >
+              {item.pulledFor.productionName}
+            </Link>
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone={item.category === "costume" ? "accent" : "neutral"}>
+            {CATEGORY_LABELS[item.category] ?? item.category}
+          </Badge>
+          {item.condition ? (
+            <Badge tone={CONDITION_TONE[item.condition] ?? "muted"}>
+              {CONDITION_LABELS[item.condition] ?? item.condition}
+            </Badge>
+          ) : null}
+          {item.quantity > 1 ? (
+            <span className="font-body text-xs text-muted">{item.quantity} in stock</span>
+          ) : null}
+        </div>
+
+        <p className="font-body text-sm text-foreground">
+          {item.description?.trim() ? (
+            item.description
+          ) : (
+            <span className="text-muted">No description yet.</span>
+          )}
+        </p>
+
+        <Link
+          href={`/items/${item.id}/edit`}
+          className="inline-flex items-center justify-center rounded-md border border-rule px-3 py-1.5 font-body text-sm text-foreground transition-colors hover:bg-background"
+        >
+          Open this item
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export function SearchBar({
   locations,
   initialText = "",
@@ -121,6 +252,9 @@ export function SearchBar({
   const [items, setItems] = useState<SearchResultItem[]>(initialItems);
   const [searchError, setSearchError] = useState<string | null>(initialError);
   const [highlighted, setHighlighted] = useState(0);
+  // Which result the detail pane is showing. Ids only, so a re-search that
+  // still contains it keeps it open and one that doesn't falls back.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const requestIdRef = useRef(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -295,6 +429,9 @@ export function SearchBar({
     .filter((chip): chip is Extract<Chip, { kind: "location" }> => chip.kind === "location")
     .map((chip) => chip.name);
   const searchWords = text.trim() ? [...termLabels, text.trim()] : termLabels;
+  const selected =
+    items.find((item) => item.id === selectedId) ?? items[0] ?? null;
+
   const resultsLabel = [
     searchWords.length > 0 ? `“${searchWords.join("” + “")}”` : null,
     locationLabels.length > 0 ? `in ${locationLabels.join(", ")}` : null,
@@ -303,8 +440,11 @@ export function SearchBar({
     .join(" ");
 
   return (
-    <div className="mb-8 max-w-2xl">
-      <div className="relative">
+    <div className="mb-8">
+      {/* The box you type in reads best at a comfortable line length; the
+          results underneath have no business being that narrow, which is what
+          left two-thirds of a desktop screen empty. */}
+      <div className={onPick ? "relative" : "relative max-w-2xl"}>
         <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-rule bg-surface px-3 py-2 transition-colors focus-within:border-accent">
           {chips.map((chip, index) => (
             <span
@@ -431,115 +571,39 @@ export function SearchBar({
                else's form, and rows that select rather than navigate. */
             <ul className="overflow-hidden rounded-lg border border-rule">
               {items.slice(0, 10).map((item) => (
-                <li key={item.id} className="border-b border-rule last:border-b-0">
-                  <button
-                    type="button"
-                    onClick={() => onPick(item)}
-                    className="flex w-full items-center gap-3 bg-surface px-3 py-2 text-left transition-colors hover:bg-background"
-                  >
-                    {item.photoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- signed URL, see items/page.tsx
-                      <img src={item.photoUrl} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />
-                    ) : (
-                      <div className="h-10 w-10 shrink-0 rounded border border-dashed border-rule" />
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-body text-sm text-foreground">
-                        {item.name}
-                        {item.quantity > 1 ? ` ×${item.quantity}` : ""}
-                      </span>
-                      <span className="block truncate font-body text-xs text-muted">
-                        {item.locationName ?? "Unassigned"}
-                      </span>
-                    </span>
-                    <Badge tone={item.category === "costume" ? "accent" : "neutral"}>
-                      {CATEGORY_LABELS[item.category] ?? item.category}
-                    </Badge>
-                  </button>
-                </li>
+                <ResultRow
+                  key={item.id}
+                  item={item}
+                  selected={false}
+                  onSelect={() => onPick(item)}
+                />
               ))}
             </ul>
           ) : (
-          <>
-            <p className="mb-4 font-body text-sm text-muted">
-              {pluralize(items.length, "match", "matches")} for {resultsLabel}
-            </p>
-            <DataTable
-              columns={[
-                "Photo",
-                "Item",
-                "Category",
-                "Qty",
-                "Condition",
-                "Location",
-                "",
-              ]}
-            >
-              {items.map((item) => (
-                <tr key={item.id} className="border-b border-rule align-top">
-                  <td className="px-3 py-3">
-                    {item.photoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- signed URLs are short-lived and per-request; see items/page.tsx.
-                      <img
-                        src={item.photoUrl}
-                        alt=""
-                        className="h-10 w-10 rounded object-cover"
-                      />
-                    ) : (
-                      <div className="h-10 w-10 rounded border border-dashed border-rule" />
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className="font-body text-sm text-foreground">
-                      {item.name}
-                    </span>
-                    {item.description ? (
-                      <p className="mt-0.5 line-clamp-1 font-body text-xs text-muted">
-                        {item.description}
-                      </p>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-3">
-                    <Badge tone={item.category === "costume" ? "accent" : "neutral"}>
-                      {CATEGORY_LABELS[item.category] ?? item.category}
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-3 font-body text-sm text-muted">
-                    {item.quantity}
-                  </td>
-                  <td className="px-3 py-3">
-                    {item.condition ? (
-                      <Badge tone={CONDITION_TONE[item.condition] ?? "muted"}>
-                        {CONDITION_LABELS[item.condition] ?? item.condition}
-                      </Badge>
-                    ) : (
-                      <span className="font-body text-sm text-muted">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 font-body text-sm">
-                    {item.location_id ? (
-                      <Link
-                        href={`/items?location=${item.location_id}`}
-                        className="text-muted underline-offset-2 hover:text-foreground hover:underline"
-                      >
-                        {item.locationName ?? "Unknown location"}
-                      </Link>
-                    ) : (
-                      <span className="text-muted">Unassigned</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 font-body text-sm text-right">
-                    <Link
-                      href={`/items/${item.id}/edit`}
-                      className="text-muted underline-offset-2 hover:text-foreground hover:underline"
-                    >
-                      Edit
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </DataTable>
-          </>
+            <>
+              <p className="mb-4 font-body text-sm text-muted">
+                {pluralize(items.length, "match", "matches")} for {resultsLabel}
+              </p>
+
+              {/* The list needs a column, not a page: everything worth knowing
+                  about one prop goes in the pane beside it, which is also
+                  where the picture can be big enough to recognise. Below lg
+                  the pane follows the list rather than sitting beside it. */}
+              <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+                <ul className="overflow-hidden rounded-lg border border-rule">
+                  {items.map((item) => (
+                    <ResultRow
+                      key={item.id}
+                      item={item}
+                      selected={item.id === selected?.id}
+                      onSelect={() => setSelectedId(item.id)}
+                    />
+                  ))}
+                </ul>
+
+                {selected ? <ItemDetail item={selected} /> : null}
+              </div>
+            </>
           )
         ) : null}
       </div>
