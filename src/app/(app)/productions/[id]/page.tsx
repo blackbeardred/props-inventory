@@ -72,7 +72,12 @@ export default async function ProductionDetailPage({
 
   const supabase = await createClient();
 
-  const [{ data: production }, { data: pullLists }, { count: itemCount }] =
+  const [
+    { data: production },
+    { data: pullLists },
+    { count: itemCount },
+    { data: locationRows },
+  ] =
     await Promise.all([
       supabase
         .from("productions")
@@ -87,6 +92,9 @@ export default async function ProductionDetailPage({
       // Only whether there is anything to add: the picker searches for itself
       // rather than being handed every item in the inventory.
       supabase.from("items").select("id", { count: "exact", head: true }),
+      // Locations, so the picker can offer them as chips the way the search
+      // page does.
+      supabase.from("locations").select("id, name").order("name"),
     ]);
 
   if (!production) {
@@ -102,6 +110,8 @@ export default async function ProductionDetailPage({
 
   const typedProduction = production as unknown as ProductionRow;
   const lists = (pullLists ?? []) as unknown as PullListRow[];
+
+  const searchLocations = (locationRows ?? []) as unknown as { id: string; name: string }[];
 
   const pullListIds = lists.map((list) => list.id);
 
@@ -308,26 +318,29 @@ export default async function ProductionDetailPage({
                 {(itemCount ?? 0) > 0 ? (
                   <form
                     action={addPullListItem}
-                    className="mt-4 flex flex-wrap items-end gap-3 border-t border-rule pt-4"
+                    className="mt-4 space-y-3 border-t border-rule pt-4"
                   >
                     <input type="hidden" name="productionId" value={typedProduction.id} />
                     <input type="hidden" name="pullListId" value={list.id} />
-                    <div className="w-full sm:w-72">
+                    <div className="w-full">
                       <ItemPicker
+                        locations={searchLocations}
                         alreadyListed={listItems.map((row) => row.item_id)}
                       />
                     </div>
-                    <div className="w-24">
-                      <TextField
-                        label="Qty"
-                        name="quantityNeeded"
-                        type="number"
-                        defaultValue="1"
-                      />
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="w-24">
+                        <TextField
+                          label="Qty"
+                          name="quantityNeeded"
+                          type="number"
+                          defaultValue="1"
+                        />
+                      </div>
+                      <SubmitButton variant="ghost" pendingText="Adding…">
+                        Add to list
+                      </SubmitButton>
                     </div>
-                    <SubmitButton variant="ghost" pendingText="Adding…">
-                      Add to list
-                    </SubmitButton>
                   </form>
                 ) : (
                   <p className="mt-4 border-t border-rule pt-4 font-body text-sm text-muted">

@@ -86,16 +86,23 @@ function syncUrl(terms: string[], locationIds: string[]) {
 
 export function SearchBar({
   locations,
-  initialText,
-  initialChips,
-  initialItems,
-  initialError,
+  initialText = "",
+  initialChips = [],
+  initialItems = [],
+  initialError = null,
+  onPick,
 }: {
   locations: LocationOption[];
-  initialText: string;
-  initialChips: LocationOption[];
-  initialItems: SearchResultItem[];
-  initialError: string | null;
+  initialText?: string;
+  initialChips?: LocationOption[];
+  initialItems?: SearchResultItem[];
+  initialError?: string | null;
+  /**
+   * Given, the results become things you choose rather than pages you visit,
+   * and the search stops writing itself into the address bar — it's part of a
+   * form on someone else's page, not the page itself.
+   */
+  onPick?: (item: SearchResultItem) => void;
 }) {
   // Anything already in the URL arrives as chips, so a reloaded or shared
   // search looks exactly like one you built by typing.
@@ -185,7 +192,9 @@ export function SearchBar({
     }
 
     const { terms, ids, query } = queryFor(nextChips, nextText);
-    syncUrl(nextText.trim() ? [...terms, nextText.trim()] : terms, ids);
+    if (!onPick) {
+      syncUrl(nextText.trim() ? [...terms, nextText.trim()] : terms, ids);
+    }
 
     if (!query && ids.length === 0) {
       requestIdRef.current += 1;
@@ -388,8 +397,15 @@ export function SearchBar({
         <p className="mt-2 font-body text-xs text-muted">Searching…</p>
       ) : null}
 
-      <div className="mt-6">
+      <div className={onPick ? "mt-3" : "mt-6"}>
         {!hasQuery ? (
+          onPick ? (
+            <p className="font-body text-sm text-muted">
+              Type a word and press enter to pin it, then add another to
+              narrow — “wood” then “table”. A location works too: “shed” covers
+              every box in it.
+            </p>
+          ) : (
           <EmptyState title="Search your inventory">
             Type a word and press enter to pin it as a filter, then add
             another to narrow further — “wood” then “table” finds the wooden
@@ -401,6 +417,7 @@ export function SearchBar({
             stays in the address bar, so you
             can bookmark or share it.
           </EmptyState>
+          )
         ) : searchError ? (
           <Notice title="Couldn’t search items">{searchError}</Notice>
         ) : items.length === 0 && !isSearching ? (
@@ -409,6 +426,40 @@ export function SearchBar({
             filter.
           </EmptyState>
         ) : items.length > 0 ? (
+          onPick ? (
+            /* Choosing, not browsing: a compact list that fits inside someone
+               else's form, and rows that select rather than navigate. */
+            <ul className="overflow-hidden rounded-lg border border-rule">
+              {items.slice(0, 10).map((item) => (
+                <li key={item.id} className="border-b border-rule last:border-b-0">
+                  <button
+                    type="button"
+                    onClick={() => onPick(item)}
+                    className="flex w-full items-center gap-3 bg-surface px-3 py-2 text-left transition-colors hover:bg-background"
+                  >
+                    {item.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- signed URL, see items/page.tsx
+                      <img src={item.photoUrl} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />
+                    ) : (
+                      <div className="h-10 w-10 shrink-0 rounded border border-dashed border-rule" />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-body text-sm text-foreground">
+                        {item.name}
+                        {item.quantity > 1 ? ` ×${item.quantity}` : ""}
+                      </span>
+                      <span className="block truncate font-body text-xs text-muted">
+                        {item.locationName ?? "Unassigned"}
+                      </span>
+                    </span>
+                    <Badge tone={item.category === "costume" ? "accent" : "neutral"}>
+                      {CATEGORY_LABELS[item.category] ?? item.category}
+                    </Badge>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
           <>
             <p className="mb-4 font-body text-sm text-muted">
               {pluralize(items.length, "match", "matches")} for {resultsLabel}
@@ -489,6 +540,7 @@ export function SearchBar({
               ))}
             </DataTable>
           </>
+          )
         ) : null}
       </div>
     </div>
