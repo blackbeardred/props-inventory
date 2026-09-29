@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   Notice,
@@ -50,7 +51,7 @@ export default async function EditItemPage({
 
   const supabase = await createClient();
 
-  const [{ data: item }, { data: locations }] = await Promise.all([
+  const [{ data: item }, { data: locations }, { data: openChecks }] = await Promise.all([
     supabase
       .from("items")
       .select(
@@ -59,6 +60,14 @@ export default async function EditItemPage({
       .eq("id", id)
       .maybeSingle(),
     supabase.from("locations").select("id, name, parent_location_id").order("name"),
+    // On a pull list and nobody has stood in front of it yet. Shown here as
+    // well as on the list itself, because this is the page someone opens when
+    // they're wondering where a prop has got to.
+    supabase
+      .from("pull_list_items")
+      .select("id, check_state, pull_lists(name, productions(id, name))")
+      .eq("item_id", id)
+      .eq("check_state", "open"),
   ]);
 
   if (!item) {
@@ -74,6 +83,11 @@ export default async function EditItemPage({
 
   const typedItem = item as unknown as ItemRow;
 
+  const unchecked = ((openChecks ?? []) as unknown as {
+    id: string;
+    pull_lists: { name: string; productions: { id: string; name: string } | null } | null;
+  }[]).filter((row) => row.pull_lists?.productions);
+
   let currentPhotoUrl: string | null = null;
   if (typedItem.photo_url) {
     const { data: signed } = await supabase.storage
@@ -85,6 +99,27 @@ export default async function EditItemPage({
   return (
     <>
       <PageHeading title="Edit item" intro={typedItem.name} />
+
+      {unchecked.length > 0 ? (
+        <div className="mb-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3">
+          <p className="font-body text-sm font-semibold text-danger-ink">NOT CHECKED</p>
+          <p className="mt-1 font-body text-sm text-foreground">
+            On the pull list for{" "}
+            {unchecked.map((row, index) => (
+              <span key={row.id}>
+                {index > 0 ? ", " : ""}
+                <Link
+                  href={`/productions/${row.pull_lists!.productions!.id}/checklist`}
+                  className="text-accent hover:underline"
+                >
+                  {row.pull_lists!.productions!.name}
+                </Link>
+              </span>
+            ))}
+            , and nobody has confirmed it in the store yet.
+          </p>
+        </div>
+      ) : null}
 
       {notice === "tags-regenerated" ? (
         <div className="mb-6">

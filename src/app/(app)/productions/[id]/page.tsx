@@ -12,6 +12,8 @@ import {
 import { SubmitButton } from "@/components/submit-button";
 import { DeleteButton } from "@/components/delete-button";
 import { createClient } from "@/lib/supabase/server";
+import { findPullIssues } from "@/lib/checklist";
+import { loadChecklistRows } from "@/lib/checklist-data";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import {
   NEXT_PULL_LIST_ITEM_ACTION_LABEL,
@@ -101,6 +103,14 @@ export default async function ProductionDetailPage({
   const items = (orgItems ?? []) as unknown as { id: string; name: string }[];
 
   const pullListIds = lists.map((list) => list.id);
+
+  // The same rule the pull-issues page uses, so the badge and the page can't
+  // disagree with each other.
+  const { rows: checklistRows, locations: checklistLocations } = await loadChecklistRows(
+    supabase,
+    pullListIds
+  );
+  const issueCount = findPullIssues(checklistRows, checklistLocations).length;
   let itemsByPullList = new Map<string, PullListItemWithItem[]>();
   if (pullListIds.length > 0) {
     const { data: pullListItems } = await supabase
@@ -140,6 +150,27 @@ export default async function ProductionDetailPage({
         }
         action={
           <span className="flex flex-wrap gap-2">
+            <Link
+              href={`/productions/${typedProduction.id}/issues`}
+              className={`inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 font-body text-sm font-medium transition-colors ${
+                issueCount > 0
+                  ? "bg-danger/15 text-danger-ink hover:bg-danger/25"
+                  : "border border-rule text-foreground hover:bg-surface"
+              }`}
+            >
+              Pull issues
+              {issueCount > 0 ? (
+                <span className="rounded-full bg-danger-ink px-1.5 font-body text-xs text-background">
+                  {issueCount}
+                </span>
+              ) : null}
+            </Link>
+            <Link
+              href={`/productions/${typedProduction.id}/checklist`}
+              className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+            >
+              Checklist
+            </Link>
             <Link
               href={`/productions/${typedProduction.id}/photo`}
               className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
