@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { uploadImportedPhotos, type PhotoUpload } from "@/lib/photo-upload";
 import { looksLikeSameThing } from "@/lib/name-match";
@@ -81,7 +81,6 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
 
 export function StagePhoto({ productionId }: { productionId: string }) {
   const router = useRouter();
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const [phase, setPhase] = useState<"idle" | "reading" | "reviewing" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -197,16 +196,21 @@ export function StagePhoto({ productionId }: { productionId: string }) {
     <div className="space-y-6">
       <section>
         <p className="font-body text-sm text-muted">
-          Photograph the prop table, or a corner of the set. Everything it
-          recognises is listed for you to confirm — nothing is marked until you
-          say so.
+          Take a photo of the prop table or a corner of the set, or pick one
+          you’ve already got. Everything it recognises is listed for you to
+          confirm — nothing is marked until you say so.
         </p>
 
+        {/*
+          No `capture` attribute on purpose. With it, a phone goes straight to
+          the camera and the photo library is unreachable — which rules out the
+          picture someone took during the run, or on a colleague's phone, or
+          before they thought to open the app. Without it, the phone offers the
+          camera and the roll side by side.
+        */}
         <input
-          ref={fileInput}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={(event) => onPhoto(event.target.files?.[0])}
           className="mt-3 block w-full font-body text-sm text-muted file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1.5 file:font-body file:text-sm file:text-foreground"
         />
