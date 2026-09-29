@@ -148,6 +148,7 @@ function Row({
             type="button"
             disabled={pending}
             onClick={() => onSet("open")}
+            data-print-hide
             className="shrink-0 rounded-md px-2 py-1 font-body text-xs text-muted hover:text-foreground"
           >
             Put back
@@ -157,6 +158,7 @@ function Row({
             type="button"
             disabled={pending}
             onClick={() => onSet("cleared")}
+            data-print-hide
             className="shrink-0 rounded-md px-2 py-1 font-body text-xs text-muted hover:text-warning-ink"
           >
             Not needed

@@ -53,3 +53,31 @@ body {
   color: var(--foreground);
   font-family: var(--font-body), Arial, Helvetica, sans-serif;
 }
+
+/* Printing.
+ *
+ * A checklist on paper is the right tool in a store with no signal and dusty
+ * hands, so the page has to survive being printed rather than needing a
+ * separate export. Navigation, buttons and anything else you can't press on
+ * paper are dropped; what's left is the list, grouped by room and box, with
+ * a box to tick with a pen. */
+@media print {
+  header,
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  /* Printers drop background colours by default, so borders do the work of
+   * separating one box from the next. */
+  [class*="rounded-lg"] {
+    break-inside: avoid;
+  }
+
+  a[href]::after {
+    content: "";
+  }
+}
