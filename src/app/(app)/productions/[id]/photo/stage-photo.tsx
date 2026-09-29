@@ -90,6 +90,9 @@ export function StagePhoto({ productionId }: { productionId: string }) {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [names, setNames] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"pulled" | "pending">("pulled");
+  // Dismissed rows are kept aside rather than dropped, so a swipe made by
+  // accident — easy, on a phone, in a dark wing — can be taken back.
+  const [removed, setRemoved] = useState<Detection[]>([]);
 
   async function onPhoto(file: File | undefined) {
     if (!file) return;
@@ -134,6 +137,7 @@ export function StagePhoto({ productionId }: { productionId: string }) {
       }
 
       setDetections(outcome.detections);
+      setRemoved([]);
       setCrops(nextCrops);
       setChoices(nextChoices);
       setCounts(nextCounts);
@@ -231,13 +235,46 @@ export function StagePhoto({ productionId }: { productionId: string }) {
             </h2>
             <p className="mt-1 font-body text-sm text-muted">
               Pick which of your items each one is. Anything left as “Skip” is
-              ignored — including things it got wrong.
+              ignored. Swipe a row away — or tap its × — to clear out what it
+              got wrong.
             </p>
+
+            {removed.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-rule bg-surface px-3 py-2">
+                <span className="font-body text-sm text-muted">
+                  Removed {removed[0].name}
+                  {removed.length > 1 ? ` and ${removed.length - 1} more` : ""}.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const [last, ...rest] = removed;
+                    setRemoved(rest);
+                    // Back where it was, not at the end — the order is the
+                    // order of the photo, and shuffling it loses the thread.
+                    setDetections((current) =>
+                      [...current, last].sort(
+                        (a, b) => Number(a.key.split("-")[0]) - Number(b.key.split("-")[0])
+                      )
+                    );
+                  }}
+                  className="rounded-md px-2 py-1 font-body text-sm font-medium text-accent hover:underline"
+                >
+                  Undo
+                </button>
+              </div>
+            ) : null}
 
             <ul className="mt-4 space-y-3">
               {detections.map((detection) => (
                 <DetectionRow
                   key={detection.key}
+                  onRemove={() => {
+                    setRemoved((current) => [detection, ...current]);
+                    setDetections((current) =>
+                      current.filter((row) => row.key !== detection.key)
+                    );
+                  }}
                   detection={detection}
                   crop={crops[detection.key] ?? null}
                   choice={choices[detection.key] ?? { kind: "skip" }}

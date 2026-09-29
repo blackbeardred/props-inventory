@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import type { Detection } from "./actions";
 
 /**
@@ -12,6 +13,19 @@ export type Choice =
   | { kind: "item"; itemId: string }
   | { kind: "new" };
 
+/** How far a row has to travel before letting go removes it. */
+const SWIPE_THRESHOLD = 110;
+
+/** Movement below this is a tap or the start of a scroll, not a swipe. */
+const SWIPE_SLOP = 12;
+
+/** Dragging a row that starts on a control would fight the control. */
+function startedOnAControl(target: EventTarget | null): boolean {
+  return Boolean(
+    target instanceof Element && target.closest("select, input, button, textarea, a")
+  );
+}
+
 export function DetectionRow({
   detection,
   crop,
@@ -21,6 +35,7 @@ export function DetectionRow({
   onChoice,
   onName,
   onCount,
+  onRemove,
 }: {
   detection: Detection;
   crop: string | null;
@@ -30,9 +45,88 @@ export function DetectionRow({
   onChoice: (choice: Choice) => void;
   onName: (name: string) => void;
   onCount: (count: number) => void;
+  onRemove: () => void;
 }) {
+  const [offset, setOffset] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+  const gesture = useRef<{ x: number; y: number; swiping: boolean } | null>(null);
+  // How far the row has travelled, kept outside React as well as in state.
+  // A flick can deliver its last move and its release in the same tick, and
+  // the released handler would then still be reading an offset of zero.
+  const travelled = useRef(0);
+
+  function onTouchStart(event: React.TouchEvent) {
+    if (startedOnAControl(event.target)) return;
+    const touch = event.touches[0];
+    gesture.current = { x: touch.clientX, y: touch.clientY, swiping: false };
+  }
+
+  function onTouchMove(event: React.TouchEvent) {
+    const start = gesture.current;
+    if (!start) return;
+
+    const touch = event.touches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+
+    // Until it's clear which way this is going, do nothing — deciding early
+    // would either swallow scrolls or make the list feel sticky.
+    if (!start.swiping) {
+      if (Math.abs(dy) > SWIPE_SLOP && Math.abs(dy) > Math.abs(dx)) {
+        gesture.current = null;
+        return;
+      }
+      if (Math.abs(dx) < SWIPE_SLOP || Math.abs(dx) <= Math.abs(dy)) return;
+      start.swiping = true;
+    }
+
+    // Rightwards only, with the last stretch resisting, so it's clear you've
+    // gone far enough rather than the row sliding off unannounced.
+    const eased = dx > SWIPE_THRESHOLD ? SWIPE_THRESHOLD + (dx - SWIPE_THRESHOLD) * 0.35 : dx;
+    travelled.current = Math.max(0, eased);
+    setOffset(travelled.current);
+  }
+
+  function onTouchEnd() {
+    const start = gesture.current;
+    gesture.current = null;
+    if (!start?.swiping) return;
+
+    if (travelled.current >= SWIPE_THRESHOLD) {
+      setLeaving(true);
+      setOffset(400);
+      window.setTimeout(onRemove, 160);
+      return;
+    }
+    travelled.current = 0;
+    setOffset(0);
+  }
+
+  const dragging = gesture.current?.swiping === true;
+
   return (
-    <li className="flex gap-3 rounded-lg border border-rule bg-surface p-3">
+    <li className="relative overflow-hidden rounded-lg">
+      {/* Revealed as the row slides right. Sits underneath rather than in the
+          flow, so nothing reflows while a finger is down. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 flex items-center rounded-lg bg-danger/15 pl-4"
+      >
+        <span className="font-body text-sm font-medium text-danger-ink">Remove</span>
+      </div>
+
+      <div
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
+        style={{
+          transform: `translateX(${offset}px)`,
+          transition: dragging ? "none" : "transform 160ms ease-out",
+          opacity: leaving ? 0 : 1,
+        }}
+        className="relative flex gap-3 rounded-lg border border-rule bg-surface p-3"
+      >
       {crop ? (
         // The crop is the whole point of the row: it's how someone tells at a
         // glance whether the app is looking at the thing they think it is.
@@ -108,6 +202,18 @@ export function DetectionRow({
             Nothing in your inventory matched “{detection.search}”.
           </p>
         ) : null}
+        </div>
+
+        {/* The swipe is a shortcut, not the only way out: a mouse has no
+            swipe, and neither does a screen reader. */}
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove “${detection.name}” from this list`}
+          className="absolute right-1 top-1 rounded-md px-2 py-1 font-body text-sm leading-none text-muted transition-colors hover:bg-background hover:text-danger-ink"
+        >
+          ×
+        </button>
       </div>
     </li>
   );
