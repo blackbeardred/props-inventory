@@ -13,7 +13,7 @@ export type Choice =
   | { kind: "item"; itemId: string }
   | { kind: "new" };
 
-/** How far a row has to travel before letting go removes it. */
+/** How far a row has to travel before letting go acts on it. */
 const SWIPE_THRESHOLD = 110;
 
 /** Movement below this is a tap or the start of a scroll, not a swipe. */
@@ -36,6 +36,7 @@ export function DetectionRow({
   onName,
   onCount,
   onRemove,
+  onAddToInventory,
 }: {
   detection: Detection;
   crop: string | null;
@@ -46,6 +47,7 @@ export function DetectionRow({
   onName: (name: string) => void;
   onCount: (count: number) => void;
   onRemove: () => void;
+  onAddToInventory: () => void;
 }) {
   const [offset, setOffset] = useState(0);
   const [leaving, setLeaving] = useState(false);
@@ -80,10 +82,12 @@ export function DetectionRow({
       start.swiping = true;
     }
 
-    // Rightwards only, with the last stretch resisting, so it's clear you've
-    // gone far enough rather than the row sliding off unannounced.
-    const eased = dx > SWIPE_THRESHOLD ? SWIPE_THRESHOLD + (dx - SWIPE_THRESHOLD) * 0.35 : dx;
-    travelled.current = Math.max(0, eased);
+    // Both ways, with the last stretch resisting, so it's clear you've gone
+    // far enough rather than the row sliding off unannounced.
+    const past = Math.abs(dx) - SWIPE_THRESHOLD;
+    const distance =
+      past > 0 ? SWIPE_THRESHOLD + past * 0.35 : Math.abs(dx);
+    travelled.current = Math.sign(dx) * distance;
     setOffset(travelled.current);
   }
 
@@ -92,12 +96,19 @@ export function DetectionRow({
     gesture.current = null;
     if (!start?.swiping) return;
 
-    if (travelled.current >= SWIPE_THRESHOLD) {
+    // Away to the left and it's gone; to the right it springs back with the
+    // row now set to be added, so the name field is there to correct.
+    if (travelled.current <= -SWIPE_THRESHOLD) {
       setLeaving(true);
-      setOffset(400);
+      setOffset(-400);
       window.setTimeout(onRemove, 160);
       return;
     }
+
+    if (travelled.current >= SWIPE_THRESHOLD) {
+      onAddToInventory();
+    }
+
     travelled.current = 0;
     setOffset(0);
   }
@@ -106,13 +117,29 @@ export function DetectionRow({
 
   return (
     <li className="relative overflow-hidden rounded-lg">
-      {/* Revealed as the row slides right. Sits underneath rather than in the
-          flow, so nothing reflows while a finger is down. */}
+      {/* Revealed as the row slides. Both sit underneath rather than in the
+          flow, so nothing reflows while a finger is down, and only the one
+          being uncovered is legible. */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 flex items-center rounded-lg bg-danger/15 pl-4"
+        className={`absolute inset-0 flex items-center justify-between rounded-lg px-4 ${
+          offset < 0 ? "bg-danger/15" : offset > 0 ? "bg-success/20" : ""
+        }`}
       >
-        <span className="font-body text-sm font-medium text-danger-ink">Remove</span>
+        <span
+          className={`font-body text-sm font-medium text-success-ink transition-opacity ${
+            offset > 0 ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          Add to inventory
+        </span>
+        <span
+          className={`font-body text-sm font-medium text-danger-ink transition-opacity ${
+            offset < 0 ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          Remove
+        </span>
       </div>
 
       <div

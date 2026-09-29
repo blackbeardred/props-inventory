@@ -234,9 +234,9 @@ export function StagePhoto({ productionId }: { productionId: string }) {
               {detections.length} thing{detections.length === 1 ? "" : "s"} in that photo
             </h2>
             <p className="mt-1 font-body text-sm text-muted">
-              Pick which of your items each one is. Anything left as “Skip” is
-              ignored. Swipe a row away — or tap its × — to clear out what it
-              got wrong.
+              Pick which of your items each one is; anything left as “Skip” is
+              ignored. On a phone, swipe a row left to clear out what it got
+              wrong, or right to add it to your inventory as something new.
             </p>
 
             {removed.length > 0 ? (
@@ -269,6 +269,12 @@ export function StagePhoto({ productionId }: { productionId: string }) {
               {detections.map((detection) => (
                 <DetectionRow
                   key={detection.key}
+                  onAddToInventory={() =>
+                    setChoices((current) => ({
+                      ...current,
+                      [detection.key]: { kind: "new" },
+                    }))
+                  }
                   onRemove={() => {
                     setRemoved((current) => [detection, ...current]);
                     setDetections((current) =>
