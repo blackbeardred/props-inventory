@@ -29,6 +29,11 @@ psql -h /tmp -p "$PORT" -U postgres -qc "drop database if exists $DB;" -c "creat
 psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 <<'SQL'
 create schema if not exists auth;
 create schema if not exists storage;
+-- Supabase ships an `extensions` schema and pgvector in it; a bare Postgres
+-- doesn't. Install it here so migration 005's table and match_items() are the
+-- real ones under test rather than a stand-in.
+--   Debian/Ubuntu:  apt-get install -y postgresql-$(pg_config --version | grep -oE '[0-9]+' | head -1)-pgvector
+create schema if not exists extensions;
 create table auth.users (id uuid primary key);
 create or replace function auth.uid() returns uuid language sql stable as $fn$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
@@ -45,6 +50,15 @@ create or replace function storage.foldername(name text) returns text[] language
 $fn$;
 SQL
 
+# pgvector has to be there before schema.sql, which declares a vector column.
+# Without it the whole file fails, so say which package is missing rather than
+# leaving a wall of Postgres errors.
+if ! psql -h /tmp -p "$PORT" -U postgres -d $DB -qc "create extension if not exists vector with schema extensions;" >/dev/null 2>&1; then
+  echo "pgvector is not installed in this Postgres — schema.sql can't load."
+  echo "  apt-get install -y postgresql-$($PGBIN/postgres -V | grep -oE '[0-9]+' | head -1)-pgvector"
+  exit 1
+fi
+
 psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../schema.sql" 2>&1 | grep -i error && { echo "schema.sql failed to load"; exit 1; }
 
 ALICE=11111111-1111-1111-1111-111111111111
@@ -55,7 +69,7 @@ ORGB=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
 psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 <<SQL
 do \$\$ begin if not exists (select 1 from pg_roles where rolname='authenticated')
   then create role authenticated nologin; end if; end \$\$;
-grant usage on schema public, auth, storage to authenticated;
+grant usage on schema public, auth, storage, extensions to authenticated;
 grant select, insert, update, delete on all tables in schema public to authenticated;
 grant select, insert, update, delete on all tables in schema storage to authenticated;
 grant execute on all functions in schema public, auth, storage to authenticated;
@@ -119,6 +133,65 @@ root "insert into memberships (user_id, org_id, role) values ('$BOB','$ORGA','me
 check "Sharing Alpha, Bob can read it"     "1" "$(as_user $BOB "select count(*) from storage.objects where name like '$ALICE/%';")"
 root "delete from memberships where user_id='$BOB' and org_id='$ORGA';"
 check "Removed again, he loses it at once" "0" "$(as_user $BOB "select count(*) from storage.objects where name like '$ALICE/%';")"
+
+# ── Visual fingerprints (migration 005) ───────────────────────────────────
+# The interesting risk here isn't reading someone else's fingerprints — it's
+# writing one. A fingerprint row carries its own org_id, so a caller could try
+# to stamp their org onto another theatre's item_id and then read that item's
+# name back out of a match result. The `exists` clause in the write policy is
+# what stops that, and it's what the third check below exercises.
+SKULL=cccccccc-cccc-cccc-cccc-cccccccccccc
+STICK=dddddddd-dddd-dddd-dddd-dddddddddddd
+BEAR=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee
+root "insert into items (id, org_id, name, photo_url) values
+        ('$SKULL','$ORGA','Yorick skull 2','a/skull.jpg'),
+        ('$STICK','$ORGA','Brass candlestick 2','a/stick.jpg'),
+        ('$BEAR','$ORGB','Beta bear head 2','b/bear.jpg');"
+
+# Two nonzero components are enough to make vectors that are near, far and
+# orthogonal to each other. An all-zero vector has no direction, so cosine
+# distance against it is undefined — worth avoiding even in a fixture.
+root "create or replace function test_vec(a float, b float) returns extensions.vector
+      language sql immutable as \$fn\$
+        select ('[' || a || ',' || b || ',' ||
+                array_to_string(array_fill(0.0::float, array[510]), ',') || ']')::extensions.vector
+      \$fn\$;"
+
+echo "── Visual fingerprints stay inside one theatre"
+check "Alice can fingerprint her own item" "1" \
+  "$(as_user_full $ALICE "insert into item_photo_embeddings (item_id, org_id, photo_url, embedding) values ('$SKULL','$ORGA','a/skull.jpg', test_vec(1,0));" | grep -c 'INSERT 0 1')"
+check "…and a second one" "1" \
+  "$(as_user_full $ALICE "insert into item_photo_embeddings (item_id, org_id, photo_url, embedding) values ('$STICK','$ORGA','a/stick.jpg', test_vec(0.9,0.1));" | grep -c 'INSERT 0 1')"
+check "Bob cannot fingerprint under Alpha's org" "1" \
+  "$(as_user_full $BOB "insert into item_photo_embeddings (item_id, org_id, photo_url, embedding) values ('$BEAR','$ORGA','b/bear.jpg', test_vec(1,0));" | grep -c 'violates row-level security')"
+check "Bob cannot claim Alpha's item as his own" "1" \
+  "$(as_user_full $BOB "insert into item_photo_embeddings (item_id, org_id, photo_url, embedding) values ('$SKULL','$ORGB','a/skull.jpg', test_vec(1,0));" | grep -c 'violates row-level security')"
+check "Bob cannot read Alpha's fingerprints" "0" \
+  "$(as_user $BOB 'select count(*) from item_photo_embeddings;')"
+check "Alice reads her own two"              "2" \
+  "$(as_user $ALICE 'select count(*) from item_photo_embeddings;')"
+
+echo "── match_items only ever matches your own items"
+root "insert into item_photo_embeddings (item_id, org_id, photo_url, embedding) values
+        ('$BEAR','$ORGB','b/bear.jpg', test_vec(1,0));"
+check "Alice's near-identical photo matches her 2, not Beta's" "2" \
+  "$(as_user $ALICE 'select count(*) from match_items(test_vec(1,0), 10);')"
+check "Bob's matches his 1"                                    "1" \
+  "$(as_user $BOB   'select count(*) from match_items(test_vec(1,0), 10);')"
+check "The closest fingerprint comes back first" "$SKULL" \
+  "$(as_user $ALICE 'select item_id from match_items(test_vec(1,0), 1);')"
+check "A different-looking photo still ranks her closest first" "$STICK" \
+  "$(as_user $ALICE 'select item_id from match_items(test_vec(0.8,0.2), 1);')"
+check "match_count is honoured"  "1" "$(as_user $ALICE 'select count(*) from match_items(test_vec(1,0), 1);')"
+check "An orthogonal photo still returns rows, just poor ones" "2" \
+  "$(as_user $ALICE 'select count(*) from match_items(test_vec(0,1), 10);')"
+check "…and scores them near zero" "t" \
+  "$(as_user $ALICE 'select max(similarity) < 0.2 from match_items(test_vec(0,1), 10);')"
+
+echo "── A fingerprint cannot outlive its item"
+root "delete from items where id='$STICK';"
+check "Deleting the item takes its fingerprint" "1" \
+  "$(as_user $ALICE 'select count(*) from item_photo_embeddings;')"
 
 echo ""
 echo "════ $PASS passed, $FAIL failed ════"
