@@ -19,6 +19,7 @@ import {
   type ItemRow,
 } from "@/lib/inventory";
 import { PHOTOS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
+import { ItemTile, ViewTab } from "@/components/item-tile";
 
 export const metadata: Metadata = {
   title: "Items · Props & Costume Inventory",
@@ -109,6 +110,21 @@ type ItemsPageProps = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
+/** Keeps the location filter and the chosen view from clobbering each other. */
+function itemsHref({
+  locationId,
+  view,
+}: {
+  locationId?: string;
+  view?: "list" | "grid";
+}): string {
+  const params = new URLSearchParams();
+  if (locationId) params.set("location", locationId);
+  if (view === "grid") params.set("view", "grid");
+  const query = params.toString();
+  return query ? `/items?${query}` : "/items";
+}
+
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -170,6 +186,10 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const inUseByItem = buildInUseMap(
     (pulledResult.data ?? []) as unknown as PulledItemRow[]
   );
+  // The chosen view rides in the URL rather than in the browser's storage, so
+  // a link to "the shelf, as pictures" is a link someone can send.
+  const view = first(params.view) === "grid" ? "grid" : "list";
+
   const activeLocation = locationId
     ? (locations.find((l) => l.id === locationId) ?? null)
     : null;
@@ -249,22 +269,37 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
         </div>
       ) : null}
 
-      {locations.length > 0 ? (
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          <FilterChip href="/items" active={!locationId}>
-            All items
-          </FilterChip>
-          {locations.map((location) => (
-            <FilterChip
-              key={location.id}
-              href={`/items?location=${location.id}`}
-              active={location.id === locationId}
-            >
-              {location.name}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        {locations.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterChip href={itemsHref({ view })} active={!locationId}>
+              All items
             </FilterChip>
-          ))}
-        </div>
-      ) : null}
+            {locations.map((location) => (
+              <FilterChip
+                key={location.id}
+                href={itemsHref({ locationId: location.id, view })}
+                active={location.id === locationId}
+              >
+                {location.name}
+              </FilterChip>
+            ))}
+          </div>
+        ) : (
+          <span />
+        )}
+
+        {items.length > 0 ? (
+          <div className="flex items-center gap-1 rounded-md border border-rule p-0.5">
+            <ViewTab href={itemsHref({ locationId })} active={view === "list"}>
+              List
+            </ViewTab>
+            <ViewTab href={itemsHref({ locationId, view: "grid" })} active={view === "grid"}>
+              Grid
+            </ViewTab>
+          </div>
+        ) : null}
+      </div>
 
       {itemsResult.error ? (
         <Notice title="Couldn’t load items">{itemsResult.error.message}</Notice>
@@ -292,6 +327,23 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
             </>
           )}
         </EmptyState>
+      ) : view === "grid" ? (
+        /* Pictures first. Names in a props store are approximate — "the small
+           urn", "the good candlestick" — so a wall of photographs is often
+           the faster way to find a thing than a column of text. */
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {items.map((item) => (
+            <ItemTile
+              key={item.id}
+              href={`/items/${item.id}/edit`}
+              name={item.name}
+              photoUrl={item.photo_url ? photoUrlByPath.get(item.photo_url) : undefined}
+              locationName={item.location_id ? (item.locations?.name ?? "Unknown location") : null}
+              quantity={item.quantity}
+              inUseIn={inUseByItem.get(item.id)?.production.name}
+            />
+          ))}
+        </ul>
       ) : (
         <>
         {/* Eight columns can't work at phone width — below md the same rows
