@@ -225,6 +225,12 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
         }
         action={
           <div className="flex items-center gap-2">
+            <a
+              href={locationId ? `/items/export?location=${locationId}` : "/items/export"}
+              className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+            >
+              Export
+            </a>
             <Link
               href="/items/import"
               className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"

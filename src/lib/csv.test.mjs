@@ -7,7 +7,7 @@
 // line numbers, multi-word headers like "Storage Location" never matching,
 // and a "Prop" alias hijacking the name column.
 
-import { parseCsv, guessMapping, parseItemsCsv, validateRow, extraColumns } from "./csv.ts";
+import { parseCsv, guessMapping, parseItemsCsv, validateRow, extraColumns, toCsv } from "./csv.ts";
 
 let pass = 0, fail = 0;
 const eq = (label, actual, expected) => {
@@ -173,6 +173,41 @@ const long = parseItemsCsv(["name,Provenance", `Long,${"y".repeat(900)}`].join("
 eq("a very long value is truncated", long.rows[0].extra.Provenance.length, 500);
 
 eq("validateRow without headers keeps nothing", validateRow(["Chair"], ["name"], 2).extra, {});
+
+console.log("");
+console.log("── Writing CSV back out");
+
+// An export has to survive its own importer, or it's a one-way door.
+const awkward = [
+  ["name", "description", "location", "Insurance value"],
+  ["Yorick's skull", 'Cast resin, aged & "weathered"', "Shelf B", "£40"],
+  ["Rope, 30ft", "Coiled\nin a crate", "Shed", ""],
+  ["  Padded name  ", "", "Rack 3", "0"],
+  ["Comma, inside", "semi; colon", "", "1,200"],
+];
+
+const written = toCsv(awkward);
+eq("what goes out comes back identical", parseCsv(written), awkward);
+eq("only the fields that need quotes get them",
+   written.split("\r\n")[0], "name,description,location,Insurance value");
+eq("rows are separated by CRLF, which Excel prefers", written.includes("\r\n"), true);
+eq("an embedded newline stays inside one field", parseCsv(written)[2][1], "Coiled\nin a crate");
+eq("doubled quotes survive the trip", parseCsv(written)[1][1], 'Cast resin, aged & "weathered"');
+eq("padding is preserved rather than trimmed away", parseCsv(written)[3][0], "  Padded name  ");
+eq("an empty table writes as nothing", toCsv([]), "");
+
+// And the real point: an export re-read by the importer gives the same items.
+const roundTripped = parseItemsCsv(toCsv([
+  ["Name", "Category", "Quantity", "Condition", "Location", "Description"],
+  ["Pewter tankard", "prop", "12", "good", "Tableware Crate", "Dented, one handle loose"],
+  ["Crimson cloak", "costume", "2", "needs repair", "Rack 3", 'Gold frogging, "stage left" tag'],
+]));
+eq("the importer reads an export cleanly", roundTripped.rows.map((r) => [r.name, r.category, r.quantity, r.condition, r.locationName]), [
+  ["Pewter tankard", "prop", 12, "good", "Tableware Crate"],
+  ["Crimson cloak", "costume", 2, "needs_repair", "Rack 3"],
+]);
+eq("descriptions survive the round trip", roundTripped.rows[1].description, 'Gold frogging, "stage left" tag');
+eq("nothing errored on the way round", roundTripped.rows.flatMap((r) => r.errors), []);
 
 console.log("");
 console.log(`════ ${pass} passed, ${fail} failed ════`);

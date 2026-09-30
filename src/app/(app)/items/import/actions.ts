@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Category, Condition } from "@/lib/inventory";
 import { MAX_EXTRA_COLUMNS, MAX_IMPORT_ROWS } from "@/lib/csv";
+import { buildLocationChoices, type LocationNode } from "@/lib/locations";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 
 const CATEGORIES: Category[] = ["prop", "costume"];
@@ -222,11 +223,22 @@ export async function importItems(
   // ── Resolve location names to ids ──────────────────────────────────────
   const { data: existingLocations } = await supabase
     .from("locations")
-    .select("id, name");
+    .select("id, name, parent_location_id");
+
+  const locationRows = (existingLocations ?? []) as unknown as LocationNode[];
 
   const locationIdByName = new Map<string, string>();
-  for (const location of (existingLocations ?? []) as { id: string; name: string }[]) {
+  for (const location of locationRows) {
     locationIdByName.set(location.name.trim().toLowerCase(), location.id);
+  }
+
+  // A sheet exported from here writes locations as full paths ("Props Room A /
+  // Shakespeare box"), both to say which room a box is in and because two
+  // boxes can share a name. Matching those as well is what lets an export go
+  // back in without creating a location literally called "A / B".
+  for (const choice of buildLocationChoices(locationRows)) {
+    const key = choice.path.trim().toLowerCase();
+    if (!locationIdByName.has(key)) locationIdByName.set(key, choice.id);
   }
 
   const wanted = new Set<string>();
@@ -245,11 +257,18 @@ export async function importItems(
       }
     }
 
+    // A path that matched nothing becomes its last segment: a sheet saying
+    // "Shed / Weapons rack" wants a rack, not a location with a slash in its
+    // name. Where it hangs is left to whoever sorts the shelves out.
+    const nameFor = (key: string) => {
+      const original = originals.get(key) ?? key;
+      const segments = original.split("/").map((segment) => segment.trim()).filter(Boolean);
+      return segments[segments.length - 1] ?? original;
+    };
+
     const { data: created, error: locationError } = await supabase
       .from("locations")
-      .insert(
-        missing.map((key) => ({ org_id: orgId, name: originals.get(key) ?? key }))
-      )
+      .insert(missing.map((key) => ({ org_id: orgId, name: nameFor(key) })))
       .select("id, name");
 
     if (locationError) {
@@ -259,8 +278,21 @@ export async function importItems(
       };
     }
 
-    for (const location of (created ?? []) as { id: string; name: string }[]) {
+    // Rebuilt from the database rather than from what came back, because the
+    // rows a sheet asked for by path ("Props Room A / Shakespeare box") were
+    // created under their leaf name, and pairing the two by position would
+    // rest on an insert order nothing promises.
+    const { data: refreshed } = await supabase
+      .from("locations")
+      .select("id, name, parent_location_id");
+
+    const refreshedRows = (refreshed ?? []) as unknown as LocationNode[];
+    for (const location of refreshedRows) {
       locationIdByName.set(location.name.trim().toLowerCase(), location.id);
+    }
+    for (const choice of buildLocationChoices(refreshedRows)) {
+      const key = choice.path.trim().toLowerCase();
+      if (!locationIdByName.has(key)) locationIdByName.set(key, choice.id);
     }
     locationsCreated = created?.length ?? 0;
   }

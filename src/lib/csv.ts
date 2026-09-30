@@ -580,6 +580,31 @@ export function parseItemsTable(
   return { headers, mapping, rows };
 }
 
+/**
+ * Writes rows back out as CSV, quoting only what has to be quoted.
+ *
+ * The inverse of parseCsv, and tested against it: what comes out of an export
+ * has to go back in through the importer unchanged, or the export is a
+ * one-way door rather than a copy of the inventory.
+ */
+export function toCsv(rows: string[][]): string {
+  return rows
+    .map((row) =>
+      row
+        .map((cell) => {
+          const value = cell ?? "";
+          // A quote, a comma or a line break means the field has to be
+          // wrapped, and any quote inside it doubled. Leading or trailing
+          // spaces are quoted too, since some readers strip them otherwise.
+          return /[",\r\n]/.test(value) || value !== value.trim()
+            ? `"${value.replace(/"/g, '""')}"`
+            : value;
+        })
+        .join(",")
+    )
+    .join("\r\n");
+}
+
 /** The template offered on the import page, so a first-timer has a shape to copy. */
 export const CSV_TEMPLATE = [
   "name,category,quantity,condition,location,description,tags,photo",
