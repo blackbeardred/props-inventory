@@ -94,6 +94,77 @@ check "nothing in 001-005 was disturbed" "8" \
         ('organizations','profiles','memberships','locations','items','productions','pull_lists','pull_list_items')")"
 
 echo ""
+echo "── Upgrading a database that ran the earlier five-step draft"
+# Reproduces a real failure: the draft created the table without photo_url or
+# model, `create table if not exists` then did nothing, and match_items failed
+# with "column e.model does not exist" — pointing at the function rather than
+# at the table that was actually wrong.
+DB2=embedtest_legacy
+psql -h /tmp -p "$PORT" -U postgres -qc "drop database if exists $DB2;" -c "create database $DB2;" >/dev/null 2>&1
+legacy() { psql -h /tmp -p "$PORT" -U postgres -d $DB2 -tAc "$1" 2>&1 | tail -1; }
+
+psql -h /tmp -p "$PORT" -U postgres -d $DB2 -q >/dev/null 2>&1 <<'SQL'
+create schema if not exists auth;
+create schema if not exists storage;
+create schema if not exists extensions;
+create extension if not exists vector with schema extensions;
+create table auth.users (id uuid primary key);
+create or replace function auth.uid() returns uuid language sql stable as $fn$
+  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+$fn$;
+create table storage.buckets (id text primary key, name text, public boolean);
+create table storage.objects (id uuid primary key default gen_random_uuid(),
+  bucket_id text not null, name text not null, owner uuid);
+create or replace function storage.foldername(name text) returns text[]
+language sql immutable as $fn$ select string_to_array(name, '/') $fn$;
+do $$ begin if not exists (select 1 from pg_roles where rolname='anon')
+  then create role anon nologin; end if; end $$;
+do $$ begin if not exists (select 1 from pg_roles where rolname='authenticated')
+  then create role authenticated nologin; end if; end $$;
+SQL
+
+for file in "$HERE/../schema.sql" "$HERE"/../migrations/00[12345]_*.sql; do
+  psql -h /tmp -p "$PORT" -U postgres -d $DB2 -q -f "$file" >/dev/null 2>&1
+done
+
+# Stand in for the draft: drop the correct table, put the old shape back, and
+# give it the old policy names too.
+psql -h /tmp -p "$PORT" -U postgres -d $DB2 -q >/dev/null 2>&1 <<'SQL'
+drop function if exists match_items(extensions.vector, int);
+drop table if exists item_photo_embeddings;
+create table item_photo_embeddings (
+  item_id uuid primary key references items(id) on delete cascade,
+  org_id uuid not null references organizations(id) on delete cascade,
+  embedding extensions.vector(512) not null,
+  created_at timestamptz not null default now()
+);
+alter table item_photo_embeddings enable row level security;
+create policy "org members read embeddings" on item_photo_embeddings
+  for select using (org_id = auth_org_id());
+create policy "org members write embeddings" on item_photo_embeddings
+  for all using (org_id = auth_org_id()) with check (org_id = auth_org_id());
+SQL
+
+check "the draft's table really is missing model" "0" \
+  "$(legacy "select count(*) from information_schema.columns where table_name='item_photo_embeddings' and column_name='model'")"
+
+out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB2 -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/006_item_photo_embeddings.sql" 2>&1 | grep -i "^ERROR" | head -2)
+check "006 now upgrades it instead of failing" "" "$out"
+check "photo_url was added"  "1" \
+  "$(legacy "select count(*) from information_schema.columns where table_name='item_photo_embeddings' and column_name='photo_url'")"
+check "model was added"      "1" \
+  "$(legacy "select count(*) from information_schema.columns where table_name='item_photo_embeddings' and column_name='model'")"
+check "both ended up NOT NULL on an empty table" "2" \
+  "$(legacy "select count(*) from information_schema.columns where table_name='item_photo_embeddings' and column_name in ('photo_url','model') and is_nullable='NO'")"
+check "match_items exists now"  "1" "$(legacy "select count(*) from pg_proc where proname='match_items'")"
+check "the draft's two policies are gone, not left OR'd alongside" "2" \
+  "$(legacy "select count(*) from pg_policies where tablename='item_photo_embeddings'")"
+check "and the surviving write policy guards the item's owner" "1" \
+  "$(legacy "select count(*) from pg_policies where tablename='item_photo_embeddings' and with_check like '%items%'")"
+check "upgrading twice is still fine" "" \
+  "$(psql -h /tmp -p "$PORT" -U postgres -d $DB2 -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/006_item_photo_embeddings.sql" 2>&1 | grep -i "^ERROR" | head -2)"
+
+echo ""
 echo "── What the fingerprints do"
 psql -h /tmp -p "$PORT" -U postgres -d $DB -q >/dev/null 2>&1 <<'SQL'
 create or replace function test_vec(a float, b float) returns extensions.vector

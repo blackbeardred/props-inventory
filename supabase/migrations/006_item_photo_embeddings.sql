@@ -63,6 +63,46 @@ create table if not exists item_photo_embeddings (
 create index if not exists item_photo_embeddings_org_idx
   on item_photo_embeddings (org_id);
 
+-- ─────────────────────────────────────────────────────────────
+-- 2b. Repairing a table left by this migration's earlier draft
+--
+-- This work was first handed over as five separate SQL steps, and that draft
+-- created item_photo_embeddings with neither photo_url nor model. A database
+-- that ran it gets nothing from the `create table if not exists` above:
+-- Postgres does not reconcile an existing table with a new definition, it
+-- simply does nothing and reports success. The first sign of trouble is
+-- match_items failing further down the file, by which point the table looks
+-- fine and the error points at the function.
+--
+-- Hence this block, which brings an older table up to the current shape and
+-- is a no-op on a table that was created correctly.
+-- ─────────────────────────────────────────────────────────────
+alter table item_photo_embeddings add column if not exists photo_url text;
+alter table item_photo_embeddings
+  add column if not exists model text default 'clip-vit-base-patch32';
+
+update item_photo_embeddings set model = 'clip-vit-base-patch32' where model is null;
+
+do $repair$
+begin
+  if not exists (select 1 from item_photo_embeddings where model is null) then
+    alter table item_photo_embeddings alter column model set not null;
+  end if;
+
+  -- photo_url cannot be invented for a row that predates the column, and a
+  -- fingerprint whose source photo is unknown is exactly the stale-fingerprint
+  -- problem the column exists to prevent. Rather than guess, or delete
+  -- somebody's rows unasked, leave the column nullable and say so plainly.
+  if not exists (select 1 from item_photo_embeddings where photo_url is null) then
+    alter table item_photo_embeddings alter column photo_url set not null;
+  else
+    raise notice
+      'item_photo_embeddings has % row(s) with no photo_url, so the column stays nullable. Those fingerprints cannot be checked against the photo they came from: delete them and re-run the backfill.',
+      (select count(*) from item_photo_embeddings where photo_url is null);
+  end if;
+end
+$repair$;
+
 -- No similarity index on purpose. At a theatre's scale — a few thousand
 -- items at the very most — scanning every fingerprint is a few
 -- milliseconds, and an approximate index (ivfflat/hnsw) would trade exact
@@ -79,6 +119,14 @@ create index if not exists item_photo_embeddings_org_idx
 -- result. The item has to be one of theirs too.
 -- ─────────────────────────────────────────────────────────────
 alter table item_photo_embeddings enable row level security;
+
+-- The earlier five-step draft named its two policies differently. They have to
+-- go, not merely be superseded: RLS policies are OR'd together, so leaving the
+-- old write policy in place would keep open the very hole the policy below was
+-- written to close — it checked only org_id, and so allowed a fingerprint to be
+-- attached to another theatre's item.
+drop policy if exists "org members read embeddings" on item_photo_embeddings;
+drop policy if exists "org members write embeddings" on item_photo_embeddings;
 
 drop policy if exists "org members can read their item embeddings" on item_photo_embeddings;
 create policy "org members can read their item embeddings" on item_photo_embeddings
