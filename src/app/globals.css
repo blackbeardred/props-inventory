@@ -80,4 +80,15 @@ body {
   a[href]::after {
     content: "";
   }
+
+  /* A narrow page margin: label sheets and checklists both want the paper,
+     not the browser's default inch of nothing. */
+  @page {
+    margin: 8mm;
+  }
+
+  /* A label cut in half by a page break is waste paper. */
+  [data-label] {
+    break-inside: avoid;
+  }
 }

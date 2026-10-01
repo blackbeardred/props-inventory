@@ -163,12 +163,22 @@ export default async function LocationsPage() {
             : "Storage rooms, racks, shelves, and bins — nested however your space is organized."
         }
         action={
-          <Link
-            href="/locations/new"
-            className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
-          >
-            Add location
-          </Link>
+          <div className="flex items-center gap-2">
+            {rows.length > 0 ? (
+              <Link
+                href="/locations/labels"
+                className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+              >
+                Print labels
+              </Link>
+            ) : null}
+            <Link
+              href="/locations/new"
+              className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
+            >
+              Add location
+            </Link>
+          </div>
         }
       />
 
