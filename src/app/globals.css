@@ -78,9 +78,18 @@ body {
 }
 
 /* The hexagon, used as a shape rather than drawn as one. Applied to a button,
- * a swatch or the wordmark's full stop; the element keeps its own size. */
+ * a swatch or the wordmark's full stop.
+ *
+ * Set only a width. That polygon cuts a *regular* hexagon out of its box at
+ * exactly one aspect ratio — the flat sides are half the width, the slanted
+ * ones are sqrt((w/4)^2 + (h/2)^2), and those are equal only when
+ * h = w * sqrt(3)/2 — so the ratio is baked in here rather than left to
+ * whoever reaches for the shape next. Give it a height as well and you get a
+ * hexagon stretched along one axis, which is what every use of this class
+ * was doing until someone looked at one closely. */
 .hex {
   clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  aspect-ratio: 2 / 1.7320508;
 }
 
 /* Honeycomb, at the edge of visible. Six hairlines of the accent green at 5

@@ -84,7 +84,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
           needs it. The wrapper is unclipped and rings on behalf of its child. */}
       <span
         data-print-hide
-        className="absolute -left-[9px] top-4 inline-flex rounded-[2px] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent"
+        className="absolute -left-[10px] top-4 inline-flex rounded-[2px] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent"
       >
         <button
           type="button"
@@ -96,7 +96,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
           // `scale`, not `transform`: Tailwind v4 compiles scale-110 to the
           // standalone scale property, so a transition on transform never
           // animated it.
-          className={`hex h-[23px] w-[20px] cursor-pointer border-0 p-0 outline-none transition-[scale,background-color] duration-150 hover:scale-110 active:scale-95 ${
+          className={`hex w-[22px] cursor-pointer border-0 p-0 outline-none transition-[scale,background-color] duration-150 hover:scale-110 active:scale-95 ${
             open ? "bg-foreground" : "bg-honey"
           }`}
         >
@@ -145,7 +145,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
             title={`In use in ${item.inUse.productionName}`}
             className="mt-0.5 flex shrink-0 items-center gap-1.5 font-mono text-[10px] text-in-use-ink"
           >
-            <span aria-hidden="true" className="hex inline-block h-[9px] w-[8px] bg-in-use" />
+            <span aria-hidden="true" className="hex inline-block w-[9px] bg-in-use" />
             {item.quantity > 1
               ? `${item.inUse.quantityInUse}/${item.quantity} in use`
               : "in use"}

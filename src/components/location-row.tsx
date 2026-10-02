@@ -89,7 +89,7 @@ export function LocationRow({
                   // compiles rotate-90 to the standalone `rotate` property, and
                   // a transition on `transform` does not touch it — the turn
                   // was snapping rather than sweeping.
-                  className={`hex h-[15px] w-[13px] cursor-pointer border-0 p-0 outline-none transition-[rotate,background-color] duration-200 ease-out hover:rotate-90 focus-visible:rotate-90 ${
+                  className={`hex w-[15px] cursor-pointer border-0 p-0 outline-none transition-[rotate,background-color] duration-200 ease-out hover:rotate-90 focus-visible:rotate-90 ${
                     expanded ? "bg-foreground" : "bg-honey"
                   }`}
                 />

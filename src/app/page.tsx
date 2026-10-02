@@ -42,7 +42,7 @@ export default async function Home() {
                 app — everywhere else the shape is a control. */}
             <span
               aria-hidden="true"
-              className="hex ml-1 inline-block h-[9px] w-[8px] bg-honey align-baseline"
+              className="hex ml-1 inline-block w-[9px] bg-honey align-baseline"
             />
           </p>
 
