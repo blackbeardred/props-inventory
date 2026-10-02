@@ -151,11 +151,24 @@ body {
   }
 }
 
-/* A cell opening is a nicety, not information. Somebody who has asked for
- * less movement still gets the contents, immediately. */
+/* A cell opening, or a hexagon turning under the pointer, is a nicety rather
+ * than information. Somebody who has asked for less movement still gets the
+ * contents, and still gets the colour change that carries the state. */
 @media (prefers-reduced-motion: reduce) {
   [data-cell-panel],
-  [data-cell-button] {
+  [data-cell-button],
+  [data-hex-toggle] {
     transition: none !important;
+  }
+
+  /* `rotate` and `scale` rather than `transform`: Tailwind v4 compiles
+     rotate-90 and scale-110 to those standalone properties, so overriding
+     `transform` here would leave the movement in place. */
+  [data-hex-toggle]:hover,
+  [data-hex-toggle]:focus-visible,
+  [data-cell-button]:hover,
+  [data-cell-button]:active {
+    rotate: none !important;
+    scale: none !important;
   }
 }

@@ -65,20 +65,38 @@ export function LocationRow({
             style={{ paddingLeft: `${row.depth * 1.25}rem` }}
           >
             {row.childCount > 0 ? (
-              <button
-                type="button"
-                onClick={onToggleChildren}
-                aria-expanded={expanded ?? false}
-                aria-label={`${expanded ? "Hide" : "Show"} what's inside ${row.name}`}
-                className="mt-0.5 shrink-0 rounded text-muted transition-colors hover:text-foreground"
-              >
-                <span aria-hidden="true" className="inline-block w-3 text-xs">
-                  {expanded ? "▾" : "▸"}
-                </span>
-              </button>
+              // The focus ring goes on this wrapper rather than on the button:
+              // a clip-path clips the element's own outline too, so a focused
+              // hexagon would draw a ring and then cut it off. Same reason as
+              // the cell button on an item card.
+              <span className="mt-[2px] inline-flex shrink-0 rounded-[2px] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent">
+                <button
+                  type="button"
+                  data-hex-toggle
+                  onClick={onToggleChildren}
+                  aria-expanded={expanded ?? false}
+                  aria-label={`${expanded ? "Hide" : "Show"} what's inside ${row.name}`}
+                  // Honey when shut, ink when open — the same two states the
+                  // cell button on an item card uses, so the hexagon-shaped
+                  // control means one thing wherever it turns up. Open/shut
+                  // rides on the colour rather than on the angle, which leaves
+                  // the turn free to answer the pointer.
+                  //
+                  // 90°, not 30°: a hexagon maps onto itself every 60°, so both
+                  // land on the same silhouette, and the longer sweep reads as
+                  // a turn rather than a twitch.
+                  // transition-[rotate,…], not transition-[transform,…]: Tailwind v4
+                  // compiles rotate-90 to the standalone `rotate` property, and
+                  // a transition on `transform` does not touch it — the turn
+                  // was snapping rather than sweeping.
+                  className={`hex h-[15px] w-[13px] cursor-pointer border-0 p-0 outline-none transition-[rotate,background-color] duration-200 ease-out hover:rotate-90 focus-visible:rotate-90 ${
+                    expanded ? "bg-foreground" : "bg-honey"
+                  }`}
+                />
+              </span>
             ) : (
               // Keeps leaf names aligned with the ones that have a control.
-              <span aria-hidden="true" className="mt-0.5 w-3 shrink-0" />
+              <span aria-hidden="true" className="mt-0.5 w-[13px] shrink-0" />
             )}
             <div>
             <span className="font-body text-sm text-foreground">

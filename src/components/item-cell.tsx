@@ -93,7 +93,10 @@ export function ItemCell({ item }: { item: ItemCellData }) {
           aria-controls={panelId}
           onClick={() => setOpen((current) => !current)}
           title={open ? `Hide details for ${item.name}` : `Show details for ${item.name}`}
-          className={`hex h-[23px] w-[20px] cursor-pointer border-0 p-0 outline-none transition-[transform,background-color] duration-150 hover:scale-110 active:scale-95 ${
+          // `scale`, not `transform`: Tailwind v4 compiles scale-110 to the
+          // standalone scale property, so a transition on transform never
+          // animated it.
+          className={`hex h-[23px] w-[20px] cursor-pointer border-0 p-0 outline-none transition-[scale,background-color] duration-150 hover:scale-110 active:scale-95 ${
             open ? "bg-foreground" : "bg-honey"
           }`}
         >
