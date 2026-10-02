@@ -11,7 +11,7 @@ import {
 import { SubmitButton } from "@/components/submit-button";
 import { PhotoField } from "@/components/photo-field";
 import { LocationField } from "@/components/location-field";
-import { buildLocationChoices, type LocationNode } from "@/lib/locations";
+import type { LocationNode } from "@/lib/locations";
 import { DeleteButton } from "@/components/delete-button";
 import { ImportDataPanel } from "@/components/import-data-panel";
 import { createClient } from "@/lib/supabase/server";
@@ -236,9 +236,7 @@ export default async function EditItemPage({
           </SelectField>
 
           <LocationField
-            choices={buildLocationChoices(
-              (locations ?? []) as unknown as LocationNode[]
-            )}
+            nodes={(locations ?? []) as unknown as LocationNode[]}
             defaultValue={typedItem.location_id ?? ""}
           />
         </div>

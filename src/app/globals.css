@@ -175,6 +175,11 @@ body {
      `transform` here would leave the movement in place. */
   [data-hex-toggle]:hover,
   [data-hex-toggle]:focus-visible,
+  /* …and the ones a parent hover turns, such as the walk-in control in the
+     location picker, where the shape is inside the button rather than being
+     it. */
+  .group:hover [data-hex-toggle],
+  .group:focus-visible [data-hex-toggle],
   [data-cell-button]:hover,
   [data-cell-button]:active {
     rotate: none !important;

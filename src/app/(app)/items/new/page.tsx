@@ -12,7 +12,7 @@ import { PhotoField } from "@/components/photo-field";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@/lib/inventory";
-import { buildLocationChoices, type LocationNode } from "@/lib/locations";
+import type { LocationNode } from "@/lib/locations";
 import { LocationField } from "@/components/location-field";
 import { createItem } from "./actions";
 
@@ -42,9 +42,7 @@ export default async function NewItemPage({
     .from("locations")
     .select("id, name, parent_location_id")
     .order("name");
-  const locationChoices = buildLocationChoices(
-    (locations ?? []) as unknown as LocationNode[]
-  );
+  const locationNodes = (locations ?? []) as unknown as LocationNode[];
 
   return (
     <>
@@ -98,7 +96,7 @@ export default async function NewItemPage({
             ))}
           </SelectField>
 
-          <LocationField choices={locationChoices} />
+          <LocationField nodes={locationNodes} />
         </div>
 
         <SubmitButton pendingText="Adding item…">Add item</SubmitButton>
