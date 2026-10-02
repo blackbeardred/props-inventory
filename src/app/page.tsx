@@ -38,6 +38,12 @@ export default async function Home() {
         <div className="w-full max-w-3xl mx-auto px-6 py-20">
           <p className="font-body text-sm text-muted mb-6">
             Props &amp; Costume Inventory
+            {/* The wordmark's full stop. The only decorative hexagon in the
+                app — everywhere else the shape is a control. */}
+            <span
+              aria-hidden="true"
+              className="hex ml-1 inline-block h-[9px] w-[8px] bg-honey align-baseline"
+            />
           </p>
 
           <h1 className="font-display text-4xl sm:text-5xl leading-[1.15] mb-6">

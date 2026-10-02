@@ -1,31 +1,50 @@
 @import "tailwindcss";
 
+/* ── Propolis ──────────────────────────────────────────────────────────────
+ *
+ * The prop table's own palette — butcher-paper cream, the tan of the table
+ * itself, felt-lined-trunk green, tape-label honey — organized the way a hive
+ * is: every item in its own cell.
+ *
+ * Every pairing below was measured rather than eyeballed, because the card
+ * ground is now tan rather than white and that costs about a point of
+ * contrast on everything. Ratios in the comments are against the card tan,
+ * which is the worse of the two grounds. See claude/brand-direction.md.
+ */
 :root {
   /* Ground and ink */
-  --background: #FAFBFC;
-  --surface: #FFFFFF;
-  --foreground: #253046;
-  --muted: #5A6A83;
-  --rule: #E5EAF0;
+  --background: #FBF7EC; /* butcher paper */
+  --surface: #E8DFC9;    /* the table itself */
+  --foreground: #2A2219; /* 11.80:1 */
+  --muted: #6B5F4C;      /*  4.70:1 */
+  --rule: #C9BC9C;
 
-  /* Brand purple, split in two. The palette's #8B7CF8 is a fill colour: at
-     3.20:1 against the page ground it can't legally carry text, and the
-     "Add item" button renders near-white type *on* the accent. So --accent
-     is that same hue darkened until white on it clears WCAG AA (6.14:1),
-     and --accent-soft keeps the original for tints, fills and borders.
-     Every bright hue below is split the same way. */
-  --accent: #5B4BD6;
-  --accent-soft: #8B7CF8;
+  /* Felt-trunk green. --accent carries type and fills at full strength
+     (4.61:1 on tan; cream on it is 5.71:1, so the primary button is legal
+     both ways). --accent-soft is for tints, fills and borders only.
+     --accent-ink is the same hue darkened for type sitting *on* one of those
+     tints, where the plain accent drops to 4.02 and fails. */
+  --accent: #3F6B52;
+  --accent-soft: #5C8C70;
+  --accent-ink: #355B44; /* 5.06:1 on its own tint */
 
-  /* Status. The -ink value is for type, the bare one for fills and dots. */
-  --in-use: #2EC4B6;
-  --in-use-ink: #0C6A61;
-  --danger: #FF7F73;
-  --danger-ink: #C0392B;
-  --success: #6BCB77;
-  --success-ink: #267432;
-  --warning: #FFC857;
-  --warning-ink: #8A6410;
+  /* Honey is the hive. It is a fill colour and nothing else: at 2.74:1 on
+     cream it cannot legally carry text, so it appears as the ground under
+     ink — the cell buttons — and never as type. */
+  --honey: #C98A2C;
+  --honey-ink: #7E5410;
+
+  /* Status. The -ink value is for type, the bare one for fills and dots.
+     Warmed to sit in this palette; "in use" keeps a cool hue on purpose,
+     because it is the one state that must not read as a condition. */
+  --in-use: #3E8C9A;
+  --in-use-ink: #185C68;
+  --danger: #D4795F;
+  --danger-ink: #9B3A22;
+  --success: #6E9C7E;
+  --success-ink: #2F5A42;
+  --warning: #E3B36A;
+  --warning-ink: #7E5410;
 }
 
 @theme inline {
@@ -35,6 +54,9 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-honey: var(--honey);
+  --color-honey-ink: var(--honey-ink);
   --color-rule: var(--rule);
   --color-in-use: var(--in-use);
   --color-in-use-ink: var(--in-use-ink);
@@ -46,12 +68,35 @@
   --color-warning-ink: var(--warning-ink);
   --font-display: var(--font-display);
   --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), Arial, Helvetica, sans-serif;
+}
+
+/* The hexagon, used as a shape rather than drawn as one. Applied to a button,
+ * a swatch or the wordmark's full stop; the element keeps its own size. */
+.hex {
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+/* Honeycomb, at the edge of visible. Six hairlines of the accent green at 5
+ * to 7 percent, tiled — it should read as texture in the paper rather than as
+ * a pattern anyone notices. Anything stronger competes with the inventory. */
+.honeycomb {
+  background-image:
+    linear-gradient(30deg, rgba(63, 107, 82, 0.07) 1px, transparent 1px),
+    linear-gradient(150deg, rgba(63, 107, 82, 0.07) 1px, transparent 1px),
+    linear-gradient(30deg, rgba(63, 107, 82, 0.07) 1px, transparent 1px),
+    linear-gradient(150deg, rgba(63, 107, 82, 0.07) 1px, transparent 1px),
+    linear-gradient(60deg, rgba(63, 107, 82, 0.05) 1px, transparent 1px),
+    linear-gradient(60deg, rgba(63, 107, 82, 0.05) 1px, transparent 1px);
+  background-size: 52px 90px;
+  background-position: 0 0, 0 0, 26px 45px, 26px 45px, 0 0, 26px 45px;
+  background-attachment: fixed;
 }
 
 /* Printing.
@@ -69,6 +114,12 @@ body {
 
   body {
     background: #fff;
+  }
+
+  /* Texture is for screens. On paper it is a few thousand hairlines of toner
+     for something nobody was meant to notice in the first place. */
+  .honeycomb {
+    background-image: none !important;
   }
 
   /* Printers drop background colours by default, so borders do the work of
@@ -90,5 +141,21 @@ body {
   /* A label cut in half by a page break is waste paper. */
   [data-label] {
     break-inside: avoid;
+  }
+
+  /* On paper every cell is open: there is nothing to click, and a printed
+     list of names with the details hidden is a worse list than the table it
+     replaced. */
+  [data-cell-panel] {
+    grid-template-rows: 1fr !important;
+  }
+}
+
+/* A cell opening is a nicety, not information. Somebody who has asked for
+ * less movement still gets the contents, immediately. */
+@media (prefers-reduced-motion: reduce) {
+  [data-cell-panel],
+  [data-cell-button] {
+    transition: none !important;
   }
 }

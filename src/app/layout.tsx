@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Inter } from "next/font/google";
+import { Courier_Prime, Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -14,6 +14,15 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+// Propolis: the quiet mono that carries meta lines, field labels and data
+// values. Not a third voice for prose — it marks the things that are read as
+// records rather than as sentences.
+const courierPrime = Courier_Prime({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+});
+
 export const metadata: Metadata = {
   title: "Props & Costume Inventory",
   description: "Track props, costumes, storage locations, and pull lists.",
@@ -23,9 +32,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${inter.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${inter.variable} ${courierPrime.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      {/* The honeycomb texture lives on the body so every page carries the
+          same ground, rather than each panel drawing its own. */}
+      <body className="honeycomb min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

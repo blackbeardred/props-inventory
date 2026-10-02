@@ -24,12 +24,14 @@ export function PageHeading({
 
 // Tinted fills rather than outlines: a status colour only reads as status
 // when its hue is actually present as a ground. Each tone pairs a light wash
-// of its hue with that hue's darkened ink, every pair clearing WCAG AA on
-// the card white (see the -ink values in globals.css).
+// of its hue with that hue's darkened ink, every pair clearing WCAG AA on the
+// card tan (see the -ink values in globals.css). The accent tone takes
+// --accent-ink rather than --accent: the plain accent clears AA on the bare
+// card but drops to 4.02 once its own tint is underneath it.
 const BADGE_TONES = {
   neutral: "bg-foreground/[0.06] text-foreground",
   muted: "bg-foreground/[0.05] text-muted",
-  accent: "bg-accent-soft/15 text-accent",
+  accent: "bg-accent-soft/15 text-accent-ink",
   success: "bg-success/15 text-success-ink",
   warning: "bg-warning/20 text-warning-ink",
   danger: "bg-danger/15 text-danger-ink",
