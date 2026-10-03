@@ -124,6 +124,39 @@ type Embedder = {
 };
 
 let loading: Promise<Embedder> | null = null;
+let ready = false;
+
+/**
+ * Whether this browser already holds the model, so using it costs nothing.
+ *
+ * The point of asking is that a 40MB download is fine when someone chose it on
+ * the fingerprints page, and rude when it ambushes them for adding one item on
+ * a phone in a storage room. Anything that fingerprints on its own initiative
+ * checks here first and quietly does nothing when the answer is no.
+ *
+ * transformers.js stores model files in the Cache API under `transformers-cache`,
+ * keyed by their URL. Rather than reconstructing the exact key — which would be
+ * a guess about someone else's naming, and would break silently if it changed —
+ * this looks for any cached .onnx belonging to the repo.
+ */
+export async function isModelCached(): Promise<boolean> {
+  if (ready) return true;
+  if (typeof caches === "undefined") return false;
+
+  try {
+    const cache = await caches.open("transformers-cache");
+    const keys = await cache.keys();
+    const repo = EMBEDDING_REPO.toLowerCase();
+    return keys.some((request) => {
+      const url = request.url.toLowerCase();
+      return url.includes(repo) && url.endsWith(".onnx");
+    });
+  } catch {
+    // Private windows, blocked storage, and insecure origins all throw here.
+    // Not being able to tell is the same as not having it.
+    return false;
+  }
+}
 
 /**
  * Loads CLIP, once per page. The promise is cached rather than the result, so
@@ -168,6 +201,7 @@ export function loadEmbedder(onProgress?: (progress: LoadProgress) => void): Pro
     ]);
 
     onProgress?.({ message: "Ready.", percent: null });
+    ready = true;
 
     return {
       processor: (image) => processor(image),

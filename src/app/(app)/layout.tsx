@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppNav } from "@/components/app-nav";
+import { FingerprintCatchUp } from "@/components/fingerprint-catch-up";
 import { OrgSwitcher } from "@/components/org-switcher";
 import { getUserAndProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -81,6 +82,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           {children}
         </div>
       </main>
+      {/* Catches up photo fingerprints in the background, but only on a device
+          that already holds the model — see the component for why. */}
+      <FingerprintCatchUp orgId={profile.active_org_id} />
     </div>
   );
 }
