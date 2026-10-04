@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   buildLocationTree,
   flattenLocationTree,
@@ -28,12 +28,18 @@ import {
  * not only in the boxes on it — so every row can be chosen, and the arrow that
  * walks into it is a separate control beside it.
  */
-/** Roughly how tall the open panel gets, for deciding which way to open. */
-const PANEL_HEIGHT = 320;
+/** How tall the list would like to be, given the room. */
+const LIST_HEIGHT = 256;
+/** And the least it can be and still be worth opening. */
+const MIN_LIST_HEIGHT = 96;
+/** Roughly what the panel costs above the list: the search box, a breadcrumb. */
+const PANEL_CHROME = 88;
 /** How wide it would like to be, for a full path. */
 const PANEL_WIDTH = 384;
 /** Breathing room kept between the panel and the edge of the window. */
 const WINDOW_MARGIN = 12;
+
+type Fit = { dropUp: boolean; alignRight: boolean; maxWidth: number; listHeight: number };
 
 export function LocationPicker({
   nodes,
@@ -58,11 +64,13 @@ export function LocationPicker({
   /** Ids from the outermost space to the one whose contents are showing. */
   const [trail, setTrail] = useState<string[]>([]);
   const [active, setActive] = useState(0);
-  /** Where the panel can go without leaving the window, measured on open. */
-  const [fit, setFit] = useState<{ dropUp: boolean; alignRight: boolean; maxWidth: number }>({
+  /** Where the panel can go without leaving the window. Re-measured, not
+   *  assumed: see measure(). */
+  const [fit, setFit] = useState<Fit>({
     dropUp: false,
     alignRight: false,
     maxWidth: PANEL_WIDTH,
+    listHeight: LIST_HEIGHT,
   });
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -118,32 +126,95 @@ export function LocationPicker({
     return list;
   }, [query, flat, hidden, here, trail, byId, tree]);
 
+  /**
+   * Where the panel fits right now.
+   *
+   * Measured rather than assumed, because every lazy answer is wrong
+   * somewhere: this field is the last row of the item form and sits in the
+   * right-hand column of a two-column grid, so "always below" puts it off the
+   * bottom of a short window and "always left-aligned" puts it off the side of
+   * a phone.
+   *
+   * It reads the *visual* viewport, not window.innerHeight. On a phone, tapping
+   * this field opens the keyboard, and the keyboard does not change
+   * innerHeight — it covers the bottom of it. A panel measured against
+   * innerHeight is a panel measured against a strip of screen that is now
+   * underneath the keyboard, which is exactly where its search box would end
+   * up while you were typing into it.
+   */
+  const measure = useCallback(() => {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const vv = window.visualViewport;
+    const viewTop = vv ? vv.offsetTop : 0;
+    const viewLeft = vv ? vv.offsetLeft : 0;
+    const viewHeight = vv ? vv.height : window.innerHeight;
+    const viewWidth = vv ? vv.width : window.innerWidth;
+
+    const below = viewTop + viewHeight - rect.bottom - WINDOW_MARGIN;
+    const above = rect.top - viewTop - WINDOW_MARGIN;
+    const dropUp = below < LIST_HEIGHT + PANEL_CHROME && above > below;
+    const room = (dropUp ? above : below) - PANEL_CHROME;
+
+    const maxWidth = Math.min(PANEL_WIDTH, viewWidth - 2 * WINDOW_MARGIN);
+
+    const next: Fit = {
+      dropUp,
+      alignRight: rect.left - viewLeft + maxWidth > viewWidth - WINDOW_MARGIN,
+      maxWidth,
+      // Never below the floor: a list two rows tall is worse than one that
+      // overlaps a little and can be scrolled.
+      listHeight: Math.max(MIN_LIST_HEIGHT, Math.min(LIST_HEIGHT, room)),
+    };
+
+    setFit((current) =>
+      current.dropUp === next.dropUp &&
+      current.alignRight === next.alignRight &&
+      current.maxWidth === next.maxWidth &&
+      current.listHeight === next.listHeight
+        ? current
+        : next,
+    );
+  }, []);
+
   // Open where the chosen thing lives, not at the top — editing an item filed
   // four deep should not start the walk over.
   function openPanel() {
     setQuery("");
     setTrail(chosen ? chosen.trail : []);
     setActive(0);
-    // Measured rather than assumed. This field is the last row of the item
-    // form and sits in the right-hand column of a two-column grid, so on a
-    // phone both of the lazy answers — always below, always left-aligned —
-    // put the panel somewhere you can't reach it.
-    const rect = rootRef.current?.getBoundingClientRect();
-    if (rect) {
-      const maxWidth = Math.min(PANEL_WIDTH, window.innerWidth - 2 * WINDOW_MARGIN);
-      const below = window.innerHeight - rect.bottom;
-      setFit({
-        dropUp: below < PANEL_HEIGHT && rect.top > below,
-        alignRight: rect.left + maxWidth > window.innerWidth - WINDOW_MARGIN,
-        maxWidth,
-      });
-    }
+    measure();
     setOpen(true);
   }
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
+
+  // The keyboard opening, the page scrolling, the phone being turned — all of
+  // them move the ground under an open panel, and none of them fire anything
+  // that a measurement taken once at open time would hear about.
+  useEffect(() => {
+    if (!open) return;
+    let frame = 0;
+    const onChange = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", onChange);
+    vv?.addEventListener("scroll", onChange);
+    window.addEventListener("resize", onChange);
+    window.addEventListener("scroll", onChange, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      vv?.removeEventListener("resize", onChange);
+      vv?.removeEventListener("scroll", onChange);
+      window.removeEventListener("resize", onChange);
+      window.removeEventListener("scroll", onChange, true);
+    };
+  }, [open, measure]);
 
   useEffect(() => {
     if (!open) return;
@@ -253,6 +324,11 @@ export function LocationPicker({
               aria-autocomplete="list"
               value={query}
               placeholder={placeholder}
+              // Box names are names: a phone capitalising and autocorrecting
+              // them turns "Rack 3" into "Rack 3." and finds nothing.
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
               onChange={(event) => {
                 setQuery(event.target.value);
                 setActive(0);
@@ -268,7 +344,14 @@ export function LocationPicker({
             </p>
           ) : null}
 
-          <ul id={listboxId} role="listbox" className="max-h-64 overflow-y-auto py-1">
+          <ul
+            id={listboxId}
+            role="listbox"
+            // overscroll-contain so flicking past the end of the list on a
+            // phone doesn't hand the scroll to the page behind it.
+            style={{ maxHeight: fit.listHeight }}
+            className="overflow-y-auto overscroll-contain py-1"
+          >
             {rows.length === 0 ? (
               <li className="px-3 py-2 font-body text-sm text-muted">
                 Nothing here matches “{query.trim()}”.
@@ -296,7 +379,8 @@ export function LocationPicker({
                     <button
                       type="button"
                       onClick={() => activate(row)}
-                      className="min-w-0 flex-1 px-3 py-1.5 text-left font-body text-sm outline-none"
+                      // Roomier on a phone, where this is a thumb rather than a pointer.
+                      className="min-w-0 flex-1 px-3 py-2.5 text-left font-body text-sm outline-none sm:py-1.5"
                     >
                       {row.kind === "none" ? (
                         <span className="text-muted">{noneLabel}</span>
@@ -327,7 +411,7 @@ export function LocationPicker({
                         type="button"
                         onClick={() => walkInto(row.node)}
                         aria-label={`Open ${row.node.name}`}
-                        className="group flex shrink-0 items-center gap-1.5 border-l border-rule/60 px-2.5 font-mono text-[10px] text-muted outline-none hover:text-foreground focus-visible:text-foreground"
+                        className="group flex shrink-0 items-center gap-1.5 border-l border-rule/60 px-3.5 font-mono text-[10px] text-muted outline-none hover:text-foreground focus-visible:text-foreground sm:px-2.5"
                       >
                         {row.node.children.length}
                         <span
