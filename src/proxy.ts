@@ -72,6 +72,11 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // The installable-app files are left out alongside the images: the
+    // browser fetches the manifest *without* cookies, so running it through
+    // here would bounce it to /login and the site would stop being
+    // installable — and the service worker, its offline page and the
+    // manifest have nothing to do with anyone's session anyway.
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|offline\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

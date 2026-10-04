@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppNav, MobileTabBar } from "@/components/app-nav";
 import { FingerprintCatchUp } from "@/components/fingerprint-catch-up";
+import { OfflineBanner } from "@/components/service-worker";
 import { OrgSwitcher } from "@/components/org-switcher";
 import { getUserAndProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -41,6 +42,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex flex-1 flex-col">
+      <OfflineBanner />
       <header className="border-b border-rule">
         {/* The shell widens only from xl up. Below that nothing changes: a
             phone is already edge to edge, and a tablet reads better narrow.

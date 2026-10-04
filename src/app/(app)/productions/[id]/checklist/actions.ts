@@ -17,6 +17,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { CheckState } from "@/lib/checklist";
+import { plausibleTickTime } from "@/lib/offline-queue";
 
 export type CheckOutcome = { ok: true } | { ok: false; error: string };
 
@@ -25,7 +26,13 @@ const STATES: CheckState[] = ["open", "checked", "cleared"];
 export async function setCheckState(
   productionId: string,
   pullListItemId: string,
-  state: CheckState
+  state: CheckState,
+  /**
+   * When the tick was really made, for one that waited on a phone with no
+   * signal. Believed only if it's plausible (not in the future, under a week
+   * old); otherwise it's now, as it always was.
+   */
+  madeAt?: string
 ): Promise<CheckOutcome> {
   if (!STATES.includes(state)) {
     return { ok: false, error: "That isn’t a state a row can be in." };
@@ -45,7 +52,10 @@ export async function setCheckState(
   // comments rather than spread across three branches.
   const patch: Record<string, unknown> = {
     check_state: state,
-    checked_at: state === "open" ? null : new Date().toISOString(),
+    checked_at:
+      state === "open"
+        ? null
+        : (plausibleTickTime(madeAt, new Date()) ?? new Date()).toISOString(),
     checked_by: state === "open" ? null : user.id,
   };
 

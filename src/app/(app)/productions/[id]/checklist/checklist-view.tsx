@@ -1,7 +1,16 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { ChecklistRoom, ChecklistRow, CheckState } from "@/lib/checklist";
+import {
+  dequeue,
+  enqueue,
+  loadQueue,
+  pendingStates,
+  saveQueue,
+  type QueuedTick,
+} from "@/lib/offline-queue";
 import { setCheckState } from "./actions";
 
 /** How far a row travels before letting go clears it. */
@@ -191,6 +200,7 @@ export function ChecklistView({
   rooms: ChecklistRoom[];
   photoUrlByRowId: Record<string, string>;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -198,11 +208,103 @@ export function ChecklistView({
   // makes a walk round a store feel broken. Overlay first, reconcile after.
   const [local, setLocal] = useState<Record<string, CheckState>>({});
 
+  // Ticks made with no signal, kept on this device until they're sent.
+  const [queue, setQueue] = useState<QueuedTick[]>([]);
+  const flushing = useRef(false);
+
+  // Storage is the source of truth for the queue, read and written in one
+  // step, so a flush that starts straight after sees this tick.
+  const keep = useCallback(
+    (tick: QueuedTick) => {
+      const next = enqueue(loadQueue(productionId), tick);
+      saveQueue(productionId, next);
+      setQueue(next);
+    },
+    [productionId]
+  );
+
+  /**
+   * Sends what's waiting, oldest first, and stops at the first one the
+   * network refuses — the rest wait for the next try. A tick the server
+   * itself rejects (a row since deleted, say) is dropped with a message
+   * rather than retried forever.
+   */
+  const flush = useCallback(async () => {
+    if (flushing.current) return;
+    flushing.current = true;
+    let sent = 0;
+    try {
+      let waiting = loadQueue(productionId);
+      for (const tick of [...waiting]) {
+        let outcome;
+        try {
+          outcome = await setCheckState(productionId, tick.rowId, tick.state, tick.at);
+        } catch {
+          break; // Still no connection.
+        }
+        waiting = dequeue(waiting, tick.rowId);
+        saveQueue(productionId, waiting);
+        setQueue(waiting);
+        sent += 1;
+        if (!outcome.ok) setError(outcome.error);
+      }
+    } finally {
+      flushing.current = false;
+    }
+    if (sent > 0) {
+      router.refresh();
+      // Ticks made while this round was sending went to the back of the
+      // line; send them too rather than waiting for the next reconnect.
+      if (loadQueue(productionId).length > 0) void flushRef.current();
+    }
+  }, [productionId, router]);
+  const flushRef = useRef(flush);
+  useEffect(() => {
+    flushRef.current = flush;
+  }, [flush]);
+
+  // On opening: anything left from an earlier visit shows as ticked, and is
+  // sent straight away if there's a connection. Then again whenever the
+  // connection comes back.
+  useEffect(() => {
+    const waiting = loadQueue(productionId);
+    if (waiting.length > 0) {
+      // Restoring from storage on mount is the one place state has to be set
+      // from an effect: it doesn't exist during the server render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setQueue(waiting);
+      setLocal((current) => ({ ...pendingStates(waiting), ...current }));
+      if (navigator.onLine) void flush();
+    }
+    const onOnline = () => void flush();
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [productionId, flush]);
+
   function set(rowId: string, state: CheckState) {
     setLocal((current) => ({ ...current, [rowId]: state }));
     setError(null);
+    const tick: QueuedTick = { rowId, state, at: new Date().toISOString() };
+
+    // Known to be offline: don't even try. Keep it for later. And while
+    // anything is still waiting, new ticks join the back of that line rather
+    // than overtaking it — otherwise an older queued tick for this same row
+    // could land after this one and undo it.
+    if (!navigator.onLine || loadQueue(productionId).length > 0) {
+      keep(tick);
+      if (navigator.onLine) void flush();
+      return;
+    }
+
     startTransition(async () => {
-      const outcome = await setCheckState(productionId, rowId, state);
+      let outcome;
+      try {
+        outcome = await setCheckState(productionId, rowId, state, tick.at);
+      } catch {
+        // The connection dropped mid-walk. Same as offline: keep it.
+        keep(tick);
+        return;
+      }
       if (!outcome.ok) {
         setError(outcome.error);
         setLocal((current) => {
@@ -227,6 +329,17 @@ export function ChecklistView({
       </p>
 
       {error ? <p className="font-body text-sm text-danger-ink">{error}</p> : null}
+
+      {queue.length > 0 ? (
+        <p
+          role="status"
+          className="rounded-md border border-rule bg-warning/20 px-3 py-2 font-body text-sm text-warning-ink"
+        >
+          {queue.length === 1 ? "1 tick is" : `${queue.length} ticks are`} saved on this device
+          and will be sent when there’s a connection. Keep this page or the app open, or come back
+          to it later — they won’t be lost.
+        </p>
+      ) : null}
 
       {rooms.map((room) => (
         <section key={room.id ?? "unfiled"}>

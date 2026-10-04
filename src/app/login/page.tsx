@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClearOfflinePages } from "@/components/service-worker";
 import Link from "next/link";
 import { Notice, PageHeading, TextField } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
@@ -24,6 +25,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-16">
+      {/* Whoever lands here — logged out, or their session ran out — the
+          pages kept for offline use belong to the last person signed in. */}
+      <ClearOfflinePages />
       <div className="w-full max-w-sm">
         <PageHeading title="Log in" intro="Welcome back." />
 

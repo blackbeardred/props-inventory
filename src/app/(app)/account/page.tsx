@@ -15,6 +15,7 @@ import { supabaseConfigured } from "@/lib/supabase/config";
 import { getUserAndProfile } from "@/lib/auth";
 import { AVATARS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
 import { logout } from "@/app/actions";
+import { InstallApp } from "@/components/install-app";
 import {
   joinOrganization,
   leaveOrganization,
@@ -308,7 +309,14 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           </form>
         </Section>
 
+        <Section title="This device">
+          <InstallApp />
+        </Section>
+
         <Section title="Signing out">
+          <p className="mb-3 font-body text-sm text-muted">
+            Logging out also forgets the pages this device kept for offline use.
+          </p>
           <form action={logout}>
             <SubmitButton pendingText="Signing out…" variant="ghost">
               Log out
