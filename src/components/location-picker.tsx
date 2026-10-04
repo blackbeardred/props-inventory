@@ -249,6 +249,14 @@ export function LocationPicker({
       setActive(0);
       return;
     }
+    // A room with shelves in it opens; a shelf with nothing in it is the
+    // answer. To file something in the room itself, open it and take the
+    // "Put it in … itself" row waiting at the top. Searching is different:
+    // you typed that box's name, so tapping it means that box.
+    if (row.kind === "location" && !row.showPath && row.node.children.length > 0) {
+      walkInto(row.node);
+      return;
+    }
     choose(row.kind === "none" ? "" : row.node.id);
   }
 
@@ -270,6 +278,7 @@ export function LocationPicker({
       return;
     }
     // Right walks in, left walks out — the same two keys a file tree uses.
+    // Right still works from a search result, which Enter would choose.
     if (event.key === "ArrowRight" && row?.kind === "location" && row.node.children.length > 0) {
       event.preventDefault();
       walkInto(row.node);
@@ -370,18 +379,28 @@ export function LocationPicker({
                 (row.kind === "none" && !value) ||
                 ((row.kind === "location" || row.kind === "self") && row.node.id === value);
 
+              // Browsing, and there is something inside: the row opens it.
+              // Searching, or nothing inside: the row is the answer.
+              const opens = row.kind === "location" && !row.showPath && row.node.children.length > 0;
+
               return (
-                <li key={key} role="option" aria-selected={selected}>
-                  <div
-                    className={`flex items-stretch ${isActive ? "bg-accent-soft/15" : ""}`}
+                <li key={key} role="option" aria-selected={selected && !opens}>
+                  <button
+                    type="button"
+                    onClick={() => activate(row)}
                     onMouseEnter={() => setActive(index)}
+                    aria-label={
+                      opens && row.kind === "location"
+                        ? `Open ${row.node.name}, ${row.node.children.length} inside`
+                        : undefined
+                    }
+                    // One control, the whole width of the row. Roomier on a
+                    // phone, where this is a thumb rather than a pointer.
+                    className={`group flex w-full items-center gap-2 px-3 py-2.5 text-left font-body text-sm outline-none sm:py-1.5 ${
+                      isActive ? "bg-accent-soft/15" : ""
+                    }`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => activate(row)}
-                      // Roomier on a phone, where this is a thumb rather than a pointer.
-                      className="min-w-0 flex-1 px-3 py-2.5 text-left font-body text-sm outline-none sm:py-1.5"
-                    >
+                    <span className="min-w-0 flex-1">
                       {row.kind === "none" ? (
                         <span className="text-muted">{noneLabel}</span>
                       ) : row.kind === "up" ? (
@@ -402,26 +421,21 @@ export function LocationPicker({
                           ) : null}
                         </>
                       )}
-                    </button>
+                    </span>
 
-                    {row.kind === "location" && row.node.children.length > 0 ? (
-                      // A separate control, because opening a room and filing
-                      // something directly in that room are different things.
-                      <button
-                        type="button"
-                        onClick={() => walkInto(row.node)}
-                        aria-label={`Open ${row.node.name}`}
-                        className="group flex shrink-0 items-center gap-1.5 border-l border-rule/60 px-3.5 font-mono text-[10px] text-muted outline-none hover:text-foreground focus-visible:text-foreground sm:px-2.5"
-                      >
+                    {opens && row.kind === "location" ? (
+                      // The hexagon says this one opens rather than answers,
+                      // and turns to say so again under the pointer.
+                      <span className="flex shrink-0 items-center gap-1.5 font-mono text-[10px] text-muted">
                         {row.node.children.length}
                         <span
                           aria-hidden="true"
                           data-hex-toggle
                           className="hex w-[9px] bg-honey transition-[rotate] duration-200 ease-out group-hover:rotate-90 group-focus-visible:rotate-90"
                         />
-                      </button>
+                      </span>
                     ) : null}
-                  </div>
+                  </button>
                 </li>
               );
             })}
