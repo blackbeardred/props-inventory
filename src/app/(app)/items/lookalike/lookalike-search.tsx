@@ -68,22 +68,39 @@ export function LookalikeSearch() {
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-rule bg-surface px-4 py-3">
-        <label className="font-body text-sm font-semibold text-foreground" htmlFor="lookalike-photo">
-          Photograph of one thing
-        </label>
+        <p className="font-body text-sm font-semibold text-foreground">Photograph of one thing</p>
         <p className="mt-1 font-body text-sm text-muted">
-          One object, filling most of the frame. A whole prop table is what the production photo
-          screen is for.
+          One object, filling most of the frame — a new photo or one you already have. A whole
+          prop table is what the production photo screen is for.
         </p>
-        <input
-          id="lookalike-photo"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          disabled={busy}
-          onChange={(event) => void onPick(event.target.files?.[0])}
-          className="mt-3 block w-full font-body text-sm"
-        />
+        {/* No `capture` attribute. With capture="environment" a phone went
+            straight to the camera and the photo library was unreachable —
+            so a picture taken earlier, or sent by a colleague, couldn't be
+            searched with. Without it the phone offers camera and library
+            side by side. The real input sits in the label, as on the
+            prop-table screen. */}
+        <label
+          className={`mt-3 flex min-h-14 w-full cursor-pointer items-center justify-center gap-3 rounded-lg px-5 py-3 font-body text-base font-medium transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
+            busy
+              ? "cursor-wait bg-accent/70 text-background"
+              : preview
+                ? "border border-rule bg-background text-foreground hover:bg-surface"
+                : "bg-accent text-background hover:opacity-90"
+          }`}
+        >
+          <span aria-hidden="true" className="hex w-4 bg-honey" />
+          {busy ? "Looking…" : preview ? "Try a different photo" : "Take or choose a photo"}
+          <input
+            type="file"
+            accept="image/*"
+            disabled={busy}
+            onChange={(event) => {
+              void onPick(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+            className="sr-only"
+          />
+        </label>
       </div>
 
       {busy ? (
