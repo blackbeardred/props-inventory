@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { uploadImportedPhotos, type PhotoUpload } from "@/lib/photo-upload";
 import { embedImage, loadEmbedder, type LoadProgress } from "@/lib/embedding";
 import { deviceMayFingerprint, markFingerprintsDue, optIn } from "@/lib/fingerprint-device";
 import { isMissingFingerprintSchema, matchEmbedding } from "@/lib/fingerprints";
 import { mergeCandidates, pickObvious } from "@/lib/visual-match";
+import { takeHandedOffPhoto } from "@/lib/photo-handoff";
 import type { Category } from "@/lib/inventory";
 import {
   applyStagePhoto,
@@ -272,6 +273,18 @@ export function StagePhoto({ productionId }: { productionId: string }) {
       setPhase("idle");
     }
   }
+
+  // A photo taken from the hexagon menu ("Take picture → Add as a prop
+  // table") is read as soon as the page opens, as if it had been chosen here.
+  useEffect(() => {
+    const file = takeHandedOffPhoto();
+    // Starting the read from an effect is the point: the photo exists only in
+    // this browser, after the server render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (file) void onPhoto(file);
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const chosen = detections.filter((detection) => choices[detection.key]?.kind !== "skip");
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { markFingerprintsDue } from "@/lib/fingerprint-device";
+import { takeHandedOffPhoto } from "@/lib/photo-handoff";
 
 // The crop window is square because every place a photo is shown — the items
 // list thumbnail, the edit page, the member avatars — is square. Cropping to
@@ -24,6 +25,7 @@ export function PhotoField({
   accept,
   helpText,
   existingUrl,
+  acceptHandoff = false,
 }: {
   label: string;
   name: string;
@@ -31,6 +33,11 @@ export function PhotoField({
   helpText?: string;
   /** Signed URL of the photo already saved on this item, if any. */
   existingUrl?: string | null;
+  /**
+   * Take a photo handed over by the hexagon menu's "Take picture → Add as a
+   * new prop", so the form opens with it already in place.
+   */
+  acceptHandoff?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -64,6 +71,27 @@ export function PhotoField({
       setCanCrop(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!acceptHandoff) return;
+    const file = takeHandedOffPhoto();
+    const input = inputRef.current;
+    if (!file || !input) return;
+    try {
+      // Into the real input, so the form posts it exactly as if it had been
+      // chosen here — the server action never knows the difference.
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      input.files = transfer.files;
+    } catch {
+      // A browser that won't let a script fill a file input: the photo
+      // can't travel, so the field stays empty and asks as usual.
+      return;
+    }
+    onFile(file);
+    // Once, on arrival: re-running this would only find the hand-off
+    // already taken.
+  }, [acceptHandoff]);
 
   const baseScale = natural ? VIEWPORT / Math.min(natural.w, natural.h) : 1;
   const scale = baseScale * zoom;

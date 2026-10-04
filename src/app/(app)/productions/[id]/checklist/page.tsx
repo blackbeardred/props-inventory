@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { RememberPlace } from "@/components/remember-place";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { EmptyState, Notice, PageHeading } from "@/components/ui";
@@ -149,6 +150,7 @@ export default async function ChecklistPage({ params, searchParams }: ChecklistP
         </EmptyState>
       ) : (
         <div className="max-w-3xl">
+          <RememberPlace id={typedProduction.id} name={typedProduction.name} checklist />
           <ChecklistView
             productionId={typedProduction.id}
             rooms={rooms}

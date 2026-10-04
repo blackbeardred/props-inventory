@@ -62,6 +62,7 @@ export default async function NewItemPage({
         <TextField label="Name" name="name" required />
 
         <PhotoField
+          acceptHandoff
           label="Photo"
           name="photo"
           accept="image/png,image/jpeg,image/webp,image/gif"

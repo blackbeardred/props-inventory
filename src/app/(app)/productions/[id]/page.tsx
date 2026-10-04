@@ -12,6 +12,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { ItemPicker } from "@/components/item-picker";
 import { DeleteButton } from "@/components/delete-button";
 import { QuantityField } from "@/components/quantity-field";
+import { RememberPlace } from "@/components/remember-place";
 import { locationPaths, type LocationNode } from "@/lib/locations";
 import { PHOTOS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
 import { createClient } from "@/lib/supabase/server";
@@ -171,6 +172,7 @@ export default async function ProductionDetailPage({
 
   return (
     <>
+      <RememberPlace id={typedProduction.id} name={typedProduction.name} />
       <PageHeading
         title={typedProduction.name}
         intro={

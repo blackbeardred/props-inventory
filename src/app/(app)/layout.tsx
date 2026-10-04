@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppNav, MobileTabBar } from "@/components/app-nav";
+import { QuickActions } from "@/components/quick-actions";
 import { FingerprintCatchUp } from "@/components/fingerprint-catch-up";
 import { OfflineBanner } from "@/components/service-worker";
 import { OrgSwitcher } from "@/components/org-switcher";
@@ -94,6 +95,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           that already holds the model — see the component for why. */}
       <FingerprintCatchUp orgId={profile.active_org_id} />
       <MobileTabBar />
+      <QuickActions />
     </div>
   );
 }
