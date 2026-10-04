@@ -12,6 +12,7 @@ type RawRow = {
   id: string;
   pull_list_id: string;
   quantity_needed: number;
+  status: "pending" | "pulled" | "returned" | null;
   check_state: CheckState | null;
   checked_at: string | null;
   checked_by: string | null;
@@ -50,7 +51,7 @@ export async function loadChecklistRows(
     supabase
       .from("pull_list_items")
       .select(
-        "id, pull_list_id, quantity_needed, check_state, checked_at, checked_by, items(id, name, photo_url, location_id)"
+        "id, pull_list_id, quantity_needed, status, check_state, checked_at, checked_by, items(id, name, photo_url, location_id)"
       )
       .in("pull_list_id", pullListIds),
     supabase.from("locations").select("id, name, parent_location_id"),
@@ -85,6 +86,7 @@ export async function loadChecklistRows(
         checkedAt: row.checked_at,
         checkedByName: row.checked_by ? (nameById.get(row.checked_by) ?? null) : null,
         locationId: row.items!.location_id,
+        pullStatus: row.status ?? undefined,
       };
     });
 

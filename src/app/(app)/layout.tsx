@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AppNav } from "@/components/app-nav";
+import { AppNav, MobileTabBar } from "@/components/app-nav";
 import { FingerprintCatchUp } from "@/components/fingerprint-catch-up";
 import { OrgSwitcher } from "@/components/org-switcher";
 import { getUserAndProfile } from "@/lib/auth";
@@ -46,7 +46,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             phone is already edge to edge, and a tablet reads better narrow.
             The header tracks the same widths so the nav stays in line with
             the content underneath it. */}
-        <div className="mx-auto flex h-14 w-full max-w-5xl flex-wrap items-center justify-between gap-2 px-6 xl:max-w-7xl xl:px-8 2xl:max-w-[96rem]">
+        {/* min-h, not h: if the row ever has to wrap, the header grows with
+            it. A fixed h-14 let a wrapped nav spill out underneath the page,
+            where nothing in it could be tapped. */}
+        <div className="mx-auto flex min-h-14 w-full max-w-5xl flex-wrap items-center justify-between gap-2 px-6 py-2 xl:max-w-7xl xl:px-8 2xl:max-w-[96rem]">
           <OrgSwitcher
             memberships={profile.memberships}
             activeOrgId={profile.active_org_id}
@@ -55,7 +58,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <AppNav />
             <Link
               href="/account"
-              className="flex items-center gap-2 font-body text-sm text-muted transition-colors hover:text-foreground"
+              aria-label={`Your account (${displayName})`}
+              className="flex min-h-11 min-w-11 items-center justify-center gap-2 font-body text-sm text-muted transition-colors hover:text-foreground"
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- signed URL, same reasoning as item photos
@@ -78,13 +82,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main className="flex-1">
-        <div className="mx-auto w-full max-w-5xl px-6 py-12 xl:max-w-7xl xl:px-8 2xl:max-w-[96rem]">
+        {/* The extra bottom padding on a phone is the tab bar's height plus
+            room to breathe, so the last thing on a page isn't under it. */}
+        <div className="mx-auto w-full max-w-5xl px-6 pb-28 pt-8 md:py-12 xl:max-w-7xl xl:px-8 2xl:max-w-[96rem]">
           {children}
         </div>
       </main>
       {/* Catches up photo fingerprints in the background, but only on a device
           that already holds the model — see the component for why. */}
       <FingerprintCatchUp orgId={profile.active_org_id} />
+      <MobileTabBar />
     </div>
   );
 }

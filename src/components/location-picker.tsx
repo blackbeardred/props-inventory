@@ -50,6 +50,7 @@ export function LocationPicker({
   /** Hidden from the list and from search — a location can't live inside itself. */
   excludeId,
   placeholder = "Type to find a shelf, box or room",
+  selfLabel,
 }: {
   nodes: LocationNode[];
   value: string;
@@ -58,6 +59,12 @@ export function LocationPicker({
   noneLabel?: string;
   excludeId?: string;
   placeholder?: string;
+  /**
+   * The row at the top of an opened container that chooses the container
+   * itself. "Put it in … itself" when filing an item; a filter wants
+   * different words for the same choice.
+   */
+  selfLabel?: (name: string) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -300,7 +307,7 @@ export function LocationPicker({
         onClick={() => (open ? setOpen(false) : openPanel())}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex w-full items-center gap-2 rounded-md border border-rule bg-surface px-3 py-2 text-left font-body text-sm outline-none transition-colors hover:border-accent-soft focus-visible:border-accent"
+        className="flex min-h-11 w-full items-center gap-2 rounded-md border border-rule bg-surface px-3 py-2 text-left font-body text-sm outline-none transition-colors hover:border-accent-soft focus-visible:border-accent"
       >
         <span className={`min-w-0 flex-1 truncate ${chosen ? "text-foreground" : "text-muted"}`}>
           {chosen ? chosen.path : noneLabel}
@@ -409,7 +416,13 @@ export function LocationPicker({
                         </span>
                       ) : row.kind === "self" ? (
                         <span className="text-foreground">
-                          Put it in <span className="font-medium">{row.node.name}</span> itself
+                          {selfLabel ? (
+                            selfLabel(row.node.name)
+                          ) : (
+                            <>
+                              Put it in <span className="font-medium">{row.node.name}</span> itself
+                            </>
+                          )}
                         </span>
                       ) : (
                         <>

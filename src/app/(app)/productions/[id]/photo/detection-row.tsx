@@ -217,7 +217,8 @@ export function DetectionRow({
         ) : null}
       </div>
 
-      <div className="min-w-0 flex-1 space-y-2">
+      {/* Right padding keeps the name clear of the 44px × in the corner. */}
+      <div className="min-w-0 flex-1 space-y-2 pr-8">
         <div>
           <p className="font-body text-sm font-medium text-foreground">
             {detection.name}
@@ -303,7 +304,7 @@ export function DetectionRow({
           type="button"
           onClick={onRemove}
           aria-label={`Remove “${detection.name}” from this list`}
-          className="absolute right-1 top-1 rounded-md px-2 py-1 font-body text-sm leading-none text-muted transition-colors hover:bg-background hover:text-danger-ink"
+          className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-md font-body text-base leading-none text-muted transition-colors hover:bg-background hover:text-danger-ink"
         >
           ×
         </button>

@@ -338,12 +338,38 @@ export function StagePhoto({ productionId }: { productionId: string }) {
           before they thought to open the app. Without it, the phone offers the
           camera and the roll side by side.
         */}
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(event) => onPhoto(event.target.files?.[0])}
-          className="mt-3 block w-full font-body text-sm text-muted file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1.5 file:font-body file:text-sm file:text-foreground"
-        />
+        {/* The whole point of the page, so it looks like it: one big
+            button rather than a browser's "Choose File / No file chosen",
+            which on a phone was a 34px strip of grey. The real input sits
+            inside the label, so a tap anywhere on it opens the camera or the
+            library, and keyboards still reach it. */}
+        <label
+          className={`mt-4 flex min-h-14 w-full cursor-pointer items-center justify-center gap-3 rounded-lg px-5 py-3 font-body text-base font-medium transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
+            phase === "reading"
+              ? "cursor-wait bg-accent/70 text-background"
+              : detections.length > 0
+                ? "border border-rule bg-surface text-foreground hover:bg-background"
+                : "bg-accent text-background hover:opacity-90"
+          }`}
+        >
+          <span aria-hidden="true" className="hex w-4 bg-honey" />
+          {phase === "reading"
+            ? "Reading the photo…"
+            : detections.length > 0
+              ? "Use a different photo"
+              : "Take or choose a photo"}
+          <input
+            type="file"
+            accept="image/*"
+            disabled={phase === "reading" || phase === "saving"}
+            onChange={(event) => {
+              void onPhoto(event.target.files?.[0]);
+              // So choosing the same file again still counts as a change.
+              event.target.value = "";
+            }}
+            className="sr-only"
+          />
+        </label>
 
         {phase === "reading" ? (
           <p className="mt-3 font-body text-sm text-muted">Looking at the photo…</p>
@@ -468,7 +494,7 @@ export function StagePhoto({ productionId }: { productionId: string }) {
               type="button"
               onClick={save}
               disabled={chosen.length === 0 || phase === "saving"}
-              className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {phase === "saving"
                 ? "Saving…"

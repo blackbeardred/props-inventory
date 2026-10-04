@@ -78,7 +78,7 @@ export default async function ProductionsPage() {
         action={
           <Link
             href="/productions/new"
-            className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
+            className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
           >
             Add production
           </Link>
@@ -98,6 +98,44 @@ export default async function ProductionsPage() {
           button above.
         </EmptyState>
       ) : (
+        <>
+        {/* Phones get cards: the table scrolled sideways there, with Edit
+            off the edge and the dates wrapped onto three lines. */}
+        <ul className="space-y-2.5 md:hidden">
+          {productions.map((production) => {
+            const lists = pullListCounts.get(production.id) ?? 0;
+            return (
+              <li key={production.id} className="rounded-lg border border-rule bg-surface">
+                <Link
+                  href={`/productions/${production.id}`}
+                  className="block px-4 pb-2 pt-3"
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="font-display text-[17px] font-semibold leading-tight text-foreground">
+                      {production.name}
+                    </span>
+                    <Badge tone={STATUS_TONE[production.status] ?? "neutral"}>
+                      {PRODUCTION_STATUS_LABELS[production.status] ?? production.status}
+                    </Badge>
+                  </span>
+                  <span className="mt-1 block font-mono text-[11px] text-muted">
+                    {formatDateRange(production.start_date, production.end_date)} ·{" "}
+                    {pluralize(lists, "pull list")}
+                  </span>
+                </Link>
+                <div className="flex justify-end border-t border-dashed border-rule px-2">
+                  <Link
+                    href={`/productions/${production.id}/edit`}
+                    className="inline-flex min-h-11 items-center px-2 font-body text-sm text-muted hover:text-foreground"
+                  >
+                    Edit
+                  </Link>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="hidden md:block">
         <DataTable columns={["Production", "Status", "Dates", "Pull lists", ""]}>
           {productions.map((production) => (
             <tr key={production.id} className="border-b border-rule align-top">
@@ -132,6 +170,8 @@ export default async function ProductionsPage() {
             </tr>
           ))}
         </DataTable>
+        </div>
+        </>
       )}
     </>
   );

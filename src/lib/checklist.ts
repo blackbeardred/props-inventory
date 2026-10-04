@@ -32,6 +32,13 @@ export type ChecklistRow = {
   checkedByName: string | null;
   /** The container the item is filed in, null when it's unassigned. */
   locationId: string | null;
+  /**
+   * Whether the prop is out of storage, which is a separate fact from whether
+   * anyone checked it (migration 005 explains why). Carried so the checklist
+   * can say "marked pulled, not checked" rather than a bare NOT CHECKED that
+   * seems to contradict the production page.
+   */
+  pullStatus?: "pending" | "pulled" | "returned";
   photoUrl?: string;
 };
 

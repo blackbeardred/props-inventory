@@ -56,7 +56,7 @@ export function LocationTree({
               onClick={() =>
                 setExpanded(allOpen ? new Set() : new Set(parents.map((row) => row.id)))
               }
-              className="font-body text-xs text-muted underline-offset-2 transition-colors hover:text-foreground hover:underline"
+              className="inline-flex min-h-11 items-center font-body text-xs text-muted underline-offset-2 transition-colors hover:text-foreground hover:underline md:min-h-0"
             >
               {allOpen ? "Collapse all" : "Expand all"}
             </button>

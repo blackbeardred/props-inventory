@@ -62,13 +62,13 @@ export default async function PullIssuesPage({ params }: IssuesPageProps) {
           <span className="flex flex-wrap gap-2">
             <Link
               href={`/productions/${typedProduction.id}/checklist`}
-              className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
             >
               Checklist
             </Link>
             <Link
               href={`/productions/${typedProduction.id}`}
-              className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
             >
               Back to production
             </Link>

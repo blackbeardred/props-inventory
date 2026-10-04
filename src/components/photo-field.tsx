@@ -236,14 +236,14 @@ export function PhotoField({
             <button
               type="button"
               onClick={applyCrop}
-              className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
             >
               Use this crop
             </button>
             <button
               type="button"
               onClick={() => setCropping(false)}
-              className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
             >
               Cancel
             </button>
@@ -288,14 +288,14 @@ export function PhotoField({
               name={name}
               accept={accept}
               onChange={(event) => onFile(event.target.files?.[0])}
-              className="block w-full font-body text-sm text-muted file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1.5 file:font-body file:text-sm file:text-foreground hover:file:bg-rule/40"
+              className="block w-full font-body text-sm text-muted file:mr-3 file:min-h-11 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1.5 md:file:min-h-0 file:font-body file:text-sm file:text-foreground hover:file:bg-rule/40"
             />
 
             {sourceUrl && canCrop ? (
               <button
                 type="button"
                 onClick={() => setCropping(true)}
-                className="mt-3 inline-flex items-center justify-center rounded-md border border-rule px-3 py-1.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+                className="mt-3 inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-3 py-1.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
               >
                 {cropped ? "Crop again" : "Crop photo"}
               </button>

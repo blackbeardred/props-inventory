@@ -117,7 +117,7 @@ export function LabelSheet({ labels }: { labels: LabelData[] }) {
           type="button"
           onClick={() => window.print()}
           disabled={count === 0}
-          className="ml-auto inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90 disabled:opacity-40"
+          className="ml-auto inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90 disabled:opacity-40"
         >
           Print
         </button>

@@ -8,6 +8,8 @@ import {
 } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { DeleteButton } from "@/components/delete-button";
+import { CopyButton } from "@/components/copy-button";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { getUserAndProfile } from "@/lib/auth";
@@ -83,9 +85,12 @@ export default async function OrganizationPage({
             with the code can join as a member.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span className="rounded-md border border-rule bg-background px-3 py-1.5 font-body text-sm text-foreground">
+            <span className="rounded-md border border-rule bg-background px-3 py-1.5 font-mono text-sm tracking-wider text-foreground">
               {profile.organizations?.invite_code ?? "Not set"}
             </span>
+            {profile.organizations?.invite_code ? (
+              <CopyButton text={profile.organizations.invite_code} />
+            ) : null}
             <form action={regenerateInviteCode}>
               <SubmitButton variant="ghost" pendingText="Generating…">
                 Generate new code
@@ -94,6 +99,32 @@ export default async function OrganizationPage({
           </div>
         </div>
       ) : null}
+
+      {/* The two picture-recognition pages had no way in at all. They belong
+          here rather than in the main nav: the backfill is run once, by
+          whoever looks after the inventory, and "find by photo" is also
+          offered from the search page where people look for things. */}
+      <div className="mb-8 rounded-lg border border-rule bg-surface px-5 py-4">
+        <p className="font-body text-sm font-medium text-foreground">Recognising photos</p>
+        <p className="mt-1 font-body text-sm text-muted">
+          Each item photo gets a visual fingerprint, so a picture of the prop table can be matched
+          against what you own.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <Link
+            href="/items/fingerprints"
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-background md:min-h-0"
+          >
+            Photo fingerprints
+          </Link>
+          <Link
+            href="/items/lookalike"
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-background md:min-h-0"
+          >
+            Find an item by photo
+          </Link>
+        </div>
+      </div>
 
       {membersError ? (
         <Notice title="Couldn’t load members">

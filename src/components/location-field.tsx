@@ -50,7 +50,7 @@ export function LocationField({
         <button
           type="button"
           onClick={() => setValue(creating ? "" : NEW_LOCATION)}
-          className="mt-1.5 font-body text-xs text-accent underline-offset-2 hover:underline"
+          className="mt-0.5 inline-flex min-h-11 items-center font-body text-xs text-accent underline-offset-2 hover:underline"
         >
           {creating ? "Pick an existing location instead" : "+ Create a new location…"}
         </button>

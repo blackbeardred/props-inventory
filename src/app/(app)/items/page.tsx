@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { RememberView } from "@/components/remember-view";
+import { ITEMS_VIEW_COOKIE } from "@/lib/items-view";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { EmptyState, Notice, PageHeading } from "@/components/ui";
@@ -8,6 +10,36 @@ import { pluralize, type ItemRow } from "@/lib/inventory";
 import { PHOTOS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
 import { ItemTile, ViewTab } from "@/components/item-tile";
 import { ItemCell, type ItemCellData } from "@/components/item-cell";
+import { LocationFilter } from "@/components/location-filter";
+import { locationPaths, type LocationNode } from "@/lib/locations";
+
+/**
+ * The location and everything nested inside it. Choosing a room means the
+ * room's boxes too; the old exact-match filter showed only what was loose on
+ * the floor. Walked breadth-first with a seen-set, because the column is a
+ * nullable self-reference and a cycle isn't impossible.
+ */
+function withDescendants(rootId: string, nodes: LocationNode[]): string[] {
+  const children = new Map<string, string[]>();
+  for (const node of nodes) {
+    if (!node.parent_location_id) continue;
+    const list = children.get(node.parent_location_id) ?? [];
+    list.push(node.id);
+    children.set(node.parent_location_id, list);
+  }
+  const seen = new Set<string>([rootId]);
+  const queue = [rootId];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    for (const child of children.get(id) ?? []) {
+      if (!seen.has(child)) {
+        seen.add(child);
+        queue.push(child);
+      }
+    }
+  }
+  return [...seen];
+}
 
 export const metadata: Metadata = {
   title: "Items · Props & Costume Inventory",
@@ -108,7 +140,9 @@ function itemsHref({
 }): string {
   const params = new URLSearchParams();
   if (locationId) params.set("location", locationId);
-  if (view === "grid") params.set("view", "grid");
+  // Both spelled out: with the last choice remembered, a bare /items means
+  // "whatever you used last", so choosing List has to say so.
+  if (view) params.set("view", view);
   const query = params.toString();
   return query ? `/items?${query}` : "/items";
 }
@@ -148,13 +182,20 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const itemColumns =
     "id, name, category, description, photo_url, quantity, condition, location_id, created_at, locations(name)";
 
-  const [locationsResult, itemsResult, pulledResult] = await Promise.all([
-    supabase.from("locations").select("id, name").order("name"),
-    locationId
+  // Locations first: filtering to a room needs the tree to know what's in it.
+  const locationsResult = await supabase
+    .from("locations")
+    .select("id, name, parent_location_id")
+    .order("name");
+  const locationNodes = (locationsResult.data ?? []) as unknown as LocationNode[];
+  const filterIds = locationId ? withDescendants(locationId, locationNodes) : null;
+
+  const [itemsResult, pulledResult] = await Promise.all([
+    filterIds
       ? supabase
           .from("items")
           .select(itemColumns)
-          .eq("location_id", locationId)
+          .in("location_id", filterIds)
           .order("name")
       : supabase.from("items").select(itemColumns).order("name"),
     // "In use" (Day 12) — every currently-pulled pull-list row, with its
@@ -166,17 +207,25 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
       .eq("status", "pulled"),
   ]);
 
-  const locations = (locationsResult.data ?? []) as unknown as {
-    id: string;
-    name: string;
-  }[];
+  const locations = locationNodes;
+  const pathById = locationPaths(locationNodes);
   const items = (itemsResult.data ?? []) as unknown as ItemListRow[];
   const inUseByItem = buildInUseMap(
     (pulledResult.data ?? []) as unknown as PulledItemRow[]
   );
-  // The chosen view rides in the URL rather than in the browser's storage, so
-  // a link to "the shelf, as pictures" is a link someone can send.
-  const view = first(params.view) === "grid" ? "grid" : "list";
+  // The chosen view rides in the URL, so a link to "the shelf, as pictures"
+  // is a link someone can send. With no view in the URL — arriving from the
+  // nav — it's whichever this browser used last, from a cookie rather than
+  // localStorage so the server renders the right one first time instead of
+  // flashing the list and swapping.
+  const viewParam = first(params.view);
+  const rememberedView = (await cookies()).get(ITEMS_VIEW_COOKIE)?.value;
+  const view =
+    viewParam === "grid" || viewParam === "list"
+      ? viewParam
+      : rememberedView === "grid"
+        ? "grid"
+        : "list";
 
   const activeLocation = locationId
     ? (locations.find((l) => l.id === locationId) ?? null)
@@ -215,19 +264,19 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
           <div className="flex items-center gap-2">
             <a
               href={locationId ? `/items/export?location=${locationId}` : "/items/export"}
-              className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
             >
               Export
             </a>
             <Link
               href="/items/import"
-              className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
             >
-              Import spreadsheet
+              Import<span className="hidden sm:inline">&nbsp;spreadsheet</span>
             </Link>
             <Link
               href="/items/new"
-              className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
             >
               Add item
             </Link>
@@ -263,29 +312,27 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
         </div>
       ) : null}
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-6 flex items-end justify-between gap-3">
         {locations.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <FilterChip href={itemsHref({ view })} active={!locationId}>
-              All items
-            </FilterChip>
-            {locations.map((location) => (
-              <FilterChip
-                key={location.id}
-                href={itemsHref({ locationId: location.id, view })}
-                active={location.id === locationId}
-              >
-                {location.name}
-              </FilterChip>
-            ))}
-          </div>
+          <LocationFilter
+            nodes={locations}
+            value={activeLocation ? activeLocation.id : ""}
+            hrefFor={Object.fromEntries([
+              ["", itemsHref({ view })],
+              ...locations.map((location) => [
+                location.id,
+                itemsHref({ locationId: location.id, view }),
+              ]),
+            ])}
+          />
         ) : (
           <span />
         )}
 
         {items.length > 0 ? (
           <div className="flex items-center gap-1 rounded-md border border-rule p-0.5">
-            <ViewTab href={itemsHref({ locationId })} active={view === "list"}>
+            <RememberView view={view} />
+            <ViewTab href={itemsHref({ locationId, view: "list" })} active={view === "list"}>
               List
             </ViewTab>
             <ViewTab href={itemsHref({ locationId, view: "grid" })} active={view === "grid"}>
@@ -332,7 +379,11 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
               href={`/items/${item.id}/edit`}
               name={item.name}
               photoUrl={item.photo_url ? photoUrlByPath.get(item.photo_url) : undefined}
-              locationName={item.location_id ? (item.locations?.name ?? "Unknown location") : null}
+              locationName={
+                item.location_id
+                  ? (pathById.get(item.location_id) ?? item.locations?.name ?? "Unknown location")
+                  : null
+              }
               quantity={item.quantity}
               inUseIn={inUseByItem.get(item.id)?.production.name}
             />
@@ -346,9 +397,16 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
            where it lives — and keeps the other six behind its hexagon, which
            is both the brand's motif and the honest shape of the problem: a
            props store is a few hundred things you scan past and one you open. */
-        <ul className="space-y-2.5">
+        /* Columns from lg up. One full-width cell per row left 1,200px-wide
+           cards with a name at one end and nothing at the other, and 101
+           items was 9,000px of scrolling at a desk. The column gap is wide
+           enough for the hexagon, which sits half outside its card. */
+        <ul className="grid items-start gap-x-6 gap-y-2.5 lg:grid-cols-2 2xl:grid-cols-3">
           {items.map((item) => (
-            <ItemCell key={item.id} item={toCellData(item, inUseByItem.get(item.id), photoUrlByPath)} />
+            <ItemCell
+              key={item.id}
+              item={toCellData(item, inUseByItem.get(item.id), photoUrlByPath, pathById)}
+            />
           ))}
         </ul>
       )}
@@ -361,6 +419,7 @@ function toCellData(
   item: ItemListRow,
   inUse: InUseInfo | undefined,
   photoUrlByPath: Map<string, string>,
+  pathById: Map<string, string>,
 ): ItemCellData {
   return {
     id: item.id,
@@ -371,7 +430,9 @@ function toCellData(
     condition: item.condition,
     createdAt: item.created_at,
     locationId: item.location_id,
-    locationName: item.locations?.name ?? null,
+    locationName: item.location_id
+      ? (pathById.get(item.location_id) ?? item.locations?.name ?? null)
+      : null,
     photoUrl: item.photo_url ? photoUrlByPath.get(item.photo_url) : undefined,
     inUse: inUse
       ? {
@@ -383,28 +444,4 @@ function toCellData(
         }
       : undefined,
   };
-}
-
-function FilterChip({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "true" : undefined}
-      className={`rounded-full border px-3 py-1 font-body text-xs transition-colors ${
-        active
-          ? "border-accent/40 text-accent"
-          : "border-rule text-muted hover:text-foreground"
-      }`}
-    >
-      {children}
-    </Link>
-  );
 }

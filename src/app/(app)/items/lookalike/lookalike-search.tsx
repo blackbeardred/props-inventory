@@ -67,11 +67,11 @@ export function LookalikeSearch() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-foreground/15 px-4 py-3">
+      <div className="rounded-lg border border-rule bg-surface px-4 py-3">
         <label className="font-body text-sm font-semibold text-foreground" htmlFor="lookalike-photo">
           Photograph of one thing
         </label>
-        <p className="mt-1 font-body text-sm text-foreground/70">
+        <p className="mt-1 font-body text-sm text-muted">
           One object, filling most of the frame. A whole prop table is what the production photo
           screen is for.
         </p>
@@ -87,12 +87,12 @@ export function LookalikeSearch() {
       </div>
 
       {busy ? (
-        <div className="rounded-lg border border-foreground/15 px-4 py-3">
+        <div className="rounded-lg border border-rule bg-surface px-4 py-3">
           <p className="font-body text-sm text-foreground">
             {load?.message ?? "Looking through your inventory…"}
           </p>
           {load?.percent !== null && load?.percent !== undefined ? (
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-foreground/10">
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-rule">
               <div className="h-full bg-accent" style={{ width: `${load.percent}%` }} />
             </div>
           ) : null}
@@ -120,7 +120,7 @@ export function LookalikeSearch() {
       {preview && matches && matches.length > 0 ? (
         <div className="grid gap-6 sm:grid-cols-[12rem_1fr]">
           <div>
-            <p className="font-body text-xs uppercase tracking-wide text-foreground/60">Your photo</p>
+            <p className="font-body text-xs uppercase tracking-wide text-muted">Your photo</p>
             {/* A blob: URL from this browser, so next/image has nothing to optimise. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={preview} alt="" className="mt-2 w-full rounded-lg object-cover" />
@@ -132,7 +132,7 @@ export function LookalikeSearch() {
               return (
                 <li
                   key={match.id}
-                  className="flex items-center gap-4 rounded-lg border border-foreground/15 px-4 py-3"
+                  className="flex items-center gap-4 rounded-lg border border-rule bg-surface px-4 py-3"
                 >
                   {match.photoUrl ? (
                     <Image
@@ -144,14 +144,14 @@ export function LookalikeSearch() {
                       className="h-16 w-16 rounded object-cover"
                     />
                   ) : (
-                    <div className="h-16 w-16 rounded bg-foreground/10" />
+                    <div className="h-16 w-16 rounded bg-rule" />
                   )}
 
                   <div className="min-w-0 flex-1">
                     <Link href={`/items/${match.id}/edit`} className="font-body font-semibold text-accent hover:underline">
                       {match.name}
                     </Link>
-                    <p className="font-body text-sm text-foreground/70">
+                    <p className="font-body text-sm text-muted">
                       {match.locationName ?? "No shelf assigned"}
                       {match.quantity > 1 ? ` · ${match.quantity} owned` : ""}
                     </p>
@@ -161,7 +161,7 @@ export function LookalikeSearch() {
                     <p className="font-body text-sm font-semibold text-foreground">
                       {WORDS[verdict]}
                     </p>
-                    <p className="font-body text-xs text-foreground/60">
+                    <p className="font-body text-xs text-muted">
                       {Math.round(match.similarity * 100)}% alike
                     </p>
                   </div>

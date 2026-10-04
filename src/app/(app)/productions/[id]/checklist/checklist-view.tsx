@@ -103,14 +103,18 @@ function Row({
         }}
         className="relative flex items-center gap-3 bg-surface px-3 py-2.5"
       >
-        <input
-          type="checkbox"
-          checked={row.checkState === "checked"}
-          disabled={pending}
-          onChange={(event) => onSet(event.target.checked ? "checked" : "open")}
-          aria-label={`Checked ${row.name}`}
-          className="h-5 w-5 shrink-0 accent-accent"
-        />
+        {/* The box itself is 24px; the label around it is the 44px a
+            finger actually hits, in a dim store, holding a prop. */}
+        <label className="-m-2.5 flex shrink-0 cursor-pointer items-center justify-center p-2.5">
+          <input
+            type="checkbox"
+            checked={row.checkState === "checked"}
+            disabled={pending}
+            onChange={(event) => onSet(event.target.checked ? "checked" : "open")}
+            aria-label={`Checked ${row.name}`}
+            className="h-6 w-6 accent-accent"
+          />
+        </label>
 
         {photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- signed URL from a private bucket
@@ -132,7 +136,16 @@ function Row({
           </p>
 
           {open ? (
-            <p className="font-body text-xs font-medium text-danger-ink">NOT CHECKED</p>
+            <p className="font-body text-xs font-medium text-danger-ink">
+              NOT CHECKED
+              {/* Pulled and checked are two different facts on purpose — a
+                  whole list can be marked pulled from a desk in seconds.
+                  Saying which one is missing stops the production page
+                  ("Pulled") and this one looking like they disagree. */}
+              {row.pullStatus === "pulled" ? (
+                <span className="font-normal"> · marked pulled, nobody has ticked it here</span>
+              ) : null}
+            </p>
           ) : cleared ? (
             <p className="font-body text-xs text-muted">Not needed after all</p>
           ) : row.checkedByName ? (
@@ -149,7 +162,7 @@ function Row({
             disabled={pending}
             onClick={() => onSet("open")}
             data-print-hide
-            className="shrink-0 rounded-md px-2 py-1 font-body text-xs text-muted hover:text-foreground"
+            className="min-h-11 shrink-0 rounded-md px-2 font-body text-xs text-muted hover:text-foreground"
           >
             Put back
           </button>
@@ -159,7 +172,7 @@ function Row({
             disabled={pending}
             onClick={() => onSet("cleared")}
             data-print-hide
-            className="shrink-0 rounded-md px-2 py-1 font-body text-xs text-muted hover:text-warning-ink"
+            className="min-h-11 shrink-0 rounded-md px-2 font-body text-xs text-muted hover:text-warning-ink"
           >
             Not needed
           </button>

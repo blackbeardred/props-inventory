@@ -99,9 +99,22 @@ export function LocationRow({
               <span aria-hidden="true" className="mt-0.5 w-[13px] shrink-0" />
             )}
             <div>
-            <span className="font-body text-sm text-foreground">
-              {row.name}
-            </span>
+            {row.childCount > 0 ? (
+              // The name opens it too. The hexagon is 15px and clipped to
+              // its shape, hit-testing included — too small to rely on with a
+              // thumb. tabIndex -1: the hexagon is the keyboard's control, and
+              // two tab stops doing one thing is one too many.
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={onToggleChildren}
+                className="-my-3 py-3 text-left font-body text-sm text-foreground"
+              >
+                {row.name}
+              </button>
+            ) : (
+              <span className="font-body text-sm text-foreground">{row.name}</span>
+            )}
             {row.description ? (
               <p className="mt-0.5 line-clamp-1 font-body text-xs text-muted">
                 {row.description}
@@ -115,13 +128,14 @@ export function LocationRow({
             </div>
           </div>
         </td>
-        <td className="px-3 py-3 font-body text-sm text-muted">
+        <td className="hidden px-3 py-3 font-body text-sm text-muted md:table-cell">
           {row.parentName ?? "—"}
         </td>
         <td className="px-3 py-3 font-body text-sm">
           <Link
             href={`/items?location=${row.id}`}
-            className="text-muted underline-offset-2 hover:text-foreground hover:underline"
+            aria-label={`${items.length} items in ${row.name}`}
+            className="-my-3 inline-block min-w-8 py-3 text-muted underline-offset-2 hover:text-foreground hover:underline"
           >
             {items.length}
           </Link>
@@ -132,23 +146,23 @@ export function LocationRow({
             </span>
           ) : null}
         </td>
-        <td className="px-3 py-3 font-body text-sm text-muted">
+        <td className="hidden px-3 py-3 font-body text-sm text-muted md:table-cell">
           {formatDate(row.created_at)}
         </td>
         <td className="px-3 py-3 text-right font-body text-sm">
-          <div className="flex items-center justify-end gap-3">
+          <div className="-my-2.5 flex items-center justify-end gap-1 md:my-0 md:gap-3">
             <button
               type="button"
               onClick={() => setOpen((current) => !current)}
               aria-expanded={open}
               disabled={items.length === 0}
-              className="text-accent underline-offset-2 transition-colors hover:underline disabled:cursor-not-allowed disabled:text-muted disabled:no-underline"
+              className="min-h-11 px-1.5 text-accent underline-offset-2 transition-colors hover:underline disabled:cursor-not-allowed disabled:text-muted disabled:no-underline md:min-h-0 md:px-0"
             >
               {open ? "Hide" : "View"}
             </button>
             <Link
               href={`/locations/${row.id}/edit`}
-              className="text-muted underline-offset-2 hover:text-foreground hover:underline"
+              className="inline-flex min-h-11 items-center px-1.5 text-muted underline-offset-2 hover:text-foreground hover:underline md:min-h-0 md:px-0"
             >
               Edit
             </Link>
@@ -186,7 +200,7 @@ export function LocationRow({
                 <button
                   type="button"
                   onClick={() => setShowAll(true)}
-                  className="mt-3 inline-flex items-center justify-center rounded-md border border-rule px-3 py-1.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-background"
+                  className="mt-3 inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-3 py-1.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-background"
                 >
                   Show {remaining} more
                 </button>
@@ -196,7 +210,7 @@ export function LocationRow({
                 <button
                   type="button"
                   onClick={() => setShowAll(false)}
-                  className="mt-3 inline-flex items-center justify-center rounded-md border border-rule px-3 py-1.5 font-body text-sm font-medium text-muted transition-colors hover:text-foreground"
+                  className="mt-3 inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-3 py-1.5 font-body text-sm font-medium text-muted transition-colors hover:text-foreground"
                 >
                   Show fewer
                 </button>

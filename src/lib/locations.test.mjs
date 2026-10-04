@@ -2,6 +2,7 @@
 //   node --experimental-strip-types --import ./src/lib/test-resolver.mjs src/lib/locations.test.mjs
 
 import {
+  locationPaths,
   buildLocationChoices,
   buildLocationTree,
   flattenLocationTree,
@@ -111,6 +112,19 @@ const choices = buildLocationChoices(ROWS);
 eq("same number of rows", choices.length, ROWS.length);
 eq("paths agree with the tree's",
    choices.find((c) => c.id === "crowns").path, byId.crowns.path);
+
+console.log("");
+console.log("── locationPaths");
+const paths = locationPaths(ROWS);
+eq("one path per location", paths.size, ROWS.length);
+eq("a nested box gets its full path", paths.get("crowns"), byId.crowns.path);
+eq("two locations with the same name are told apart",
+   locationPaths([
+     { id: "a", name: "Props Room A", parent_location_id: null },
+     { id: "b", name: "Props Room B", parent_location_id: null },
+     { id: "a1", name: "B", parent_location_id: "a" },
+     { id: "b1", name: "B", parent_location_id: "b" },
+   ]).get("b1"), "Props Room B / B");
 
 console.log("");
 console.log(`════ ${pass} passed, ${fail} failed ════`);

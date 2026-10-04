@@ -19,6 +19,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 import { seeItems, type SeenObject } from "@/lib/ai/see-items";
 import { type Category, type ItemRow } from "@/lib/inventory";
+import { locationPaths, type LocationNode } from "@/lib/locations";
 
 const CATEGORIES: Category[] = ["prop", "costume"];
 
@@ -123,10 +124,10 @@ export async function readStagePhoto(
   }
 
   // Locations are looked up once and shared, rather than joined per search.
-  const { data: locationRows } = await supabase.from("locations").select("id, name");
-  const locationNames = new Map(
-    ((locationRows ?? []) as { id: string; name: string }[]).map((row) => [row.id, row.name])
-  );
+  const { data: locationRows } = await supabase
+    .from("locations")
+    .select("id, name, parent_location_id");
+  const locationNames = locationPaths((locationRows ?? []) as unknown as LocationNode[]);
 
   const searched: { object: SeenObject; items: ItemRow[] }[] = [];
   for (const object of seen.objects) {

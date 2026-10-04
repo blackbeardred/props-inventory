@@ -4,7 +4,7 @@ import { PageHeading } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { FingerprintRunner } from "./fingerprint-runner";
 
-export const metadata: Metadata = { title: "Photo fingerprints" };
+export const metadata: Metadata = { title: "Photo fingerprints · Props & Costume Inventory" };
 
 export default async function FingerprintsPage() {
   const supabase = await createClient();

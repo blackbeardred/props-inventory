@@ -11,6 +11,9 @@ import {
 import { SubmitButton } from "@/components/submit-button";
 import { ItemPicker } from "@/components/item-picker";
 import { DeleteButton } from "@/components/delete-button";
+import { QuantityField } from "@/components/quantity-field";
+import { locationPaths, type LocationNode } from "@/lib/locations";
+import { PHOTOS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
 import { createClient } from "@/lib/supabase/server";
 import { findPullIssues } from "@/lib/checklist";
 import { loadChecklistRows } from "@/lib/checklist-data";
@@ -55,7 +58,13 @@ function first(value: string | string[] | undefined) {
 }
 
 type PullListItemWithItem = PullListItemRow & {
-  items: { name: string; category: string } | null;
+  check_state?: "open" | "checked" | "cleared" | null;
+  items: {
+    name: string;
+    category: string;
+    photo_url: string | null;
+    location_id: string | null;
+  } | null;
 };
 
 export default async function ProductionDetailPage({
@@ -94,7 +103,7 @@ export default async function ProductionDetailPage({
       supabase.from("items").select("id", { count: "exact", head: true }),
       // Locations, so the picker can offer them as chips the way the search
       // page does.
-      supabase.from("locations").select("id, name").order("name"),
+      supabase.from("locations").select("id, name, parent_location_id").order("name"),
     ]);
 
   if (!production) {
@@ -111,7 +120,8 @@ export default async function ProductionDetailPage({
   const typedProduction = production as unknown as ProductionRow;
   const lists = (pullLists ?? []) as unknown as PullListRow[];
 
-  const searchLocations = (locationRows ?? []) as unknown as { id: string; name: string }[];
+  const searchLocations = (locationRows ?? []) as unknown as LocationNode[];
+  const pathById = locationPaths(searchLocations);
 
   const pullListIds = lists.map((list) => list.id);
 
@@ -123,16 +133,34 @@ export default async function ProductionDetailPage({
   );
   const issueCount = findPullIssues(checklistRows, checklistLocations).length;
   let itemsByPullList = new Map<string, PullListItemWithItem[]>();
+  const photoUrlByPath = new Map<string, string>();
   if (pullListIds.length > 0) {
     const { data: pullListItems } = await supabase
       .from("pull_list_items")
       .select(
-        "id, pull_list_id, item_id, quantity_needed, status, created_at, items(name, category)"
+        "id, pull_list_id, item_id, quantity_needed, status, check_state, created_at, items(name, category, photo_url, location_id)"
       )
       .in("pull_list_id", pullListIds)
       .order("created_at");
 
     const rows = (pullListItems ?? []) as unknown as PullListItemWithItem[];
+
+    // Each row's photo, signed in one request. The photo and where it lives
+    // are the two things you need when pulling, and the row had neither.
+    const paths = [
+      ...new Set(
+        rows.map((row) => row.items?.photo_url).filter((path): path is string => Boolean(path))
+      ),
+    ];
+    if (paths.length > 0) {
+      const { data: signed } = await supabase.storage
+        .from(PHOTOS_BUCKET)
+        .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
+      for (const entry of signed ?? []) {
+        if (entry.path && entry.signedUrl) photoUrlByPath.set(entry.path, entry.signedUrl);
+      }
+    }
+
     itemsByPullList = new Map();
     for (const row of rows) {
       const list = itemsByPullList.get(row.pull_list_id) ?? [];
@@ -178,19 +206,19 @@ export default async function ProductionDetailPage({
             </Link>
             <Link
               href={`/productions/${typedProduction.id}/checklist`}
-              className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
             >
               Checklist
             </Link>
             <Link
               href={`/productions/${typedProduction.id}/photo`}
-              className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
             >
               Mark from a photo
             </Link>
             <Link
               href={`/productions/${typedProduction.id}/edit`}
-              className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
             >
               Edit production
             </Link>
@@ -224,21 +252,14 @@ export default async function ProductionDetailPage({
         lists.map((list) => {
           const listItems = itemsByPullList.get(list.id) ?? [];
           return (
+            // Capped at a reading width: full-width on a desktop put each
+            // item's name at the left edge and its buttons 1,000px away.
             <div
               key={list.id}
-              className="mb-8 rounded-lg border border-rule"
+              className="mb-8 max-w-3xl rounded-lg border border-rule"
             >
-              <div className="flex items-center justify-between border-b border-rule px-5 py-3">
+              <div className="border-b border-rule px-5 py-3">
                 <h2 className="font-display text-lg">{list.name}</h2>
-                <form action={deletePullList}>
-                  <input type="hidden" name="productionId" value={typedProduction.id} />
-                  <input type="hidden" name="pullListId" value={list.id} />
-                  <DeleteButton
-                    confirmMessage={`Delete "${list.name}" and everything on it? This can’t be undone.`}
-                  >
-                    Delete list
-                  </DeleteButton>
-                </form>
               </div>
 
               <div className="px-5 py-4">
@@ -248,70 +269,98 @@ export default async function ProductionDetailPage({
                   </p>
                 ) : (
                   <ul className="divide-y divide-rule">
-                    {listItems.map((pullListItem) => (
-                      <li
-                        key={pullListItem.id}
-                        className="flex flex-wrap items-center justify-between gap-3 py-3"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-body text-sm text-foreground">
-                            {pullListItem.items?.name ?? "Unknown item"}
-                          </span>
-                          <form
-                            action={updatePullListItemQuantity}
-                            className="flex items-center gap-1"
-                          >
-                            <input type="hidden" name="productionId" value={typedProduction.id} />
-                            <input type="hidden" name="pullListItemId" value={pullListItem.id} />
-                            <span className="font-body text-xs text-muted">×</span>
-                            <input
-                              type="number"
-                              name="quantityNeeded"
-                              min={1}
-                              defaultValue={pullListItem.quantity_needed}
-                              className="w-14 rounded-md border border-rule bg-surface px-2 py-1 font-body text-xs text-foreground outline-none transition-colors focus:border-accent"
-                            />
-                            <SubmitButton variant="ghost" pendingText="…">
-                              Save
-                            </SubmitButton>
-                          </form>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Badge
-                            tone={
-                              pullListItem.status === "pulled"
-                                ? "accent"
-                                : pullListItem.status === "returned"
-                                  ? "muted"
-                                  : "neutral"
-                            }
-                          >
-                            {PULL_LIST_ITEM_STATUS_LABELS[pullListItem.status]}
-                          </Badge>
-                          <form action={updatePullListItemStatus}>
-                            <input type="hidden" name="productionId" value={typedProduction.id} />
-                            <input type="hidden" name="pullListItemId" value={pullListItem.id} />
-                            <input
-                              type="hidden"
-                              name="newStatus"
-                              value={NEXT_PULL_LIST_ITEM_STATUS[pullListItem.status]}
-                            />
-                            <SubmitButton variant="ghost" pendingText="Saving…">
-                              {NEXT_PULL_LIST_ITEM_ACTION_LABEL[pullListItem.status]}
-                            </SubmitButton>
-                          </form>
-                          <form action={removePullListItem}>
-                            <input type="hidden" name="productionId" value={typedProduction.id} />
-                            <input type="hidden" name="pullListItemId" value={pullListItem.id} />
-                            <DeleteButton
-                              confirmMessage={`Remove "${pullListItem.items?.name ?? "this item"}" from the list?`}
+                    {listItems.map((pullListItem) => {
+                      const photoPath = pullListItem.items?.photo_url;
+                      const photoUrl = photoPath ? photoUrlByPath.get(photoPath) : undefined;
+                      const locationId = pullListItem.items?.location_id;
+                      const where = locationId
+                        ? (pathById.get(locationId) ?? "Unknown location")
+                        : "Unassigned";
+                      const notChecked =
+                        pullListItem.status === "pulled" &&
+                        (pullListItem.check_state ?? "open") === "open";
+                      return (
+                        <li
+                          key={pullListItem.id}
+                          className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3"
+                        >
+                          {/* What it is and where it lives, as on the checklist. */}
+                          <div className="flex min-w-0 flex-1 basis-56 items-center gap-3">
+                            {photoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- signed URL from a private bucket
+                              <img
+                                src={photoUrl}
+                                alt=""
+                                className="h-11 w-11 shrink-0 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="h-11 w-11 shrink-0 rounded border border-dashed border-rule" />
+                            )}
+                            <div className="min-w-0">
+                              <p className="truncate font-body text-sm font-medium text-foreground">
+                                {pullListItem.items?.name ?? "Unknown item"}
+                              </p>
+                              <p className="truncate font-mono text-[11px] text-muted">{where}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            <form action={updatePullListItemQuantity}>
+                              <input type="hidden" name="productionId" value={typedProduction.id} />
+                              <input type="hidden" name="pullListItemId" value={pullListItem.id} />
+                              <QuantityField
+                                name="quantityNeeded"
+                                defaultValue={pullListItem.quantity_needed}
+                                label={`How many ${pullListItem.items?.name ?? "of this item"}`}
+                              />
+                            </form>
+                            <Badge
+                              tone={
+                                pullListItem.status === "pulled"
+                                  ? "accent"
+                                  : pullListItem.status === "returned"
+                                    ? "muted"
+                                    : "neutral"
+                              }
                             >
-                              Remove
-                            </DeleteButton>
-                          </form>
-                        </div>
-                      </li>
-                    ))}
+                              {PULL_LIST_ITEM_STATUS_LABELS[pullListItem.status]}
+                            </Badge>
+                            {/* The checklist's NOT CHECKED, said here too, so the
+                                two pages tell the same story: out of storage,
+                                but nobody has confirmed it on the walk round. */}
+                            {notChecked ? (
+                              <Link
+                                href={`/productions/${typedProduction.id}/checklist`}
+                                className="inline-flex min-h-11 items-center font-body text-xs font-medium text-danger-ink hover:underline md:min-h-0"
+                              >
+                                not checked
+                              </Link>
+                            ) : null}
+                            <form action={updatePullListItemStatus}>
+                              <input type="hidden" name="productionId" value={typedProduction.id} />
+                              <input type="hidden" name="pullListItemId" value={pullListItem.id} />
+                              <input
+                                type="hidden"
+                                name="newStatus"
+                                value={NEXT_PULL_LIST_ITEM_STATUS[pullListItem.status]}
+                              />
+                              <SubmitButton variant="ghost" pendingText="Saving…">
+                                {NEXT_PULL_LIST_ITEM_ACTION_LABEL[pullListItem.status]}
+                              </SubmitButton>
+                            </form>
+                            <form action={removePullListItem}>
+                              <input type="hidden" name="productionId" value={typedProduction.id} />
+                              <input type="hidden" name="pullListItemId" value={pullListItem.id} />
+                              <DeleteButton
+                                confirmMessage={`Remove "${pullListItem.items?.name ?? "this item"}" from the list?`}
+                              >
+                                Remove
+                              </DeleteButton>
+                            </form>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
 
@@ -349,6 +398,21 @@ export default async function ProductionDetailPage({
                   </p>
                 )}
               </div>
+
+              {/* At the foot of the list, not beside its title: the one
+                  button that throws the whole list away shouldn't be the
+                  first thing next to its name. */}
+              <div className="flex justify-end border-t border-rule px-5 py-3">
+                <form action={deletePullList}>
+                  <input type="hidden" name="productionId" value={typedProduction.id} />
+                  <input type="hidden" name="pullListId" value={list.id} />
+                  <DeleteButton
+                    confirmMessage={`Delete "${list.name}" and everything on it? This can’t be undone.`}
+                  >
+                    Delete this list
+                  </DeleteButton>
+                </form>
+              </div>
             </div>
           );
         })
@@ -356,10 +420,10 @@ export default async function ProductionDetailPage({
 
       <form
         action={createPullList}
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-rule px-5 py-4"
+        className="flex max-w-3xl flex-wrap items-end gap-3 rounded-lg border border-dashed border-rule px-5 py-4"
       >
         <input type="hidden" name="productionId" value={typedProduction.id} />
-        <div className="w-64">
+        <div className="w-full sm:w-64">
           <TextField label="New pull list name" name="name" defaultValue="Pull List" />
         </div>
         <SubmitButton pendingText="Creating…">New pull list</SubmitButton>

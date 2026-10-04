@@ -180,3 +180,13 @@ export function matchLocations(
   scored.sort((a, b) => a.rank - b.rank || a.node.path.localeCompare(b.node.path));
   return scored.map((entry) => entry.node);
 }
+
+/**
+ * Every location's full path — "Props Room A / Shelf 3 / Shakespeare box" —
+ * keyed by id, read off the finished tree so it can't disagree with the
+ * picker. For anywhere a location is shown on its own: a bare "B" doesn't
+ * say which B once two rooms both have one.
+ */
+export function locationPaths(rows: LocationNode[]): Map<string, string> {
+  return new Map(flattenLocationTree(buildLocationTree(rows)).map((node) => [node.id, node.path]));
+}

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Courier_Prime, Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 
@@ -22,6 +22,14 @@ const courierPrime = Courier_Prime({
   subsets: ["latin"],
   weight: ["400", "700"],
 });
+
+// viewport-fit=cover is what makes env(safe-area-inset-bottom) report the
+// iPhone home indicator's height, which the phone tab bar pads itself by.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: "Props & Costume Inventory",

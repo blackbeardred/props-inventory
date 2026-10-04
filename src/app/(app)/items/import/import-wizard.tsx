@@ -453,7 +453,7 @@ export function ImportWizard({
               type="button"
               onClick={runImport}
               disabled={valid.length === 0 || phase !== "idle"}
-              className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {phase === "importing"
                 ? "Importing…"

@@ -167,14 +167,14 @@ export default async function LocationsPage() {
             {rows.length > 0 ? (
               <Link
                 href="/locations/labels"
-                className="inline-flex items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
+                className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
               >
                 Print labels
               </Link>
             ) : null}
             <Link
               href="/locations/new"
-              className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
+              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90"
             >
               Add location
             </Link>
@@ -195,7 +195,10 @@ export default async function LocationsPage() {
           button above.
         </EmptyState>
       ) : (
-        <DataTable columns={["Location", "Within", "Items", "Added", ""]}>
+        // "Within" and "Added" go on a phone: the indentation already shows
+        // what's inside what, and with them the table scrolled sideways and
+        // put View and Edit off the edge of the screen.
+        <DataTable columns={["Location", "Within", "Items", "Added", ""]} phoneHidden={[1, 3]}>
           <LocationTree
             rows={rows}
             itemsByLocation={Object.fromEntries(itemsByLocation)}

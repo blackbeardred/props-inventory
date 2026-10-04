@@ -198,7 +198,7 @@ export function FingerprintCatchUp({ orgId }: { orgId: string | null }) {
         role="dialog"
         aria-labelledby="fingerprint-offer-title"
         data-print-hide
-        className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-sm rounded-lg border border-rule bg-surface p-4 shadow-lg sm:left-auto sm:right-4 sm:mx-0"
+        className="fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-sm md:bottom-4 rounded-lg border border-rule bg-surface p-4 shadow-lg sm:left-auto sm:right-4 sm:mx-0"
       >
         <p id="fingerprint-offer-title" className="font-display text-base text-foreground">
           Recognise photos on this device?
@@ -249,7 +249,7 @@ export function FingerprintCatchUp({ orgId }: { orgId: string | null }) {
     <p
       aria-live="polite"
       data-print-hide
-      className="pointer-events-none fixed bottom-4 right-4 z-40 rounded-full border border-rule bg-surface/95 px-3 py-1.5 font-body text-xs text-muted shadow-sm backdrop-blur"
+      className="pointer-events-none fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-40 md:bottom-4 rounded-full border border-rule bg-surface/95 px-3 py-1.5 font-body text-xs text-muted shadow-sm backdrop-blur"
     >
       {label}
     </p>

@@ -21,7 +21,7 @@ export function OrgSwitcher({
     return (
       <Link
         href="/"
-        className="font-display text-sm text-muted transition-colors hover:text-foreground"
+        className="inline-flex min-h-11 items-center font-display text-sm text-muted transition-colors hover:text-foreground"
       >
         {activeName}
       </Link>
@@ -30,7 +30,7 @@ export function OrgSwitcher({
 
   return (
     <details className="relative">
-      <summary className="cursor-pointer list-none font-display text-sm text-muted transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 font-display text-sm text-muted transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
         {activeName} <span aria-hidden="true">▾</span>
       </summary>
       <div className="absolute left-0 z-20 mt-2 w-60 rounded-md border border-rule bg-surface p-1 shadow-lg">

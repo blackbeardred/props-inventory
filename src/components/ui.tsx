@@ -17,7 +17,10 @@ export function PageHeading({
           <p className="mt-2 max-w-xl font-body text-sm text-muted">{intro}</p>
         ) : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {/* max-w-full rather than shrink-0: a row of buttons that can't shrink
+          can't wrap either, and on a phone that pushed the production page
+          to 540px wide with "Edit production" off the edge. */}
+      {action ? <div className="max-w-full">{action}</div> : null}
     </div>
   );
 }
@@ -92,9 +95,16 @@ export function Notice({
 export function DataTable({
   columns,
   children,
+  phoneHidden = [],
 }: {
   columns: ReactNode[];
   children: ReactNode;
+  /**
+   * Column indexes left out below md, where a table that scrolls sideways
+   * hides the very links people came for. The rows' own cells must hide the
+   * same columns (`hidden md:table-cell`).
+   */
+  phoneHidden?: number[];
 }) {
   return (
     <div className="overflow-x-auto">
@@ -104,7 +114,9 @@ export function DataTable({
             {columns.map((label, i) => (
               <th
                 key={i}
-                className="px-3 py-2 font-body text-xs font-medium uppercase tracking-wide text-muted"
+                className={`px-3 py-2 font-body text-xs font-medium uppercase tracking-wide text-muted ${
+                  phoneHidden.includes(i) ? "hidden md:table-cell" : ""
+                }`}
               >
                 {label}
               </th>
@@ -146,7 +158,7 @@ export function TextField({
         autoComplete={autoComplete}
         defaultValue={defaultValue}
         minLength={minLength}
-        className="w-full rounded-md border border-rule bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors focus:border-accent"
+        className="min-h-11 w-full rounded-md border border-rule bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors focus:border-accent md:min-h-0"
       />
     </label>
   );
@@ -174,7 +186,7 @@ export function SelectField({
         name={name}
         defaultValue={defaultValue}
         required={required}
-        className="w-full rounded-md border border-rule bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors focus:border-accent"
+        className="min-h-11 w-full rounded-md border border-rule bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors focus:border-accent md:min-h-0"
       >
         {children}
       </select>
@@ -202,7 +214,7 @@ export function TextareaField({
         name={name}
         rows={rows}
         defaultValue={defaultValue}
-        className="w-full rounded-md border border-rule bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors focus:border-accent"
+        className="min-h-11 w-full rounded-md border border-rule bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors focus:border-accent md:min-h-0"
       />
     </label>
   );

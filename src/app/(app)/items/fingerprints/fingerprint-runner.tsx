@@ -73,7 +73,7 @@ export function FingerprintRunner({ orgId }: { orgId: string }) {
   }
 
   if (phase === "counting") {
-    return <p className="font-body text-sm text-foreground/70">Checking what needs doing…</p>;
+    return <p className="font-body text-sm text-muted">Checking what needs doing…</p>;
   }
 
   if (phase === "failed") {
@@ -107,16 +107,17 @@ export function FingerprintRunner({ orgId }: { orgId: string }) {
       ) : null}
 
       {phase === "ready" && outstanding > 0 ? (
-        <div className="rounded-lg border border-foreground/15 px-4 py-3">
+        <div className="rounded-lg border border-rule bg-surface px-4 py-3">
           <p className="font-body text-sm text-foreground">
-            The first run downloads the vision model — about 40MB, once per device, then cached by
-            the browser. Best done here on a desktop rather than on a phone in a storage room.
-            Leave this tab open while it works.
+            This device downloads the recognition model the first time — a one-time download,
+            cached afterwards, so best done on Wi-Fi. A big backlog is quicker on a computer than a
+            phone. Leave this page open while it works. New photos after this are fingerprinted
+            by whichever device saves them.
           </p>
           <button
             type="button"
             onClick={() => void start()}
-            className="mt-3 rounded-md bg-accent px-4 py-2 font-body text-sm font-semibold text-white"
+            className="mt-3 inline-flex min-h-11 items-center rounded-md bg-accent px-4 py-2 font-body text-sm font-semibold text-background md:min-h-0"
           >
             Fingerprint {outstanding} {outstanding === 1 ? "item" : "items"}
           </button>
@@ -124,7 +125,7 @@ export function FingerprintRunner({ orgId }: { orgId: string }) {
       ) : null}
 
       {phase === "running" ? (
-        <div className="rounded-lg border border-foreground/15 px-4 py-3">
+        <div className="rounded-lg border border-rule bg-surface px-4 py-3">
           {load && load.percent !== null ? (
             <>
               <p className="font-body text-sm text-foreground">{load.message}</p>
@@ -187,8 +188,8 @@ export function FingerprintRunner({ orgId }: { orgId: string }) {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-foreground/15 px-4 py-3">
-      <dt className="font-body text-xs uppercase tracking-wide text-foreground/60">{label}</dt>
+    <div className="rounded-lg border border-rule bg-surface px-4 py-3">
+      <dt className="font-body text-xs uppercase tracking-wide text-muted">{label}</dt>
       <dd className="mt-1 font-body text-2xl font-semibold text-foreground">{value}</dd>
     </div>
   );
@@ -197,7 +198,7 @@ function Stat({ label, value }: { label: string; value: number }) {
 function Bar({ percent }: { percent: number }) {
   const clamped = Math.min(100, Math.max(0, percent));
   return (
-    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-foreground/10">
+    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-rule">
       <div className="h-full bg-accent transition-[width]" style={{ width: `${clamped}%` }} />
     </div>
   );

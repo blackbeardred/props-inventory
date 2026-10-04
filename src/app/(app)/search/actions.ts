@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { locationPaths, type LocationNode } from "@/lib/locations";
 import { PHOTOS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
 import type { ItemRow } from "@/lib/inventory";
 
@@ -73,18 +74,14 @@ export async function searchItemsLive(
       rows.map((row) => row.location_id).filter((id): id is string => Boolean(id))
     )
   );
-  const locationNameById = new Map<string, string>();
+  // Full paths, which needs every location rather than just the ones these
+  // results sit in — a box's path runs through rooms no result is filed in.
+  let locationNameById = new Map<string, string>();
   if (locationIdsToResolve.length > 0) {
     const { data: locationRows } = await supabase
       .from("locations")
-      .select("id, name")
-      .in("id", locationIdsToResolve);
-    for (const location of (locationRows ?? []) as unknown as {
-      id: string;
-      name: string;
-    }[]) {
-      locationNameById.set(location.id, location.name);
-    }
+      .select("id, name, parent_location_id");
+    locationNameById = locationPaths((locationRows ?? []) as unknown as LocationNode[]);
   }
 
   const photoPaths = rows

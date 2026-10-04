@@ -15,7 +15,7 @@ export function ViewTab({
     <Link
       href={href}
       aria-current={active ? "true" : undefined}
-      className={`rounded px-3 py-1 font-body text-sm transition-colors ${
+      className={`inline-flex min-h-10 items-center rounded px-4 font-body text-sm transition-colors ${
         active
           ? "bg-accent font-medium text-background"
           : "text-muted hover:bg-surface hover:text-foreground"

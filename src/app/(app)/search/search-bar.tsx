@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent } from "react";
 import Link from "next/link";
 import {
@@ -14,6 +14,7 @@ import {
   CONDITION_TONE,
   pluralize,
 } from "@/lib/inventory";
+import { describeMatch } from "@/lib/search-reason";
 import { searchItemsLive, type SearchResultItem } from "./actions";
 
 type LocationOption = {
@@ -91,10 +92,16 @@ function syncUrl(terms: string[], locationIds: string[]) {
 function ResultRow({
   item,
   selected,
+  expanded,
+  reason,
   onSelect,
 }: {
   item: SearchResultItem;
   selected: boolean;
+  /** Only meaningful below lg, where the details open under the row. */
+  expanded?: boolean;
+  /** Why it's here, when its name doesn't say. */
+  reason?: string | null;
   onSelect: () => void;
 }) {
   return (
@@ -103,8 +110,15 @@ function ResultRow({
         type="button"
         onClick={onSelect}
         aria-current={selected ? "true" : undefined}
-        className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
-          selected ? "bg-accent-soft/15" : "bg-surface hover:bg-background"
+        aria-expanded={expanded}
+        className={`flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
+          expanded
+            ? "bg-accent-soft/15"
+            : selected
+              // The default selection (the first result) is only shown as
+              // selected where the pane beside the list shows it.
+              ? "bg-surface hover:bg-background lg:bg-accent-soft/15"
+              : "bg-surface hover:bg-background"
         }`}
       >
         {item.photoUrl ? (
@@ -121,6 +135,11 @@ function ResultRow({
           <span className="block truncate font-body text-xs text-muted">
             {item.locationName ?? "Unassigned"}
           </span>
+          {reason ? (
+            <span className="block truncate font-mono text-[10px] text-muted">
+              matched {reason}
+            </span>
+          ) : null}
         </span>
         {item.pulledFor ? (
           <span
@@ -142,14 +161,26 @@ function ResultRow({
  * photograph first, because that's what identifies a prop, then everything
  * written down about it.
  */
-function ItemDetail({ item }: { item: SearchResultItem }) {
+function ItemDetail({ item, inline = false }: { item: SearchResultItem; inline?: boolean }) {
+  // Inline is the phone version, opened under the row that was tapped. It
+  // drops the card's own border (the list already draws one) and keeps the
+  // photo short enough that the next result is still in sight.
+  const photoShape = inline ? "aspect-[4/3] max-h-72" : "aspect-square";
   return (
-    <div className="overflow-hidden rounded-lg border border-rule bg-surface">
+    <div
+      className={
+        inline
+          ? "overflow-hidden bg-surface"
+          : "overflow-hidden rounded-lg border border-rule bg-surface"
+      }
+    >
       {item.photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- signed URL, see items/page.tsx
-        <img src={item.photoUrl} alt="" className="aspect-square w-full object-cover" />
+        <img src={item.photoUrl} alt="" className={`${photoShape} w-full object-cover`} />
       ) : (
-        <div className="flex aspect-square w-full items-center justify-center border-b border-rule bg-background font-body text-sm text-muted">
+        <div
+          className={`flex ${photoShape} w-full items-center justify-center border-b border-rule bg-background font-body text-sm text-muted`}
+        >
           No photo
         </div>
       )}
@@ -206,7 +237,7 @@ function ItemDetail({ item }: { item: SearchResultItem }) {
 
         <Link
           href={`/items/${item.id}/edit`}
-          className="inline-flex items-center justify-center rounded-md border border-rule px-3 py-1.5 font-body text-sm text-foreground transition-colors hover:bg-background"
+          className="inline-flex min-h-11 items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm text-foreground transition-colors hover:bg-background"
         >
           Open this item
         </Link>
@@ -463,7 +494,9 @@ export function SearchBar({
                 type="button"
                 onClick={() => removeChipAt(index)}
                 aria-label={`Remove ${chipLabel(chip)} filter`}
-                className={`rounded-full transition-colors ${
+                // Visually a small ×, but the hit area reaches past the chip's
+                // edge so it can be hit with a thumb.
+                className={`-my-2 -mr-1.5 rounded-full px-1.5 py-2 transition-colors ${
                   chip.kind === "location"
                     ? "text-accent/70 hover:text-accent"
                     : "text-muted hover:text-foreground"
@@ -480,11 +513,14 @@ export function SearchBar({
             onKeyDown={handleKeyDown}
             placeholder={
               chips.length === 0
-                ? "Search for anything — wood, shed, shakespeare…"
+                ? "Search — a word, or a room or shelf"
                 : "Add another word to narrow it…"
             }
-            autoFocus
-            className="min-w-[10rem] flex-1 bg-transparent font-body text-sm text-foreground outline-none placeholder:text-muted"
+            // Only on the search page itself. Inside someone else's form —
+            // the pull list on a production page — it scrolled the page down
+            // to the box on load and put the page's own buttons off-screen.
+            autoFocus={!onPick}
+            className="min-h-8 min-w-[10rem] flex-1 bg-transparent font-body text-sm text-foreground outline-none placeholder:text-muted"
           />
         </div>
 
@@ -541,21 +577,26 @@ export function SearchBar({
         {!hasQuery ? (
           onPick ? (
             <p className="font-body text-sm text-muted">
-              Type a word and press enter to pin it, then add another to
-              narrow — “wood” then “table”. A location works too: “shed” covers
-              every box in it.
+              Type a word and press enter to pin it; add another to narrow it
+              down. A room or shelf name works too, and covers everything
+              inside it.
             </p>
           ) : (
+          // Shorter than it was: the old paragraph ran to fourteen lines on a
+          // phone and its examples ("shed", "garage") were places this
+          // theatre doesn't have.
           <EmptyState title="Search your inventory">
-            Type a word and press enter to pin it as a filter, then add
-            another to narrow further — “wood” then “table” finds the wooden
-            table. Items match on what they are and what they’re made of, not
-            just their name, so “wood” finds a guitar too. Where something is
-            kept counts as well: “shed” finds everything in the shed and every
-            box inside it, and “shed” plus “shakespeare” finds the Shakespeare
-            box in the shed rather than the one in the garage. Your search
-            stays in the address bar, so you
-            can bookmark or share it.
+            Type a word and press enter to pin it, then add another to narrow
+            it down: “wood”, then “table”. Things match on what they are and
+            what they’re made of, not just their name. A room or shelf name
+            covers everything inside it.
+            <span className="mt-3 block">
+              Holding the thing?{" "}
+              <Link href="/items/lookalike" className="text-accent-ink hover:underline">
+                Find it by photo
+              </Link>
+              .
+            </span>
           </EmptyState>
           )
         ) : searchError ? (
@@ -575,6 +616,10 @@ export function SearchBar({
                   key={item.id}
                   item={item}
                   selected={false}
+                  reason={describeMatch(
+                    { name: item.name, description: item.description, importData: item.import_data },
+                    searchWords
+                  )}
                   onSelect={() => onPick(item)}
                 />
               ))}
@@ -587,21 +632,53 @@ export function SearchBar({
 
               {/* The list needs a column, not a page: everything worth knowing
                   about one prop goes in the pane beside it, which is also
-                  where the picture can be big enough to recognise. Below lg
-                  the pane follows the list rather than sitting beside it. */}
+                  where the picture can be big enough to recognise.
+
+                  Below lg there is no "beside". The pane used to follow the
+                  whole list instead, which on a phone put it 1,600px down —
+                  tapping a result changed something nobody could see. So
+                  there, the details open under the row you tapped, and
+                  tapping it again closes them. */}
               <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
                 <ul className="overflow-hidden rounded-lg border border-rule">
                   {items.map((item) => (
-                    <ResultRow
-                      key={item.id}
-                      item={item}
-                      selected={item.id === selected?.id}
-                      onSelect={() => setSelectedId(item.id)}
-                    />
+                    <Fragment key={item.id}>
+                      <ResultRow
+                        item={item}
+                        selected={item.id === selected?.id}
+                        expanded={item.id === selectedId}
+                        reason={describeMatch(
+                          {
+                            name: item.name,
+                            description: item.description,
+                            importData: item.import_data,
+                          },
+                          searchWords
+                        )}
+                        onSelect={() =>
+                          setSelectedId((current) => {
+                            // On a phone a second tap closes the row. On a
+                            // desktop the pane always shows something, so a
+                            // second tap leaves it where it is.
+                            const wide = window.matchMedia("(min-width: 1024px)").matches;
+                            return current === item.id && !wide ? null : item.id;
+                          })
+                        }
+                      />
+                      {item.id === selectedId ? (
+                        <li className="border-b border-rule last:border-b-0 lg:hidden">
+                          <ItemDetail item={item} inline />
+                        </li>
+                      ) : null}
+                    </Fragment>
                   ))}
                 </ul>
 
-                {selected ? <ItemDetail item={selected} /> : null}
+                {selected ? (
+                  <div className="hidden lg:block">
+                    <ItemDetail item={selected} />
+                  </div>
+                ) : null}
               </div>
             </>
           )

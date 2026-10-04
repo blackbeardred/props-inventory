@@ -57,8 +57,13 @@ function Pair({ label, children }: { label: string; children: React.ReactNode })
  * The collapsed card carries only what you need to find the thing — its name,
  * and quietly beneath it what kind of thing it is and where it lives. Every
  * other fact is behind the hexagon on the left edge, which is a real button
- * rather than a decoration: it is the only hexagon on the card, and pressing
- * it is the only thing it does.
+ * rather than a decoration: it is what a keyboard or a screen reader uses,
+ * and it shows open or shut.
+ *
+ * A tap anywhere on the card does the same. It used to be the hexagon alone,
+ * under a caption saying "tap the cell for details" — and people read "cell"
+ * as the card, tapped it, and got nothing. On a phone the hexagon is a 22px
+ * target and the card is the whole width of the screen.
  *
  * The panel opens by animating a grid row from 0fr to 1fr rather than by
  * animating a max-height to a fixed number. Same reveal, but a long
@@ -76,7 +81,15 @@ export function ItemCell({ item }: { item: ItemCellData }) {
     <li
       // Padded on the left to leave the cell button its own margin, so the
       // hexagon sits half outside the card the way a tab does.
-      className="relative rounded-lg border border-rule bg-surface py-3 pl-6 pr-3.5 sm:pl-7"
+      className="relative cursor-pointer rounded-lg border border-rule bg-surface py-3 pl-6 pr-3.5 sm:pl-7"
+      onClick={(event) => {
+        // Links, buttons and fields inside the card keep their own meaning,
+        // and a drag to select text isn't a tap.
+        const target = event.target as Element;
+        if (target.closest("a, button, input, select, textarea, label")) return;
+        if (window.getSelection()?.toString()) return;
+        setOpen((current) => !current);
+      }}
     >
       {/* The focus ring lives on this wrapper, not on the button. A clip-path
           clips the element's own outline too, so a focused hexagon would draw
@@ -118,13 +131,12 @@ export function ItemCell({ item }: { item: ItemCellData }) {
         ) : null}
 
         <div className="min-w-0 flex-1">
-          <h3 className="font-display text-[17px] font-semibold leading-tight">
-            <Link
-              href={`/items/${item.id}/edit`}
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              {item.name}
-            </Link>
+          {/* Plain text, not a link to the edit page: the name is the
+              biggest thing on the card, so it's what gets tapped, and a tap
+              should open the card rather than leave the list. Editing is
+              one line down, inside it. */}
+          <h3 className="font-display text-[17px] font-semibold leading-tight text-foreground">
+            {item.name}
           </h3>
 
           {/* Quiet on purpose. This is a caption under the name, not a second
@@ -135,7 +147,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
 
           {!open ? (
             <p data-print-hide className="mt-0.5 font-mono text-[10px] leading-snug text-muted/75">
-              tap the cell for details
+              tap for details
             </p>
           ) : null}
         </div>
@@ -171,7 +183,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
               <Pair label="Production">
                 <Link
                   href={`/productions/${item.inUse.productionId}`}
-                  className="text-accent-ink underline-offset-2 hover:underline"
+                  className="-my-3.5 inline-block py-3.5 text-accent-ink underline-offset-2 hover:underline"
                 >
                   {item.inUse.productionName}
                 </Link>
@@ -197,11 +209,13 @@ export function ItemCell({ item }: { item: ItemCellData }) {
 
             <Pair label="Qty">{item.quantity}</Pair>
 
-            <Pair label="Cell">
+            <Pair label="Kept in">
               {item.locationId ? (
                 <Link
                   href={`/items?location=${item.locationId}`}
-                  className="text-accent-ink underline-offset-2 hover:underline"
+                  // The padding widens what a thumb can hit without moving
+                  // the line; the negative margin gives the space back.
+                  className="-my-3.5 inline-block py-3.5 text-accent-ink underline-offset-2 hover:underline"
                 >
                   {item.locationName ?? "Unknown location"}
                 </Link>
@@ -230,7 +244,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
           <p className="mt-2">
             <Link
               href={`/items/${item.id}/edit`}
-              className="font-mono text-[11px] text-accent underline-offset-2 hover:underline"
+              className="inline-flex min-h-11 items-center font-mono text-[11px] text-accent underline-offset-2 hover:underline"
             >
               Edit this item →
             </Link>
