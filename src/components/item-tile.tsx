@@ -61,8 +61,17 @@ export function ItemTile({
       >
         <div className="relative aspect-square shrink-0 bg-background">
           {photoUrl ? (
+            // Absolutely placed, not h-full: in a flex column the box's
+            // automatic minimum height is its content's, so a tall photo (a
+            // violin, a hat stand) used to push the square taller — and the
+            // grid then stretched every tile in that row to match.
             // eslint-disable-next-line @next/next/no-img-element -- signed URL from a private bucket
-            <img src={photoUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+            <img
+              src={photoUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+              loading="lazy"
+            />
           ) : (
             <span className="flex h-full w-full items-center justify-center px-2 text-center font-body text-xs text-muted">
               No photo

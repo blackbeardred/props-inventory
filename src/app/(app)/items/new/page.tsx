@@ -8,6 +8,7 @@ import {
   TextareaField,
 } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { SubmitShortcut } from "@/components/submit-shortcut";
 import { PhotoField } from "@/components/photo-field";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
@@ -99,7 +100,10 @@ export default async function NewItemPage({
           <LocationField nodes={locationNodes} />
         </div>
 
-        <SubmitButton pendingText="Adding item…">Add item</SubmitButton>
+        <div className="flex items-center gap-3">
+          <SubmitButton pendingText="Adding item…">Add item</SubmitButton>
+          <SubmitShortcut />
+        </div>
       </form>
     </>
   );

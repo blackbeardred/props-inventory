@@ -9,6 +9,7 @@ import {
   TextareaField,
 } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { SubmitShortcut } from "@/components/submit-shortcut";
 import { PhotoField } from "@/components/photo-field";
 import { LocationField } from "@/components/location-field";
 import type { LocationNode } from "@/lib/locations";
@@ -241,7 +242,10 @@ export default async function EditItemPage({
           />
         </div>
 
-        <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
+        <div className="flex items-center gap-3">
+          <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
+          <SubmitShortcut />
+        </div>
       </form>
 
       <div className="mt-8 max-w-lg border-t border-rule pt-6">
