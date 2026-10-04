@@ -20,6 +20,7 @@ import {
   type SheetImage,
 } from "@/lib/xlsx";
 import { uploadImportedPhotos, type PhotoUpload } from "@/lib/photo-upload";
+import { markFingerprintsDue } from "@/lib/fingerprint-device";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@/lib/inventory";
 import { attachPhotos, importItems } from "./actions";
 
@@ -208,7 +209,13 @@ export function ImportWizard({
     if (outcome.unmatchedLocations > 0) {
       params.set("unmatched", String(outcome.unmatchedLocations));
     }
-    if (attached > 0) params.set("photos", String(attached));
+    if (attached > 0) {
+      params.set("photos", String(attached));
+      // Picked up by the items page this goes to: on a device that recognises
+      // photos the new ones start straight away, and on one that doesn't
+      // it's the moment to ask.
+      markFingerprintsDue();
+    }
     if (failed > 0) params.set("photosFailed", String(failed));
 
     router.push(`/items?${params.toString()}`);

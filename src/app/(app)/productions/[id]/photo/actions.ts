@@ -16,6 +16,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 import { seeItems, type SeenObject } from "@/lib/ai/see-items";
 import { type Category, type ItemRow } from "@/lib/inventory";
 
@@ -35,7 +36,13 @@ export type Candidate = {
   quantity: number;
   /** True when this item is already on this production's list. */
   alreadyListed: boolean;
+  /** A short-lived link to the item's own photo, so the review screen can
+   *  put it beside the crop. Null when the item has none. */
+  photoUrl: string | null;
 };
+
+/** Long enough to sit on a review screen while someone works down it. */
+const PREVIEW_URL_TTL = 60 * 60;
 
 export type Detection = SeenObject & {
   /** Stable across the round trip, so the browser can key its rows. */
@@ -44,7 +51,13 @@ export type Detection = SeenObject & {
 };
 
 export type ReadOutcome =
-  | { ok: true; detections: Detection[] }
+  | {
+      ok: true;
+      detections: Detection[];
+      /** Everything already on this production's lists. The browser needs it
+       *  for candidates the picture finds, which never pass through here. */
+      listedItemIds: string[];
+    }
   | { ok: false; error: string };
 
 function decodeDataUrl(dataUrl: string): { bytes: Uint8Array; mediaType: string } | null {
@@ -115,28 +128,51 @@ export async function readStagePhoto(
     ((locationRows ?? []) as { id: string; name: string }[]).map((row) => [row.id, row.name])
   );
 
-  const detections: Detection[] = [];
-  for (const [index, object] of seen.objects.entries()) {
+  const searched: { object: SeenObject; items: ItemRow[] }[] = [];
+  for (const object of seen.objects) {
     const { data: matches } = await supabase.rpc("search_items_prefix", {
       search_query: object.search,
       location_ids: null,
     });
-
-    const candidates = ((matches ?? []) as unknown as ItemRow[])
-      .slice(0, CANDIDATES_PER_OBJECT)
-      .map((item) => ({
-        id: item.id,
-        name: item.name,
-        category: item.category,
-        locationName: item.location_id ? (locationNames.get(item.location_id) ?? null) : null,
-        quantity: item.quantity,
-        alreadyListed: listed.has(item.id),
-      }));
-
-    detections.push({ ...object, key: `${index}-${object.search}`, candidates });
+    searched.push({
+      object,
+      items: ((matches ?? []) as unknown as ItemRow[]).slice(0, CANDIDATES_PER_OBJECT),
+    });
   }
 
-  return { ok: true, detections };
+  // Every candidate's photo in one request, rather than one per candidate.
+  const paths = [
+    ...new Set(
+      searched.flatMap(({ items }) =>
+        items.map((item) => item.photo_url).filter((path): path is string => Boolean(path))
+      )
+    ),
+  ];
+  const signedByPath = new Map<string, string>();
+  if (paths.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from(PHOTOS_BUCKET)
+      .createSignedUrls(paths, PREVIEW_URL_TTL);
+    for (const entry of signed ?? []) {
+      if (entry.path && entry.signedUrl) signedByPath.set(entry.path, entry.signedUrl);
+    }
+  }
+
+  const detections: Detection[] = searched.map(({ object, items }, index) => ({
+    ...object,
+    key: `${index}-${object.search}`,
+    candidates: items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      locationName: item.location_id ? (locationNames.get(item.location_id) ?? null) : null,
+      quantity: item.quantity,
+      alreadyListed: listed.has(item.id),
+      photoUrl: item.photo_url ? (signedByPath.get(item.photo_url) ?? null) : null,
+    })),
+  }));
+
+  return { ok: true, detections, listedItemIds: [...listed] };
 }
 
 export type MarkDecision = {

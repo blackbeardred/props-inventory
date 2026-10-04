@@ -19,11 +19,15 @@ import {
   type LoadProgress,
 } from "@/lib/embedding";
 
+export { describeSimilarity } from "@/lib/visual-match";
+
 export type FingerprintTarget = {
   id: string;
   name: string;
   /** The storage path of the photo to fingerprint. */
   photoUrl: string;
+  /** When the item was added, so the newest can go first. */
+  createdAt: string;
 };
 
 export type FingerprintFailure = { name: string; reason: string };
@@ -56,7 +60,11 @@ export async function takeFingerprintTally(): Promise<FingerprintTally> {
 
   const [{ data: items, error: itemsError }, { data: existing, error: existingError }] =
     await Promise.all([
-      supabase.from("items").select("id, name, photo_url").not("photo_url", "is", null).order("name"),
+      supabase
+        .from("items")
+        .select("id, name, photo_url, created_at")
+        .not("photo_url", "is", null)
+        .order("name"),
       supabase.from("item_photo_embeddings").select("item_id, photo_url, model"),
     ]);
 
@@ -68,7 +76,7 @@ export async function takeFingerprintTally(): Promise<FingerprintTally> {
     done.set(row.item_id, { photo_url: row.photo_url, model: row.model });
   }
 
-  const rows = (items ?? []) as { id: string; name: string; photo_url: string }[];
+  const rows = (items ?? []) as { id: string; name: string; photo_url: string; created_at: string }[];
   const outstanding: FingerprintTarget[] = [];
   let current = 0;
 
@@ -77,7 +85,12 @@ export async function takeFingerprintTally(): Promise<FingerprintTally> {
     if (fingerprint && fingerprint.photo_url === item.photo_url && fingerprint.model === EMBEDDING_MODEL) {
       current += 1;
     } else {
-      outstanding.push({ id: item.id, name: item.name, photoUrl: item.photo_url });
+      outstanding.push({
+        id: item.id,
+        name: item.name,
+        photoUrl: item.photo_url,
+        createdAt: item.created_at,
+      });
     }
   }
 
@@ -182,6 +195,9 @@ export type Lookalike = {
   photoUrl: string | null;
 };
 
+/** Signed URLs live this long — long enough to sit on a review screen. */
+const PREVIEW_URL_TTL = 60 * 60;
+
 /**
  * The items whose photographs look most like the one given.
  *
@@ -190,7 +206,14 @@ export type Lookalike = {
  * the one place it is decided everywhere else.
  */
 export async function findLookalikes(blob: Blob, limit = 5): Promise<Lookalike[]> {
-  const embedding = await embedImage(blob);
+  return matchEmbedding(await embedImage(blob), limit);
+}
+
+/**
+ * The same, for a fingerprint already in hand — the prop-table screen takes
+ * one per crop and would otherwise be re-embedding nothing.
+ */
+export async function matchEmbedding(embedding: number[], limit = 5): Promise<Lookalike[]> {
   const supabase = createClient();
 
   const { data: matches, error } = await supabase.rpc("match_items", {
@@ -222,20 +245,26 @@ export async function findLookalikes(blob: Blob, limit = 5): Promise<Lookalike[]
     }[]).map((item) => [item.id, item])
   );
 
+  // One request for every photo rather than one per match.
+  const paths = [...byId.values()]
+    .map((item) => item.photo_url)
+    .filter((path): path is string => Boolean(path));
+  const signedByPath = new Map<string, string>();
+  if (paths.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from(PHOTOS_BUCKET)
+      .createSignedUrls(paths, PREVIEW_URL_TTL);
+    for (const entry of signed ?? []) {
+      if (entry.path && entry.signedUrl) signedByPath.set(entry.path, entry.signedUrl);
+    }
+  }
+
   const results: Lookalike[] = [];
   for (const match of scored) {
     const item = byId.get(match.item_id);
     // A match whose item the items policy won't return isn't an error — it
     // just doesn't belong to this theatre, so it silently isn't shown.
     if (!item) continue;
-
-    let photoUrl: string | null = null;
-    if (item.photo_url) {
-      const { data: signed } = await supabase.storage
-        .from(PHOTOS_BUCKET)
-        .createSignedUrl(item.photo_url, 60 * 60);
-      photoUrl = signed?.signedUrl ?? null;
-    }
 
     results.push({
       id: item.id,
@@ -244,7 +273,7 @@ export async function findLookalikes(blob: Blob, limit = 5): Promise<Lookalike[]
       locationName: item.locations?.name ?? null,
       quantity: item.quantity,
       similarity: match.similarity,
-      photoUrl,
+      photoUrl: item.photo_url ? (signedByPath.get(item.photo_url) ?? null) : null,
     });
   }
 
@@ -252,15 +281,11 @@ export async function findLookalikes(blob: Blob, limit = 5): Promise<Lookalike[]
 }
 
 /**
- * How to describe a score to someone who is about to trust it.
- *
- * The thresholds are a first guess, deliberately cautious, and meant to be
- * moved once there are real photographs of real props to try them against.
- * Being told "probably" about a right answer costs a glance; being told
- * "certain" about a wrong one costs a prop nobody can find on opening night.
+ * Whether an error means the fingerprints table or match_items isn't there —
+ * migration 006 not yet run. Worth telling apart from a passing network
+ * failure: one is fixed by trying again, the other never will be.
  */
-export function describeSimilarity(score: number): "strong" | "likely" | "weak" {
-  if (score >= 0.9) return "strong";
-  if (score >= 0.75) return "likely";
-  return "weak";
+export function isMissingFingerprintSchema(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /item_photo_embeddings|match_items|schema cache|does not exist/i.test(message);
 }

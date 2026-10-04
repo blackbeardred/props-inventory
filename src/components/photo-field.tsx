@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { markFingerprintsDue } from "@/lib/fingerprint-device";
 
 // The crop window is square because every place a photo is shown — the items
 // list thumbnail, the edit page, the member avatars — is square. Cropping to
@@ -84,6 +85,9 @@ export function PhotoField({
 
   function onFile(file: File | undefined) {
     if (!file) return;
+    // So the page this form redirects to fingerprints the new photo straight
+    // away, rather than whenever the background check next comes round.
+    markFingerprintsDue();
     const url = URL.createObjectURL(file);
     setSourceUrl(url);
     setPreviewUrl(url);

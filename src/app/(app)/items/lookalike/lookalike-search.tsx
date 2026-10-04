@@ -20,6 +20,7 @@ import { useRef, useState } from "react";
 import { Notice } from "@/components/ui";
 import type { LoadProgress } from "@/lib/embedding";
 import { loadEmbedder } from "@/lib/embedding";
+import { optIn } from "@/lib/fingerprint-device";
 import { describeSimilarity, findLookalikes, type Lookalike } from "@/lib/fingerprints";
 
 const WORDS: Record<ReturnType<typeof describeSimilarity>, string> = {
@@ -47,8 +48,11 @@ export function LookalikeSearch() {
     setBusy(true);
 
     try {
-      // Loaded explicitly first so the 40MB download reports progress instead
-      // of looking like a frozen page.
+      // Loaded explicitly first so the download reports progress instead of
+      // looking like a frozen page. Choosing to search by photo is choosing to
+      // hold the model, so this device fingerprints its own new photos from
+      // now on as well.
+      optIn();
       await loadEmbedder(setLoad);
       setMatches(await findLookalikes(file, 5));
     } catch (problem) {

@@ -19,6 +19,7 @@ import {
   type FingerprintTally,
   type RunProgress,
 } from "@/lib/fingerprints";
+import { optIn } from "@/lib/fingerprint-device";
 
 type Phase = "counting" | "ready" | "running" | "finished" | "failed";
 
@@ -52,6 +53,8 @@ export function FingerprintRunner({ orgId }: { orgId: string }) {
 
   async function start() {
     if (!tally) return;
+    // Having run the backfill here, this device keeps up with new photos too.
+    optIn();
     stopping.current = false;
     setFailures([]);
     setPhase("running");

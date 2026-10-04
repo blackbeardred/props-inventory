@@ -1,15 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { uploadImportedPhotos, type PhotoUpload } from "@/lib/photo-upload";
-import { looksLikeSameThing } from "@/lib/name-match";
+import { embedImage, loadEmbedder, type LoadProgress } from "@/lib/embedding";
+import { deviceMayFingerprint, markFingerprintsDue, optIn } from "@/lib/fingerprint-device";
+import { isMissingFingerprintSchema, matchEmbedding } from "@/lib/fingerprints";
+import { mergeCandidates, pickObvious } from "@/lib/visual-match";
+import type { Category } from "@/lib/inventory";
 import {
   applyStagePhoto,
   readStagePhoto,
+  type Candidate,
   type Detection,
 } from "./actions";
-import { DetectionRow, type Choice } from "./detection-row";
+import { DetectionRow, type Choice, type RankedCandidate } from "./detection-row";
+
+/** How many of the closest photos to ask for, per thing in the picture. */
+const PICTURE_MATCHES = 5;
+
+type PictureHit = Candidate & { similarity: number };
+
+/**
+ * Where comparing by picture has got to. It runs after the review screen is
+ * already up, because the name matches are useful on their own and nobody
+ * should wait on a model to see them.
+ */
+type PicturePass =
+  | { kind: "idle" }
+  | { kind: "offer" }
+  | { kind: "loading"; progress: LoadProgress | null }
+  | { kind: "matching"; done: number; total: number }
+  | { kind: "done" }
+  | { kind: "nothing-to-compare" }
+  | { kind: "not-set-up" }
+  | { kind: "failed" };
+
+function choiceFor(name: string, candidates: RankedCandidate[]): Choice {
+  const obvious = pickObvious(name, candidates);
+  return obvious ? { kind: "item", itemId: obvious.id } : { kind: "skip" };
+}
 
 // A phone photo is 3-4MB and several thousand pixels wide. Claude works from
 // about 1568px anyway, and a server action's body is not the place for the
@@ -69,6 +99,10 @@ function cropTo(image: HTMLImageElement, box: Detection["box"]): string | null {
   return canvas.toDataURL("image/jpeg", CROP_QUALITY);
 }
 
+function dataUrlToBlob(dataUrl: string): Blob {
+  return new Blob([dataUrlToBytes(dataUrl) as BlobPart], { type: "image/jpeg" });
+}
+
 function dataUrlToBytes(dataUrl: string): Uint8Array {
   const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
   const binary = atob(base64);
@@ -93,12 +127,91 @@ export function StagePhoto({ productionId }: { productionId: string }) {
   // Dismissed rows are kept aside rather than dropped, so a swipe made by
   // accident — easy, on a phone, in a dark wing — can be taken back.
   const [removed, setRemoved] = useState<Detection[]>([]);
+  const [pictureHits, setPictureHits] = useState<Record<string, PictureHit[]>>({});
+  const [picturePass, setPicturePass] = useState<PicturePass>({ kind: "idle" });
+  // Rows the reviewer has decided about. Picture matches arriving afterwards
+  // may re-rank the dropdown but must never change a choice someone made.
+  const touched = useRef(new Set<string>());
+  const listedRef = useRef<string[]>([]);
+  // Bumped per photo, so a slow picture pass for the last photo can't write
+  // its results into the review of this one.
+  const passId = useRef(0);
+
+  function candidatesFor(detection: Detection): RankedCandidate[] {
+    return mergeCandidates(detection.candidates, pictureHits[detection.key] ?? []);
+  }
+
+  /**
+   * Compares each crop against the photos of everything the theatre owns.
+   * One at a time: this is the CPU doing arithmetic, and two at once on a
+   * phone makes each slower and the screen sticky.
+   */
+  async function comparePictures(
+    rows: Detection[],
+    cropsByKey: Record<string, string>,
+    listedItemIds: string[]
+  ) {
+    const id = ++passId.current;
+    const stale = () => passId.current !== id;
+    const listed = new Set(listedItemIds);
+    const withCrops = rows.filter((row) => cropsByKey[row.key]);
+    if (withCrops.length === 0) {
+      setPicturePass({ kind: "idle" });
+      return;
+    }
+
+    try {
+      setPicturePass({ kind: "loading", progress: null });
+      await loadEmbedder((progress) => {
+        if (!stale()) setPicturePass({ kind: "loading", progress });
+      });
+
+      let anyFingerprints = false;
+      for (const [index, row] of withCrops.entries()) {
+        if (stale()) return;
+        setPicturePass({ kind: "matching", done: index, total: withCrops.length });
+
+        const embedding = await embedImage(dataUrlToBlob(cropsByKey[row.key]));
+        const lookalikes = await matchEmbedding(embedding, PICTURE_MATCHES);
+        if (stale()) return;
+        if (lookalikes.length > 0) anyFingerprints = true;
+
+        const hits: PictureHit[] = lookalikes.map((match) => ({
+          id: match.id,
+          name: match.name,
+          category: match.category as Category,
+          locationName: match.locationName,
+          quantity: match.quantity,
+          alreadyListed: listed.has(match.id),
+          photoUrl: match.photoUrl,
+          similarity: match.similarity,
+        }));
+
+        setPictureHits((current) => ({ ...current, [row.key]: hits }));
+        if (!touched.current.has(row.key)) {
+          setChoices((current) => ({
+            ...current,
+            [row.key]: choiceFor(row.name, mergeCandidates(row.candidates, hits)),
+          }));
+        }
+      }
+
+      setPicturePass(anyFingerprints ? { kind: "done" } : { kind: "nothing-to-compare" });
+    } catch (problem) {
+      if (stale()) return;
+      setPicturePass(
+        isMissingFingerprintSchema(problem) ? { kind: "not-set-up" } : { kind: "failed" }
+      );
+    }
+  }
 
   async function onPhoto(file: File | undefined) {
     if (!file) return;
     setError(null);
     setPhase("reading");
     setDetections([]);
+    passId.current += 1;
+    setPicturePass({ kind: "idle" });
 
     try {
       const { dataUrl, image } = await downscale(file);
@@ -121,19 +234,15 @@ export function StagePhoto({ productionId }: { productionId: string }) {
         nextCounts[detection.key] = detection.quantity;
         nextNames[detection.key] = detection.name;
         // Pre-selecting a guess is worse than leaving it blank: a reviewer
-        // scrolling twenty rows trusts what's already filled in. So only the
-        // unambiguous cases start ticked — one possibility, or a name that
-        // plainly says the same thing.
-        // Being the only result isn't evidence of anything — a vague search
-        // that returns one wrong thing would tick it. Only the name deciding
-        // it's the same thing counts.
-        const obvious = detection.candidates.find((candidate) =>
-          looksLikeSameThing(detection.name, candidate.name)
+        // scrolling twenty rows trusts what's already filled in. So only a
+        // name that plainly says the same thing starts ticked — being the
+        // only search result isn't evidence of anything. Once the pictures
+        // have been compared they can choose between several such names, or
+        // veto one, but never tick something on their own (visual-match.ts).
+        nextChoices[detection.key] = choiceFor(
+          detection.name,
+          mergeCandidates(detection.candidates, [])
         );
-
-        nextChoices[detection.key] = obvious
-          ? { kind: "item", itemId: obvious.id }
-          : { kind: "skip" };
       }
 
       setDetections(outcome.detections);
@@ -142,7 +251,22 @@ export function StagePhoto({ productionId }: { productionId: string }) {
       setChoices(nextChoices);
       setCounts(nextCounts);
       setNames(nextNames);
+      setPictureHits({});
+      touched.current = new Set();
+      listedRef.current = outcome.listedItemIds;
       setPhase("reviewing");
+
+      // On a device that already recognises photos, compare straight away.
+      // Anywhere else, offer — it means a download, and that's theirs to
+      // agree to.
+      if (await deviceMayFingerprint()) {
+        void comparePictures(outcome.detections, nextCrops, outcome.listedItemIds);
+      } else {
+        passId.current += 1;
+        setPicturePass(
+          Object.keys(nextCrops).length > 0 ? { kind: "offer" } : { kind: "idle" }
+        );
+      }
     } catch {
       setError("Couldn’t read that photo on this device. Try a different one.");
       setPhase("idle");
@@ -191,6 +315,8 @@ export function StagePhoto({ productionId }: { productionId: string }) {
     }
     if (uploads.length > 0) {
       await uploadImportedPhotos(outcome.orgId, uploads, () => {});
+      // The production page this goes to fingerprints them, or asks to.
+      markFingerprintsDue();
     }
 
     router.push(`/productions/${productionId}?marked=${outcome.marked}`);
@@ -239,6 +365,14 @@ export function StagePhoto({ productionId }: { productionId: string }) {
               wrong, or right to add it to your inventory as something new.
             </p>
 
+            <PicturePassNotice
+              pass={picturePass}
+              onCompare={() => {
+                optIn();
+                void comparePictures(detections, crops, listedRef.current);
+              }}
+            />
+
             {removed.length > 0 ? (
               <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-rule bg-surface px-3 py-2">
                 <span className="font-body text-sm text-muted">
@@ -269,12 +403,14 @@ export function StagePhoto({ productionId }: { productionId: string }) {
               {detections.map((detection) => (
                 <DetectionRow
                   key={detection.key}
-                  onAddToInventory={() =>
+                  candidates={candidatesFor(detection)}
+                  onAddToInventory={() => {
+                    touched.current.add(detection.key);
                     setChoices((current) => ({
                       ...current,
                       [detection.key]: { kind: "new" },
-                    }))
-                  }
+                    }));
+                  }}
                   onRemove={() => {
                     setRemoved((current) => [detection, ...current]);
                     setDetections((current) =>
@@ -286,9 +422,10 @@ export function StagePhoto({ productionId }: { productionId: string }) {
                   choice={choices[detection.key] ?? { kind: "skip" }}
                   name={names[detection.key] ?? detection.name}
                   count={counts[detection.key] ?? detection.quantity}
-                  onChoice={(choice) =>
-                    setChoices((current) => ({ ...current, [detection.key]: choice }))
-                  }
+                  onChoice={(choice) => {
+                    touched.current.add(detection.key);
+                    setChoices((current) => ({ ...current, [detection.key]: choice }));
+                  }}
                   onName={(name) =>
                     setNames((current) => ({ ...current, [detection.key]: name }))
                   }
@@ -348,5 +485,72 @@ export function StagePhoto({ productionId }: { productionId: string }) {
         </>
       ) : null}
     </div>
+  );
+}
+
+/** One line under the heading saying what comparing by picture is doing. */
+function PicturePassNotice({
+  pass,
+  onCompare,
+}: {
+  pass: PicturePass;
+  onCompare: () => void;
+}) {
+  if (pass.kind === "idle") return null;
+
+  if (pass.kind === "offer") {
+    return (
+      <div className="mt-3 rounded-lg border border-rule bg-surface px-3 py-3">
+        <p className="font-body text-sm text-foreground">
+          These were matched by name. Comparing each one with the photos of your items finds the
+          ones the name missed, and tells look-alikes apart.
+        </p>
+        <p className="mt-1 font-body text-xs text-muted">
+          Needs the recognition model on this device: a one-time download, best done on Wi-Fi.
+        </p>
+        <button
+          type="button"
+          onClick={onCompare}
+          className="mt-2 inline-flex min-h-11 items-center justify-center rounded-md border border-accent px-4 py-2 font-body text-sm font-medium text-accent transition-colors hover:bg-accent/10"
+        >
+          Compare by picture
+        </button>
+      </div>
+    );
+  }
+
+  if (pass.kind === "loading") {
+    const percent = pass.progress?.percent;
+    return (
+      <div className="mt-3" aria-live="polite">
+        <p className="font-body text-sm text-muted">
+          {percent !== null && percent !== undefined
+            ? `Downloading the recognition model… ${percent}%`
+            : "Getting the recognition model ready…"}
+        </p>
+        {percent !== null && percent !== undefined ? (
+          <div className="mt-1 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-rule">
+            <div className="h-full bg-accent" style={{ width: `${percent}%` }} />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  const text =
+    pass.kind === "matching"
+      ? `Comparing pictures… ${pass.done + 1} of ${pass.total}`
+      : pass.kind === "done"
+        ? "Matched by picture as well as by name."
+        : pass.kind === "nothing-to-compare"
+          ? "None of your items has a fingerprinted photo yet, so these are matched by name only."
+          : pass.kind === "not-set-up"
+            ? "Matching by picture isn’t set up on this inventory yet, so these are matched by name only."
+            : "Couldn’t compare pictures this time, so these are matched by name only.";
+
+  return (
+    <p aria-live="polite" className="mt-3 font-mono text-xs text-muted">
+      {text}
+    </p>
   );
 }
