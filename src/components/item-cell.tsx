@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { SwipeReveal } from "@/components/swipe-reveal";
 import { requestAddToProduction } from "@/components/add-to-production";
-import { useSwipeRight } from "@/lib/use-swipe";
+import { useSwipeLeft } from "@/lib/use-swipe";
 import {
   CATEGORY_LABELS,
   CONDITION_LABELS,
@@ -76,8 +76,8 @@ function Pair({ label, children }: { label: string; children: React.ReactNode })
 export function ItemCell({ item }: { item: ItemCellData }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
-  // On a phone, a swipe to the right puts it on a production's pull list.
-  const swipe = useSwipeRight(() => requestAddToProduction({ id: item.id, name: item.name }));
+  // On a phone, a swipe to the left puts it on a production's pull list.
+  const swipe = useSwipeLeft(() => requestAddToProduction({ id: item.id, name: item.name }));
 
   const place = item.locationId ? (item.locationName ?? "Unknown location") : "Unassigned";
 
@@ -284,7 +284,7 @@ export function ItemDetails({ item }: { item: ItemCellData }) {
         >
           Edit this item →
         </Link>
-        {/* What a right swipe does on a phone, as a button for everyone
+        {/* What a left swipe does on a phone, as a button for everyone
             else — and for anyone who didn't know about the swipe. */}
         <button
           type="button"

@@ -5,9 +5,6 @@ import type { TouchEvent } from "react";
 export const SWIPE_THRESHOLD = 110;
 /** Movement under this is a tap or a wobble, not a swipe. */
 const SLOP = 12;
-/** Touches starting this close to the left edge belong to the browser's own
- *  back gesture on iPhones, not to the row. */
-const EDGE = 20;
 
 function startedOnAControl(target: EventTarget | null): boolean {
   return Boolean(
@@ -16,7 +13,7 @@ function startedOnAControl(target: EventTarget | null): boolean {
 }
 
 /**
- * A rightward swipe on a row or a tile: the shared mechanics behind "swipe an
+ * A leftward swipe on a row or a tile: the shared mechanics behind "swipe an
  * item to add it to a production" and "swipe a pull-list line to mark it
  * pulled".
  *
@@ -29,7 +26,7 @@ function startedOnAControl(target: EventTarget | null): boolean {
  * Put `touch-action: pan-y` on the element that takes the handlers: the browser
  * keeps vertical scrolling and hands horizontal movement to the row.
  */
-export function useSwipeRight(
+export function useSwipeLeft(
   onCommit: () => void,
   {
     enabled = true,
@@ -50,8 +47,10 @@ export function useSwipeRight(
   function onTouchStart(event: TouchEvent) {
     if (!enabled) return;
     if (!startOnControls && startedOnAControl(event.target)) return;
+    // From anywhere on the row, the very edge of the screen included: the
+    // user asked for a swipe begun at the side to count. (Leftward also stays
+    // clear of the iPhone's own back gesture, which starts at the left edge.)
     const touch = event.touches[0];
-    if (touch.clientX < EDGE) return;
     gesture.current = { x: touch.clientX, y: touch.clientY, swiping: false };
   }
 
@@ -72,13 +71,13 @@ export function useSwipeRight(
       setDragging(true);
     }
 
-    const distance = Math.max(0, dx);
+    const distance = Math.max(0, -dx);
     const eased =
       distance > SWIPE_THRESHOLD
         ? SWIPE_THRESHOLD + (distance - SWIPE_THRESHOLD) * 0.35
         : distance;
     travelled.current = eased;
-    setOffset(eased);
+    setOffset(-eased);
   }
 
   function finish(allowCommit: boolean) {
@@ -97,7 +96,7 @@ export function useSwipeRight(
     offset,
     dragging,
     /** Far enough that letting go now will do it. */
-    armed: offset >= SWIPE_THRESHOLD,
+    armed: -offset >= SWIPE_THRESHOLD,
     /** True just after a swipe, so the click some browsers still send at the
      *  end of one doesn't also open or close the card. */
     justSwiped: () => Date.now() - swipedAt.current < 400,

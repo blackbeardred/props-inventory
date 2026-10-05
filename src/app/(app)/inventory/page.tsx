@@ -438,7 +438,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
         /* One cell per item; columns from lg up (see Day 22). The column gap
            is wide enough for the hexagon, which sits half outside its card;
            so is the 12px pulled back on the left, which lets the list clip
-           sideways — a card swiped right would otherwise widen the page. */
+           sideways — a card swiped off the side would otherwise widen the page. */
         <ul className="-ml-3 grid items-start gap-x-6 gap-y-2.5 overflow-x-clip pl-3 lg:grid-cols-2 2xl:grid-cols-3">
           {items.map((item) => (
             <ItemCell

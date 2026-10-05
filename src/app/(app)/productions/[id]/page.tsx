@@ -253,10 +253,13 @@ export default async function ProductionDetailPage({
           const listItems = itemsByPullList.get(list.id) ?? [];
           return (
             // Capped at a reading width: full-width on a desktop put each
-            // item's name at the left edge and its buttons 1,000px away.
+            // item's name at the left edge and its buttons 1,000px away. On a
+            // phone it runs edge to edge instead (no side borders), so each
+            // line — and the swipe that marks it pulled — reaches the sides of
+            // the screen rather than stopping at a margin.
             <div
               key={list.id}
-              className="mb-8 max-w-3xl rounded-lg border border-rule"
+              className="-mx-6 mb-8 max-w-3xl border-y border-rule md:mx-0 md:rounded-lg md:border"
             >
               <div className="border-b border-rule px-5 py-3">
                 <h2 className="font-display text-lg">{list.name}</h2>
@@ -268,7 +271,7 @@ export default async function ProductionDetailPage({
                     Nothing on this list yet.
                   </p>
                 ) : (
-                  <ul className="divide-y divide-rule">
+                  <ul className="-mx-5 divide-y divide-rule md:mx-0">
                     {listItems.map((pullListItem) => {
                       const photoPath = pullListItem.items?.photo_url;
                       const photoUrl = photoPath ? photoUrlByPath.get(photoPath) : undefined;

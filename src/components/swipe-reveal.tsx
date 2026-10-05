@@ -3,7 +3,7 @@
 import { usePullTargetLabel } from "@/components/add-to-production";
 
 /**
- * The strip an item card uncovers as it's swiped right: where letting go will
+ * The strip an item card uncovers as it's swiped left: where letting go will
  * send it. Named when a production is remembered ("Add to Noises Off!"), so
  * a swipe never goes somewhere the thumb couldn't see; "Add to a production…"
  * when letting go will ask.
@@ -21,13 +21,15 @@ export function SwipeReveal({
   rounded?: boolean;
 }) {
   const label = usePullTargetLabel();
-  if (offset <= 0) return null;
+  // Negative: the card moves left, uncovering the strip's right-hand end.
+  const gap = -offset;
+  if (gap <= 0) return null;
 
   return (
     <div
       aria-hidden="true"
       data-swipe-reveal
-      className={`absolute inset-0 flex items-center overflow-hidden pl-3 transition-colors ${
+      className={`absolute inset-0 flex items-center justify-end overflow-hidden pr-3 transition-colors ${
         rounded ? "rounded-lg" : ""
       } ${
         armed ? "bg-accent text-background" : "bg-accent/20 text-accent-ink"
@@ -36,8 +38,8 @@ export function SwipeReveal({
       {/* As wide as the gap the card has opened, so it reads as it's
           uncovered instead of being cut off by the card. */}
       <span
-        className="flex min-w-0 flex-col gap-0.5 overflow-hidden"
-        style={{ width: Math.max(0, offset - 18) }}
+        className="flex min-w-0 flex-col items-end gap-0.5 overflow-hidden text-right"
+        style={{ width: Math.max(0, gap - 18) }}
       >
         <span className="flex items-center gap-1.5 font-mono text-[11px] leading-none">
           <span
@@ -47,7 +49,7 @@ export function SwipeReveal({
           />
           {label ? "Add to" : "Add to a"}
         </span>
-        <span className="truncate font-body text-sm font-medium leading-tight">
+        <span className="max-w-full truncate font-body text-sm font-medium leading-tight">
           {label || "production…"}
         </span>
       </span>

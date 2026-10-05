@@ -3,7 +3,7 @@
 import { useState, useTransition, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { PULL_LIST_ITEM_STATUS_LABELS, type PullListItemStatus } from "@/lib/inventory";
-import { useSwipeRight } from "@/lib/use-swipe";
+import { useSwipeLeft } from "@/lib/use-swipe";
 import { updatePullListItemStatus } from "./actions";
 
 /** In the order things happen to a prop, which is also the order on screen. */
@@ -18,7 +18,10 @@ function statusForm(productionId: string, pullListItemId: string, status: PullLi
 }
 
 /**
- * One line of a pull list, which a phone can swipe right to mark pulled.
+ * One line of a pull list, which a phone can swipe left to mark pulled.
+ *
+ * On a phone the line runs the full width of the screen, edge to edge, so a
+ * swipe begun at the very side lands on it rather than on the list's margin.
  *
  * The line slides over a green strip that says what letting go will do, and
  * says "Already pulled" instead when it is — a swipe then does nothing, rather
@@ -40,7 +43,7 @@ export function PullRow({
   const [sent, setSent] = useState(false);
   const already = status === "pulled";
 
-  const swipe = useSwipeRight(() => {
+  const swipe = useSwipeLeft(() => {
     if (already) return;
     setSent(true);
     startSaving(async () => {
@@ -60,7 +63,7 @@ export function PullRow({
     >
       <div
         aria-hidden="true"
-        className={`absolute inset-0 flex items-center pl-4 transition-colors ${
+        className={`absolute inset-0 flex items-center justify-end pr-5 transition-colors ${
           already ? "bg-rule/40" : swipe.armed ? "bg-accent/30" : "bg-accent/15"
         }`}
       >
@@ -74,7 +77,7 @@ export function PullRow({
       <div
         {...swipe.handlers}
         style={swipe.style}
-        className={`relative flex flex-wrap items-center gap-x-4 gap-y-2 bg-background py-3 transition-opacity ${
+        className={`relative flex flex-wrap items-center gap-x-4 gap-y-2 bg-background px-5 py-3 transition-opacity md:px-0 ${
           showPulled ? "opacity-60" : ""
         }`}
       >

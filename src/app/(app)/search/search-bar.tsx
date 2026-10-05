@@ -15,7 +15,7 @@ import {
   pluralize,
 } from "@/lib/inventory";
 import { describeMatch } from "@/lib/search-reason";
-import { useSwipeRight } from "@/lib/use-swipe";
+import { useSwipeLeft } from "@/lib/use-swipe";
 import { SwipeReveal } from "@/components/swipe-reveal";
 import { requestAddToProduction } from "@/components/add-to-production";
 import { searchItemsLive, type SearchResultItem } from "./actions";
@@ -111,11 +111,11 @@ function ResultRow({
   /** Why it's here, when its name doesn't say. */
   reason?: string | null;
   onSelect: () => void;
-  /** Browsing, not choosing: a right swipe on a phone adds it to a
+  /** Browsing, not choosing: a left swipe on a phone adds it to a
    *  production, as it does on the Inventory list. */
   swipeable?: boolean;
 }) {
-  const swipe = useSwipeRight(
+  const swipe = useSwipeLeft(
     () => requestAddToProduction({ id: item.id, name: item.name }),
     { enabled: swipeable, startOnControls: true }
   );

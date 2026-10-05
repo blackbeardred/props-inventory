@@ -7,7 +7,7 @@ import { flushSync } from "react-dom";
 import { ItemDetails, type ItemCellData } from "@/components/item-cell";
 import { SwipeReveal } from "@/components/swipe-reveal";
 import { requestAddToProduction } from "@/components/add-to-production";
-import { useSwipeRight } from "@/lib/use-swipe";
+import { useSwipeLeft } from "@/lib/use-swipe";
 import { CATEGORY_LABELS } from "@/lib/inventory";
 
 /** One half of the list/grid switch on the items page. */
@@ -59,8 +59,8 @@ export function ItemTile({ item }: { item: ItemCellData }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const ref = useRef<HTMLLIElement>(null);
-  // On a phone, a swipe to the right puts it on a production's pull list.
-  const swipe = useSwipeRight(() => requestAddToProduction({ id: item.id, name: item.name }));
+  // On a phone, a swipe to the left puts it on a production's pull list.
+  const swipe = useSwipeLeft(() => requestAddToProduction({ id: item.id, name: item.name }));
 
   const place = item.locationId ? (item.locationName ?? "Unknown location") : "Unassigned";
 
@@ -119,7 +119,7 @@ export function ItemTile({ item }: { item: ItemCellData }) {
       // lets the browser match this tile's old box to its new one. The tile
       // being opened or shut lends the name to its photo instead.
       style={{ "--vt": `tile-${item.id}` } as CSSProperties}
-      // Clipped, so a tile swiped right slides under its own edge rather
+      // Clipped, so a tile swiped left slides under its own edge rather
       // than over the tile beside it.
       className={`relative overflow-hidden rounded-lg ${open ? "col-span-full" : "h-full"}`}
     >
