@@ -61,7 +61,7 @@ async function resolveLocationId(
 export async function updateItem(formData: FormData) {
   const itemId = String(formData.get("itemId") ?? "");
   if (!itemId) {
-    redirect("/items");
+    redirect("/inventory");
   }
 
   const name = String(formData.get("name") ?? "").trim();
@@ -126,7 +126,7 @@ export async function updateItem(formData: FormData) {
     .maybeSingle();
 
   if (!existingItem) {
-    redirect("/items");
+    redirect("/inventory");
   }
 
   let resolvedLocationId: string | null;
@@ -215,7 +215,7 @@ export async function updateItem(formData: FormData) {
     await supabase.storage.from(PHOTOS_BUCKET).remove([oldPhotoPath]);
   }
 
-  redirect("/items");
+  redirect("/inventory");
 }
 
 /**
@@ -227,7 +227,7 @@ export async function updateItem(formData: FormData) {
 export async function regenerateTags(formData: FormData) {
   const itemId = String(formData.get("itemId") ?? "");
   if (!itemId) {
-    redirect("/items");
+    redirect("/inventory");
   }
 
   const supabase = await createClient();
@@ -246,7 +246,7 @@ export async function regenerateTags(formData: FormData) {
     .maybeSingle();
 
   if (!existingItem) {
-    redirect("/items");
+    redirect("/inventory");
   }
 
   let photo: { bytes: Uint8Array; mediaType: string } | null = null;
@@ -290,7 +290,7 @@ export async function regenerateTags(formData: FormData) {
 export async function deleteItem(formData: FormData) {
   const itemId = String(formData.get("itemId") ?? "");
   if (!itemId) {
-    redirect("/items");
+    redirect("/inventory");
   }
 
   const supabase = await createClient();
@@ -313,5 +313,5 @@ export async function deleteItem(formData: FormData) {
     await supabase.storage.from(PHOTOS_BUCKET).remove([existingItem.photo_url]);
   }
 
-  redirect("/items");
+  redirect("/inventory");
 }

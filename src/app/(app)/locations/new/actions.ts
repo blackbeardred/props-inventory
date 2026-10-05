@@ -48,5 +48,6 @@ export async function createLocation(formData: FormData) {
     fail(error.message);
   }
 
-  redirect("/locations");
+  // Back inside the place it was added to, where it now shows as a tile.
+  redirect(parentLocationId ? `/inventory?place=${parentLocationId}` : "/inventory");
 }

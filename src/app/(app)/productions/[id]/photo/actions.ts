@@ -314,7 +314,7 @@ export async function applyStagePhoto(
   }
 
   revalidatePath(`/productions/${productionId}`);
-  revalidatePath("/items");
+  revalidatePath("/inventory");
 
   return { ok: true, marked: rows.length, createdItems, orgId };
 }

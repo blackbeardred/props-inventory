@@ -20,7 +20,7 @@ function first(value: string | string[] | undefined) {
 
 export default async function ImportItemsPage({ searchParams }: ImportPageProps) {
   if (!supabaseConfigured) {
-    redirect("/items");
+    redirect("/inventory");
   }
 
   const error = first((await searchParams).error);
@@ -39,10 +39,10 @@ export default async function ImportItemsPage({ searchParams }: ImportPageProps)
         intro="Bring an existing inventory in from a spreadsheet, rather than typing it in one item at a time."
         action={
           <Link
-            href="/items"
+            href="/inventory"
             className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
           >
-            Back to items
+            Back to inventory
           </Link>
         }
       />

@@ -73,7 +73,7 @@ export async function setCheckState(
   revalidatePath(`/productions/${productionId}/checklist`);
   revalidatePath(`/productions/${productionId}/issues`);
   revalidatePath(`/productions/${productionId}`);
-  revalidatePath("/items");
+  revalidatePath("/inventory");
 
   return { ok: true };
 }

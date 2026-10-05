@@ -32,7 +32,7 @@ function descendantIds(id: string, rows: LocationRow[]): Set<string> {
 export async function updateLocation(formData: FormData) {
   const locationId = String(formData.get("locationId") ?? "");
   if (!locationId) {
-    redirect("/locations");
+    redirect("/inventory");
   }
 
   const name = String(formData.get("name") ?? "").trim();
@@ -85,13 +85,13 @@ export async function updateLocation(formData: FormData) {
     fail(locationId, error.message);
   }
 
-  redirect("/locations");
+  redirect(`/inventory?place=${locationId}`);
 }
 
 export async function deleteLocation(formData: FormData) {
   const locationId = String(formData.get("locationId") ?? "");
   if (!locationId) {
-    redirect("/locations");
+    redirect("/inventory");
   }
 
   const supabase = await createClient();
@@ -106,5 +106,5 @@ export async function deleteLocation(formData: FormData) {
     );
   }
 
-  redirect("/locations");
+  redirect("/inventory");
 }

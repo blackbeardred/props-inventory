@@ -43,7 +43,7 @@ export default async function EditItemPage({
   searchParams,
 }: EditItemPageProps) {
   if (!supabaseConfigured) {
-    redirect("/items");
+    redirect("/inventory");
   }
 
   const { id } = await params;

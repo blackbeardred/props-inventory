@@ -64,7 +64,10 @@ export default async function LabelsPage() {
 
   const labels: LabelData[] = buildLocationChoices(rows).map((choice) => {
     const segments = choice.path.split(" / ");
-    const url = `${origin}/items?location=${choice.id}`;
+    // Straight into the place in Inventory. Labels printed before carry
+    // /items?location=…, which still redirects here, so no box needs a new
+    // label.
+    const url = `${origin}/inventory?place=${choice.id}`;
     return {
       id: choice.id,
       name: segments[segments.length - 1],
@@ -86,10 +89,10 @@ export default async function LabelsPage() {
           intro="A QR code per location. Print, cut along the dashed lines, and tape one to each box — scanning it opens that box’s contents."
           action={
             <Link
-              href="/locations"
+              href="/inventory"
               className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface"
             >
-              Back to locations
+              Back to inventory
             </Link>
           }
         />

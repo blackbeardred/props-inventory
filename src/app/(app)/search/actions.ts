@@ -58,10 +58,24 @@ export async function searchItemsLive(
     }
     rows = (data ?? []) as unknown as ItemRow[];
   } else {
+    // Everything beneath the chosen places too, the same as a text search
+    // does — "Props Room A" means its shelves and boxes, not just what's
+    // loose on its floor.
+    const { data: below } = await supabase.rpc("location_descendants", {
+      p_ids: locationIds,
+    });
+    const ids = [
+      ...new Set([
+        ...locationIds,
+        ...((below ?? []) as unknown[]).map((row) =>
+          typeof row === "string" ? row : String(Object.values(row as object)[0])
+        ),
+      ]),
+    ];
     const { data, error } = await supabase
       .from("items")
       .select(ITEM_COLUMNS)
-      .in("location_id", locationIds)
+      .in("location_id", ids)
       .order("name");
     if (error) {
       return { items: [], error: error.message };

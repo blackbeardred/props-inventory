@@ -5,7 +5,7 @@ import type { MetadataRoute } from "next";
  * opens it full screen from the home screen with no browser bar — the space
  * a phone in a storage room needs for the list, not for a URL.
  *
- * start_url is /items rather than / because the landing page is for people
+ * start_url is /inventory rather than / because the landing page is for people
  * who haven't signed up; someone opening the app from their home screen has.
  * A signed-out person is sent to log in from there as usual.
  *
@@ -18,7 +18,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Props",
     description: "Props, costumes, where they live, and what each production has pulled.",
     id: "/",
-    start_url: "/items",
+    start_url: "/inventory",
     scope: "/",
     display: "standalone",
     background_color: "#FBF7EC",
@@ -30,7 +30,7 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     shortcuts: [
-      { name: "Search", url: "/search", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+      { name: "Inventory", url: "/inventory", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Productions", url: "/productions", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Add an item", url: "/items/new", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
     ],

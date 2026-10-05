@@ -27,5 +27,5 @@ export async function updatePassword(formData: FormData) {
     redirect(`/reset-password?error=${encodeURIComponent(error.message)}`);
   }
 
-  redirect("/locations");
+  redirect("/inventory");
 }

@@ -62,7 +62,7 @@ export async function proxy(request: NextRequest) {
 
   if (user && AUTH_PATHS.has(pathname)) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/locations";
+    redirectUrl.pathname = "/inventory";
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }

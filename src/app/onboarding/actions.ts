@@ -33,7 +33,7 @@ export async function createOrganization(formData: FormData) {
     return redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
   }
 
-  return redirect("/locations");
+  return redirect("/inventory");
 }
 
 export async function joinOrganization(formData: FormData) {
@@ -66,5 +66,5 @@ export async function joinOrganization(formData: FormData) {
     return redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
   }
 
-  return redirect("/locations");
+  return redirect("/inventory");
 }

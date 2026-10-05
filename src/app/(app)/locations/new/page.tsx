@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import {
   Notice,
   PageHeading,
-  SelectField,
   TextField,
   TextareaField,
 } from "@/components/ui";
@@ -11,6 +10,8 @@ import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import type { LocationRow } from "@/lib/inventory";
+import type { LocationNode } from "@/lib/locations";
+import { LocationInput } from "@/components/location-input";
 import { createLocation } from "./actions";
 
 export const metadata: Metadata = {
@@ -25,27 +26,17 @@ function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-/** Nesting depth of a location, walking up parent_location_id. Guards cycles. */
-function depthOf(id: string, byId: Map<string, LocationRow>): number {
-  let depth = 0;
-  let current = byId.get(id);
-  const seen = new Set<string>();
-  while (current?.parent_location_id && !seen.has(current.id)) {
-    seen.add(current.id);
-    current = byId.get(current.parent_location_id);
-    depth += 1;
-  }
-  return depth;
-}
-
 export default async function NewLocationPage({
   searchParams,
 }: NewLocationPageProps) {
   if (!supabaseConfigured) {
-    redirect("/locations");
+    redirect("/inventory");
   }
 
-  const error = first((await searchParams).error);
+  const params = await searchParams;
+  const error = first(params.error);
+  // "+ Add a shelf or box in …" from inside a place in Inventory.
+  const parent = first(params.parent) ?? "";
 
   const supabase = await createClient();
   const { data } = await supabase
@@ -71,19 +62,13 @@ export default async function NewLocationPage({
       <form action={createLocation} className="max-w-lg space-y-5">
         <TextField label="Name" name="name" required />
         <TextareaField label="Description" name="description" rows={3} />
-        <SelectField
-          label="Within (optional)"
+        <LocationInput
           name="parentLocationId"
-          defaultValue=""
-        >
-          <option value="">No parent — top level</option>
-          {locations.map((location) => (
-            <option key={location.id} value={location.id}>
-              {"— ".repeat(depthOf(location.id, byId))}
-              {location.name}
-            </option>
-          ))}
-        </SelectField>
+          nodes={locations as unknown as LocationNode[]}
+          defaultValue={byId.has(parent) ? parent : ""}
+          label="Inside"
+          noneLabel="Nothing — it’s a room of its own"
+        />
         <SubmitButton pendingText="Adding location…">
           Add location
         </SubmitButton>

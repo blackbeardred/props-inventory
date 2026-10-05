@@ -21,7 +21,7 @@ function first(value: string | string[] | undefined) {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const error = first(params.error);
-  const next = first(params.next) ?? "/locations";
+  const next = first(params.next) ?? "/inventory";
 
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-16">

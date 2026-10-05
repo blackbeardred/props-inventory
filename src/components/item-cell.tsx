@@ -222,7 +222,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
             <Pair label="Kept in">
               {item.locationId ? (
                 <Link
-                  href={`/items?location=${item.locationId}`}
+                  href={`/inventory?place=${item.locationId}`}
                   // The padding widens what a thumb can hit without moving
                   // the line; the negative margin gives the space back.
                   className="-my-3.5 inline-block py-3.5 text-accent-ink underline-offset-2 hover:underline"

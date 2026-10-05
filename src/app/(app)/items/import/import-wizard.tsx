@@ -204,7 +204,7 @@ export function ImportWizard({
     const params = new URLSearchParams({ imported: String(outcome.imported) });
     if (outcome.skipped > 0) params.set("skipped", String(outcome.skipped));
     if (outcome.locationsCreated > 0) {
-      params.set("locations", String(outcome.locationsCreated));
+      params.set("newPlaces", String(outcome.locationsCreated));
     }
     if (outcome.unmatchedLocations > 0) {
       params.set("unmatched", String(outcome.unmatchedLocations));
@@ -218,7 +218,7 @@ export function ImportWizard({
     }
     if (failed > 0) params.set("photosFailed", String(failed));
 
-    router.push(`/items?${params.toString()}`);
+    router.push(`/inventory?${params.toString()}`);
   }
 
   const templateHref = `data:text/csv;charset=utf-8,${encodeURIComponent(CSV_TEMPLATE)}`;

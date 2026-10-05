@@ -29,7 +29,7 @@ export default async function OnboardingPage({
   // A profile alone is no longer enough — someone who left their only
   // theatre still has one, and belongs here until they join somewhere.
   if (profile && profile.memberships.length > 0) {
-    redirect("/locations");
+    redirect("/inventory");
   }
 
   const error = first((await searchParams).error);

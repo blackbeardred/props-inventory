@@ -66,7 +66,7 @@ export default async function EditLocationPage({
   searchParams,
 }: EditLocationPageProps) {
   if (!supabaseConfigured) {
-    redirect("/locations");
+    redirect("/inventory");
   }
 
   const { id } = await params;

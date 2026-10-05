@@ -33,10 +33,13 @@ export default async function NewItemPage({
   searchParams,
 }: NewItemPageProps) {
   if (!supabaseConfigured) {
-    redirect("/items");
+    redirect("/inventory");
   }
 
-  const error = first((await searchParams).error);
+  const params = await searchParams;
+  const error = first(params.error);
+  // Arriving from a place in Inventory ("Add item here") files it there.
+  const startIn = first(params.location) ?? "";
 
   const supabase = await createClient();
   const { data: locations } = await supabase
@@ -98,7 +101,10 @@ export default async function NewItemPage({
             ))}
           </SelectField>
 
-          <LocationField nodes={locationNodes} />
+          <LocationField
+            nodes={locationNodes}
+            defaultValue={locationNodes.some((node) => node.id === startIn) ? startIn : ""}
+          />
         </div>
 
         <div className="flex items-center gap-3">

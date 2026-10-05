@@ -13,8 +13,15 @@ export function PageHeading({
     <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
       <div>
         <h1 className="font-display text-3xl leading-tight">{title}</h1>
+        {/* A <div> when the intro is markup (a breadcrumb, a row of badges):
+            a <nav> or a list inside a <p> is invalid HTML, and React then
+            throws away the server render to fix it. */}
         {intro ? (
-          <p className="mt-2 max-w-xl font-body text-sm text-muted">{intro}</p>
+          typeof intro === "string" ? (
+            <p className="mt-2 max-w-xl font-body text-sm text-muted">{intro}</p>
+          ) : (
+            <div className="mt-2 max-w-xl font-body text-sm text-muted">{intro}</div>
+          )
         ) : null}
       </div>
       {/* max-w-full rather than shrink-0: a row of buttons that can't shrink
@@ -240,7 +247,7 @@ export function FileField({
         type="file"
         name={name}
         accept={accept}
-        className="block w-full font-body text-sm text-muted file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1.5 file:font-body file:text-sm file:text-foreground hover:file:bg-rule/40"
+        className="block min-h-11 w-full font-body text-sm text-muted md:min-h-0 file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1.5 file:font-body file:text-sm file:text-foreground hover:file:bg-rule/40"
       />
       {helpText ? (
         <span className="mt-1 block font-body text-xs text-muted">

@@ -3,16 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+/**
+ * Three places, not five. Items, Locations and Search were three ways into
+ * the same list, and Account and Organization both held the invite code and
+ * the theatre switcher; they're one Inventory and one Theatre page now. Each
+ * tab also lights up for the pages that live under it — adding an item is
+ * still "in" Inventory.
+ */
 const LINKS = [
-  { href: "/locations", label: "Locations" },
-  { href: "/items", label: "Items" },
-  { href: "/productions", label: "Productions" },
-  { href: "/search", label: "Search" },
-  { href: "/organization", label: "Organization" },
+  { href: "/inventory", label: "Inventory", also: ["/items", "/locations", "/search"] },
+  { href: "/productions", label: "Productions", also: [] },
+  { href: "/theatre", label: "Theatre", also: ["/account", "/organization"] },
 ] as const;
 
-function isActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isActive(pathname: string, link: (typeof LINKS)[number]): boolean {
+  return [link.href, ...link.also].some(
+    (href) => pathname === href || pathname.startsWith(`${href}/`)
+  );
 }
 
 /**
@@ -31,7 +38,7 @@ export function AppNav() {
   return (
     <nav aria-label="Main" className="hidden flex-wrap items-center gap-1 md:flex">
       {LINKS.map((link) => {
-        const active = isActive(pathname, link.href);
+        const active = isActive(pathname, link);
         return (
           <Link
             key={link.href}
@@ -54,13 +61,12 @@ export function AppNav() {
 }
 
 /**
- * The phone nav: five tabs along the bottom edge.
+ * The phone nav: three tabs along the bottom edge.
  *
  * Each tab carries the hexagon, meaning what it means everywhere else in the
  * app — honey when shut, ink when open — so the page you're on is the one
  * cell that's open, turned the same 90° an opened cell turns. Every tab is
- * the full height of the bar (56px) and a fifth of its width, comfortably
- * past the 44px a finger needs.
+ * the full height of the bar (56px) and a third of its width.
  *
  * Padded by the safe-area inset so it clears the iPhone home indicator; that
  * only reports a value because the root layout sets `viewport-fit=cover`.
@@ -74,15 +80,15 @@ export function MobileTabBar() {
       data-print-hide
       className="fixed inset-x-0 bottom-0 z-30 border-t border-rule bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
     >
-      <ul className="grid grid-cols-5">
+      <ul className="grid grid-cols-3">
         {LINKS.map((link) => {
-          const active = isActive(pathname, link.href);
+          const active = isActive(pathname, link);
           return (
             <li key={link.href}>
               <Link
                 href={link.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 font-body text-[11px] leading-none transition-colors ${
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 font-body text-xs leading-none transition-colors ${
                   active ? "font-medium text-accent-ink" : "text-muted"
                 }`}
               >

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 function fail(message: string): never {
-  redirect(`/organization?error=${encodeURIComponent(message)}`);
+  redirect(`/theatre?error=${encodeURIComponent(message)}`);
 }
 
 export async function regenerateInviteCode() {
@@ -15,7 +15,7 @@ export async function regenerateInviteCode() {
     fail(error.message);
   }
 
-  redirect("/organization");
+  redirect("/theatre#members");
 }
 
 export async function setMemberRole(formData: FormData) {
@@ -36,7 +36,7 @@ export async function setMemberRole(formData: FormData) {
     fail(error.message);
   }
 
-  redirect("/organization");
+  redirect("/theatre#members");
 }
 
 export async function removeMember(formData: FormData) {
@@ -55,5 +55,5 @@ export async function removeMember(formData: FormData) {
     fail(error.message);
   }
 
-  redirect("/organization");
+  redirect("/theatre#members");
 }

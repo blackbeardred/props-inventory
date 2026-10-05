@@ -78,7 +78,7 @@ export default async function Home() {
           {user ? (
             <div className="mt-12 text-center">
               <Link
-                href="/locations"
+                href="/inventory"
                 className="font-display text-3xl sm:text-4xl text-accent hover:underline"
               >
                 Explore my Inventory
@@ -86,22 +86,15 @@ export default async function Home() {
             </div>
           ) : null}
 
-          <p className="font-body text-sm text-muted mt-10">
-            Day 2 is live &mdash;{" "}
-            <Link href="/locations" className="text-accent hover:underline">
-              Locations
-            </Link>
-            ,{" "}
-            <Link href="/items" className="text-accent hover:underline">
-              Items
-            </Link>
-            , and{" "}
-            <Link href="/productions" className="text-accent hover:underline">
-              Productions
-            </Link>
-            . Day 3 is live &mdash; sign up above to create your
-            organization.
-          </p>
+          {/* A build-log line ("Day 2 is live…") used to sit here; it read as
+              unfinished to anyone new, and linked to pages that no longer
+              exist on their own. */}
+          {!user ? (
+            <p className="font-body text-sm text-muted mt-10">
+              New here? Sign up above to set up your theatre, or join one with
+              its invite code.
+            </p>
+          ) : null}
         </div>
       </div>
     </main>

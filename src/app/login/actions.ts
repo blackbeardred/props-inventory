@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const nextParam = String(formData.get("next") ?? "/locations");
-  const next = nextParam.startsWith("/") ? nextParam : "/locations";
+  const nextParam = String(formData.get("next") ?? "/inventory");
+  const next = nextParam.startsWith("/") ? nextParam : "/inventory";
 
   if (!email || !password) {
     return redirect(

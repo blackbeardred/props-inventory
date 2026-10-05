@@ -179,5 +179,6 @@ export async function createItem(formData: FormData) {
     fail(insertError.message);
   }
 
-  redirect("/items");
+  // Back to wherever it was filed, so it's there to see.
+  redirect(resolvedLocationId ? `/inventory?place=${resolvedLocationId}` : "/inventory");
 }

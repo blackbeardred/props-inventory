@@ -14,11 +14,11 @@ const ALLOWED_AVATAR_TYPES: Record<string, string> = {
 };
 
 function fail(message: string): never {
-  redirect(`/account?error=${encodeURIComponent(message)}`);
+  redirect(`/theatre?error=${encodeURIComponent(message)}`);
 }
 
 function done(notice: string): never {
-  redirect(`/account?notice=${notice}`);
+  redirect(`/theatre?notice=${notice}`);
 }
 
 async function requireUser() {
@@ -28,7 +28,7 @@ async function requireUser() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?next=/account");
+    redirect("/login?next=/theatre");
   }
 
   return { supabase, user };
@@ -166,7 +166,7 @@ export async function switchOrganization(formData: FormData) {
     fail(error.message);
   }
 
-  redirect("/items");
+  redirect("/inventory");
 }
 
 export async function leaveOrganization(formData: FormData) {
@@ -215,5 +215,5 @@ export async function joinOrganization(formData: FormData) {
     fail(error.message);
   }
 
-  redirect("/items");
+  redirect("/inventory");
 }

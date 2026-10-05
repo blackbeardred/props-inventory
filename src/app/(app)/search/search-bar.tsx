@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useRef, useState } from "react";
-import type { ChangeEvent, KeyboardEvent } from "react";
+import type { ChangeEvent, KeyboardEvent, ReactNode } from "react";
 import Link from "next/link";
 import {
   Badge,
@@ -70,7 +70,11 @@ function matchScore(name: string, needle: string): number | null {
 function syncUrl(terms: string[], locationIds: string[]) {
   const text = terms.join(" ");
   if (typeof window === "undefined") return;
-  const params = new URLSearchParams();
+  // Starts from what's already there, so the page's own state — which place
+  // you're in, list or grid — survives a search being typed.
+  const params = new URLSearchParams(window.location.search);
+  params.delete("q");
+  params.delete("locations");
   if (text) params.set("q", text);
   if (locationIds.length > 0) params.set("locations", locationIds.join(","));
   const query = params.toString();
@@ -253,6 +257,8 @@ export function SearchBar({
   initialItems = [],
   initialError = null,
   onPick,
+  scope = null,
+  browse,
 }: {
   locations: LocationOption[];
   initialText?: string;
@@ -265,6 +271,17 @@ export function SearchBar({
    * form on someone else's page, not the page itself.
    */
   onPick?: (item: SearchResultItem) => void;
+  /**
+   * The place being browsed, on the Inventory page. A search with no place
+   * of its own is kept inside this one (and everything beneath it).
+   */
+  scope?: LocationOption | null;
+  /**
+   * What to show when nothing has been searched for: on the Inventory page,
+   * the places and items you're browsing. Typing replaces it with results;
+   * clearing the box brings it back.
+   */
+  browse?: ReactNode;
 }) {
   // Anything already in the URL arrives as chips, so a reloaded or shared
   // search looks exactly like one you built by typing.
@@ -351,6 +368,12 @@ export function SearchBar({
     return { terms, ids, query: [...terms, live].filter(Boolean).join(" ") };
   }
 
+  /** The places a search covers: its own location chips, or else the place
+   *  being browsed. Never written into the URL — the place already is. */
+  function searchIds(ids: string[]): string[] {
+    return ids.length > 0 ? ids : scope ? [scope.id] : [];
+  }
+
   function scheduleSearch(nextText: string, nextChips: Chip[]) {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -372,7 +395,7 @@ export function SearchBar({
     const requestId = ++requestIdRef.current;
     setIsSearching(true);
     debounceTimerRef.current = setTimeout(() => {
-      searchItemsLive(query, ids).then((result) => {
+      searchItemsLive(query, searchIds(ids)).then((result) => {
         if (requestIdRef.current !== requestId) return;
         setItems(result.items);
         setSearchError(result.error);
@@ -476,7 +499,7 @@ export function SearchBar({
           results underneath have no business being that narrow, which is what
           left two-thirds of a desktop screen empty. */}
       <div className={onPick ? "relative" : "relative max-w-2xl"}>
-        <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-rule bg-surface px-3 py-2 transition-colors focus-within:border-accent">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-rule bg-surface px-3 py-1 transition-colors md:py-2 focus-within:border-accent">
           {chips.map((chip, index) => (
             <span
               key={chipKey(chip, index)}
@@ -512,16 +535,29 @@ export function SearchBar({
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
             placeholder={
-              chips.length === 0
-                ? "Search — a word, or a room or shelf"
-                : "Add another word to narrow it…"
+              chips.length > 0
+                ? "Add another word to narrow it…"
+                : scope
+                  ? `Search in ${scope.name}`
+                  : "Search — a word, or a room or shelf"
             }
             // Only on the search page itself. Inside someone else's form —
             // the pull list on a production page — it scrolled the page down
             // to the box on load and put the page's own buttons off-screen.
-            autoFocus={!onPick}
-            className="min-h-8 min-w-[10rem] flex-1 bg-transparent font-body text-sm text-foreground outline-none placeholder:text-muted"
+            autoFocus={!onPick && browse === undefined}
+            className="min-h-10 md:min-h-8 min-w-[10rem] flex-1 bg-transparent font-body text-sm text-foreground outline-none placeholder:text-muted"
           />
+          {/* The other way to search, kept in the box so it's found where
+              searching happens — the Search page that used to carry it is
+              part of Inventory now. Not inside a production's pull-list form. */}
+          {onPick ? null : (
+            <Link
+              href="/items/lookalike"
+              className="inline-flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-md px-1.5 font-body text-sm text-accent-ink hover:underline md:min-h-8"
+            >
+              By photo
+            </Link>
+          )}
         </div>
 
         {suggestions.length > 0 ? (
@@ -575,7 +611,9 @@ export function SearchBar({
 
       <div className={onPick ? "mt-3" : "mt-6"}>
         {!hasQuery ? (
-          onPick ? (
+          browse !== undefined ? (
+            browse
+          ) : onPick ? (
             <p className="font-body text-sm text-muted">
               Type a word and press enter to pin it; add another to narrow it
               down. A room or shelf name works too, and covers everything
@@ -628,6 +666,7 @@ export function SearchBar({
             <>
               <p className="mb-4 font-body text-sm text-muted">
                 {pluralize(items.length, "match", "matches")} for {resultsLabel}
+                {scope && locationLabels.length === 0 ? ` in ${scope.name}` : ""}
               </p>
 
               {/* The list needs a column, not a page: everything worth knowing
