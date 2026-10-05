@@ -5,14 +5,15 @@ import { useFormStatus } from "react-dom";
 /**
  * A submit button for a destructive action, gated behind a native confirm()
  * dialog and disabled while its form's action is pending. Must be rendered
- * inside a <form action={...}>.
+ * inside a <form action={...}>. Without a confirmMessage it doesn't ask —
+ * for small things the Undo bar can bring straight back.
  */
 export function DeleteButton({
   children,
   confirmMessage,
 }: {
   children: string;
-  confirmMessage: string;
+  confirmMessage?: string;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -21,7 +22,7 @@ export function DeleteButton({
       disabled={pending}
       aria-busy={pending}
       onClick={(event) => {
-        if (!window.confirm(confirmMessage)) {
+        if (confirmMessage && !window.confirm(confirmMessage)) {
           event.preventDefault();
         }
       }}

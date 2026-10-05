@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppNav, MobileTabBar } from "@/components/app-nav";
 import { QuickActions } from "@/components/quick-actions";
+import { DeletedBar } from "@/components/deleted-bar";
 import { FingerprintCatchUp } from "@/components/fingerprint-catch-up";
 import { OfflineBanner } from "@/components/service-worker";
 import { OrgSwitcher } from "@/components/org-switcher";
@@ -96,6 +97,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <FingerprintCatchUp orgId={profile.active_org_id} />
       <MobileTabBar />
       <QuickActions />
+      {/* Undo, right after a delete. Reads the address, so it waits for it. */}
+      <Suspense fallback={null}>
+        <DeletedBar />
+      </Suspense>
     </div>
   );
 }

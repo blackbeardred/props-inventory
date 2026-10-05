@@ -8,11 +8,17 @@ import { test as base, expect, type Locator, type Page } from "@playwright/test"
  * otherwise pass straight over. A test that expects errors (the offline
  * checks, say) opts out with `test.use({ consoleErrors: "ignore" })`.
  */
-export const test = base.extend<{ consoleErrors: "fail" | "ignore"; resetFixtures: void }>({
+export const test = base.extend<{
+  consoleErrors: "fail" | "ignore";
+  /** Extra setup for the sample theatre, e.g. "role=member" (see e2e/fixtures/db.ts). */
+  fixtureOptions: string;
+  resetFixtures: void;
+}>({
   consoleErrors: ["fail", { option: true }],
+  fixtureOptions: ["", { option: true }],
   resetFixtures: [
-    async ({ request }, provide) => {
-      const reset = await request.post("/api/e2e/reset");
+    async ({ request, fixtureOptions }, provide) => {
+      const reset = await request.post(`/api/e2e/reset${fixtureOptions ? `?${fixtureOptions}` : ""}`);
       expect(reset.ok(), "the fixture build answers /api/e2e/reset").toBeTruthy();
       await provide();
     },
@@ -24,7 +30,14 @@ export const test = base.extend<{ consoleErrors: "fail" | "ignore"; resetFixture
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
     page.on("console", (message) => {
-      if (message.type() === "error") errors.push(`console: ${message.text().slice(0, 300)}`);
+      if (message.type() !== "error") return;
+      // "Failed to load resource" doesn't say which; the response handler
+      // below records the address instead.
+      if (message.text().startsWith("Failed to load resource")) return;
+      errors.push(`console: ${message.text().slice(0, 300)}`);
+    });
+    page.on("response", (response) => {
+      if (response.status() >= 400) errors.push(`HTTP ${response.status()} ${response.request().method()} ${response.url()}`);
     });
     await provide(page);
     if (consoleErrors === "fail") expect(errors, "no errors in the browser console").toEqual([]);

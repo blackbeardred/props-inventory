@@ -351,9 +351,8 @@ export default async function ProductionDetailPage({
                             <form action={removePullListItem} className="col-start-3 md:order-3">
                               <input type="hidden" name="productionId" value={typedProduction.id} />
                               <input type="hidden" name="pullListItemId" value={pullListItem.id} />
-                              <DeleteButton
-                                confirmMessage={`Remove "${pullListItem.items?.name ?? "this item"}" from the list?`}
-                              >
+                              {/* No "are you sure": the Undo bar puts it straight back. */}
+                              <DeleteButton>
                                 Remove
                               </DeleteButton>
                             </form>
@@ -407,7 +406,7 @@ export default async function ProductionDetailPage({
                   <input type="hidden" name="productionId" value={typedProduction.id} />
                   <input type="hidden" name="pullListId" value={list.id} />
                   <DeleteButton
-                    confirmMessage={`Delete "${list.name}" and everything on it? This can’t be undone.`}
+                    confirmMessage={`Delete "${list.name}" and everything on it? You can restore it from Theatre → Recently deleted for 30 days.`}
                   >
                     Delete this list
                   </DeleteButton>

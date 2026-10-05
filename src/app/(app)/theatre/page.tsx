@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { KEEP_DAYS } from "@/lib/deleted-records";
+import { purgeExpired } from "@/lib/recently-deleted";
 import {
   Badge,
   FileField,
@@ -137,6 +139,15 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
 
   const activeNotice = notice ? NOTICES[notice] : undefined;
 
+  // Anything past its 30 days is cleared whenever Theatre or Recently
+  // deleted is opened, so old photos don't pile up in storage. The count is
+  // null when migration 007 hasn't been run: the link still goes to the page,
+  // which says so.
+  await purgeExpired(supabase);
+  const { count: deletedCount } = await supabase
+    .from("deleted_records")
+    .select("id", { count: "exact", head: true });
+
   return (
     <>
       <PageHeading
@@ -262,6 +273,24 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
               Find an item by photo
             </Link>
           </div>
+        </Section>
+
+        <Section
+          id="deleted"
+          title="Recently deleted"
+          intro={`Items, places, productions and pull lists wait here for ${KEEP_DAYS} days after they're deleted, in case you want them back.`}
+        >
+          <Link
+            href="/theatre/deleted"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface md:min-h-0"
+          >
+            Recently deleted
+            {deletedCount ? (
+              <span className="rounded-full bg-foreground/[0.08] px-1.5 font-body text-xs text-muted">
+                {deletedCount}
+              </span>
+            ) : null}
+          </Link>
         </Section>
 
         <Section

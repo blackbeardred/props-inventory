@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { trashLocation } from "@/lib/recently-deleted";
+import { withUndo } from "@/lib/undo-href";
 import type { LocationRow } from "@/lib/inventory";
 
 function fail(locationId: string, message: string): never {
@@ -95,16 +97,10 @@ export async function deleteLocation(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("locations")
-    .delete()
-    .eq("id", locationId);
-
-  if (error) {
-    redirect(
-      `/locations/${locationId}/edit?error=${encodeURIComponent(error.message)}`
-    );
+  const result = await trashLocation(supabase, locationId);
+  if (!result.ok) {
+    redirect(`/locations/${locationId}/edit?error=${encodeURIComponent(result.message)}`);
   }
 
-  redirect("/inventory");
+  redirect(withUndo("/inventory", result.recordId, result.label));
 }

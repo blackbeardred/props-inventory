@@ -118,7 +118,7 @@ export default async function EditProductionPage({
           Its pull lists and pull-list items are deleted with it.
         </p>
         <DeleteButton
-          confirmMessage={`Delete "${typed.name}" and all of its pull lists? This can’t be undone.`}
+          confirmMessage={`Delete "${typed.name}" and all of its pull lists? You can restore it from Theatre → Recently deleted for 30 days.`}
         >
           Delete production
         </DeleteButton>

@@ -3,6 +3,8 @@
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { trashItem } from "@/lib/recently-deleted";
+import { withUndo } from "@/lib/undo-href";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 import { generateTags } from "@/lib/ai/tag-item";
 
@@ -295,23 +297,12 @@ export async function deleteItem(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { data: existingItem } = await supabase
-    .from("items")
-    .select("photo_url, auto_tags")
-    .eq("id", itemId)
-    .maybeSingle();
-
-  const { error } = await supabase.from("items").delete().eq("id", itemId);
-
-  if (error) {
-    redirect(
-      `/items/${itemId}/edit?error=${encodeURIComponent(error.message)}`
-    );
+  // Into Recently Deleted for 30 days, photo included: the picture stays in
+  // storage until the snapshot is cleared (src/lib/recently-deleted.ts).
+  const result = await trashItem(supabase, itemId);
+  if (!result.ok) {
+    redirect(`/items/${itemId}/edit?error=${encodeURIComponent(result.message)}`);
   }
 
-  if (existingItem?.photo_url) {
-    await supabase.storage.from(PHOTOS_BUCKET).remove([existingItem.photo_url]);
-  }
-
-  redirect("/inventory");
+  redirect(withUndo("/inventory", result.recordId, result.label));
 }

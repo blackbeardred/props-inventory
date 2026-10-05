@@ -118,6 +118,8 @@ test.describe("pull list (phone)", () => {
       },
     });
     await expect(pressed(page, "Brass candlestick")).toHaveText("Pulled");
+    // Saved, not just shown: the current status's own button is disabled.
+    await expect(row(page, "Brass candlestick").locator('button[value="pulled"]')).toBeDisabled();
     await swipe(page, row(page, "Brass candlestick"), -160, {
       during: async () => {
         await expect(row(page, "Brass candlestick")).toContainText("Already pulled");

@@ -162,7 +162,7 @@ export default async function EditLocationPage({
             : "No items are stored here."}
         </p>
         <DeleteButton
-          confirmMessage={`Delete "${typedLocation.name}"? Any items stored here become unassigned, and any sub-locations move to the top level. This can’t be undone.`}
+          confirmMessage={`Delete "${typedLocation.name}"? Any items stored here become unassigned, and any sub-locations move to the top level. You can restore it, and put them back inside, from Theatre → Recently deleted for 30 days.`}
         >
           Delete location
         </DeleteButton>

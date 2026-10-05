@@ -25,19 +25,20 @@ function seed(): Record<string, Row[]> {
     profiles: [{ id: "u1", full_name: "testname", avatar_url: null, active_org_id: "org1" }],
     memberships: [{ user_id: "u1", org_id: "org1", role: "owner", created_at: "2026-09-24T00:00:00Z" }],
     locations: [
-      { id: "roomA", name: "Props Room A", parent_location_id: null, description: null, created_at: now },
-      { id: "roomB", name: "Props Room B", parent_location_id: null, description: null, created_at: now },
-      { id: "costume", name: "Costume Storage", parent_location_id: null, description: null, created_at: now },
-      { id: "shelfA", name: "A", parent_location_id: "roomA", description: null, created_at: now },
-      { id: "shelfB", name: "B", parent_location_id: "roomA", description: null, created_at: now },
-      { id: "shelfB2", name: "B", parent_location_id: "roomB", description: null, created_at: now },
-      { id: "shake", name: "Shakespeare Box", parent_location_id: "shelfA", description: null, created_at: now },
-      { id: "loft", name: "Loft", parent_location_id: null, description: null, created_at: now },
+      { id: "roomA", org_id: "org1", name: "Props Room A", parent_location_id: null, description: null, created_at: now },
+      { id: "roomB", org_id: "org1", name: "Props Room B", parent_location_id: null, description: null, created_at: now },
+      { id: "costume", org_id: "org1", name: "Costume Storage", parent_location_id: null, description: null, created_at: now },
+      { id: "shelfA", org_id: "org1", name: "A", parent_location_id: "roomA", description: null, created_at: now },
+      { id: "shelfB", org_id: "org1", name: "B", parent_location_id: "roomA", description: null, created_at: now },
+      { id: "shelfB2", org_id: "org1", name: "B", parent_location_id: "roomB", description: null, created_at: now },
+      { id: "shake", org_id: "org1", name: "Shakespeare Box", parent_location_id: "shelfA", description: null, created_at: now },
+      { id: "loft", org_id: "org1", name: "Loft", parent_location_id: null, description: null, created_at: now },
     ],
     items: [],
-    productions: [{ id: "prod1", name: "Noises Off!", status: "planning", start_date: "2026-11-01", end_date: "2026-12-02", created_at: now }],
+    productions: [{ id: "prod1", org_id: "org1", name: "Noises Off!", status: "planning", start_date: "2026-11-01", end_date: "2026-12-02", created_at: now }],
     pull_lists: [{ id: "pl1", production_id: "prod1", name: "Pull List", created_at: now }],
     pull_list_items: [],
+    deleted_records: [],
   };
   names.forEach((name, i) => {
     DB.items.push({
@@ -69,9 +70,25 @@ export const DB: Record<string, Row[]> = new Proxy({} as Record<string, Row[]>, 
   getOwnPropertyDescriptor: (_t, key) => ({ ...Object.getOwnPropertyDescriptor(store.__fixtureDB!, key), configurable: true }),
 });
 
-/** Back to the seeded theatre: called by POST /api/e2e/reset. */
-export function resetFixtures(): void {
-  store.__fixtureDB = seed();
+/**
+ * Back to the seeded theatre: called by POST /api/e2e/reset. Options:
+ *   role=member   the signed-in person is a member, not the owner
+ *   deleted=old   Recently Deleted already holds two things: one deleted
+ *                 10 days ago, one 40 days ago (past its 30, due a purge)
+ */
+export function resetFixtures(options?: URLSearchParams): void {
+  const db = seed();
+  if (options?.get("role") === "member") db.memberships[0].role = "member";
+  if (options?.get("deleted") === "old") {
+    const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+    db.deleted_records.push(
+      { id: "dr-recent", org_id: "org1", kind: "item", label: "Spare lantern", detail: "Loft", photo_paths: [], deleted_by: "u1", deleted_at: daysAgo(10),
+        snapshot: { kind: "item", item: { id: "it-spare", org_id: "org1", name: "Spare lantern", category: "prop", description: null, photo_url: null, quantity: 1, condition: null, location_id: "loft", created_at: now, auto_tags: [], import_data: {} }, lines: [], embedding: null } },
+      { id: "dr-expired", org_id: "org1", kind: "item", label: "Broken umbrella", detail: "Unassigned", photo_paths: ["org1/umbrella.jpg"], deleted_by: "u1", deleted_at: daysAgo(40),
+        snapshot: { kind: "item", item: { id: "it-umbrella", org_id: "org1", name: "Broken umbrella" }, lines: [], embedding: null } }
+    );
+  }
+  store.__fixtureDB = db;
 }
 
 export function photoFor(path: string) {
@@ -92,8 +109,14 @@ function embed(table: string, row: Row, select: string): Row {
     if (select.includes("pull_lists(")) {
       const pl = DB.pull_lists.find((x) => x.id === row.pull_list_id);
       const prod = pl && DB.productions.find((x) => x.id === pl.production_id);
-      out.pull_lists = pl ? { name: pl.name, productions: prod ?? null } : null;
+      out.pull_lists = pl ? { name: pl.name, production_id: pl.production_id, productions: prod ?? null } : null;
     }
+  }
+  if (table === "pull_lists" && select.includes("productions(")) {
+    out.productions = DB.productions.find((x) => x.id === row.production_id) ?? null;
+  }
+  if (table === "deleted_records" && select.includes("profiles(")) {
+    out.profiles = DB.profiles.find((x) => x.id === row.deleted_by) ?? null;
   }
   if (table === "productions" && select.includes("pull_lists(")) {
     out.pull_lists = DB.pull_lists.filter((x) => x.production_id === row.id);
@@ -105,6 +128,26 @@ function embed(table: string, row: Row, select: string): Row {
     out.profiles = DB.profiles.find((x) => x.id === row.user_id) ?? null;
   }
   return out;
+}
+
+/** What the real foreign keys do on delete (schema.sql): cascade or set null. */
+function cascade(table: string, gone: string[]) {
+  if (!gone.length) return;
+  const drop = (t: string, col: string, ids: string[]) => {
+    const removed = (DB[t] ?? []).filter((r) => ids.includes(r[col] as string));
+    DB[t] = (DB[t] ?? []).filter((r) => !removed.includes(r));
+    return removed.map((r) => r.id as string);
+  };
+  if (table === "productions") cascade("pull_lists", drop("pull_lists", "production_id", gone));
+  if (table === "pull_lists") drop("pull_list_items", "pull_list_id", gone);
+  if (table === "items") {
+    drop("pull_list_items", "item_id", gone);
+    drop("item_photo_embeddings", "item_id", gone);
+  }
+  if (table === "locations") {
+    for (const l of DB.locations) if (gone.includes(l.parent_location_id as string)) l.parent_location_id = null;
+    for (const i of DB.items) if (gone.includes(i.location_id as string)) i.location_id = null;
+  }
 }
 
 export function query(table: string) {
@@ -122,24 +165,50 @@ export function query(table: string) {
   b.is = (col: string, v: unknown) => { rows = rows.filter((r) => (r[col] ?? null) === v); return b; };
   b.order = (col: string, opts?: { ascending?: boolean }) => { const asc = opts?.ascending !== false; rows.sort((x, y) => String(x[col] ?? "").localeCompare(String(y[col] ?? "")) * (asc ? 1 : -1)); return b; };
   b.limit = (n: number) => { rows = rows.slice(0, n); return b; };
+  const compare = (col: string, test: (a: string, b: string) => boolean) => (v: unknown) => {
+    rows = rows.filter((r) => r[col] !== null && r[col] !== undefined && test(String(r[col]), String(v)));
+    return b;
+  };
+  b.lt = (col: string, v: unknown) => compare(col, (a, z) => a < z)(v);
+  b.lte = (col: string, v: unknown) => compare(col, (a, z) => a <= z)(v);
+  b.gt = (col: string, v: unknown) => compare(col, (a, z) => a > z)(v);
+  b.gte = (col: string, v: unknown) => compare(col, (a, z) => a >= z)(v);
   b.range = () => b;
   b.maybeSingle = () => { single = true; return b; };
   b.single = () => { single = true; return b; };
-  let op: { kind: "insert" | "update" | "delete"; v?: Row | Row[] } | null = null;
+  let op: { kind: "insert" | "update" | "delete" | "upsert"; v?: Row | Row[]; ignoreDuplicates?: boolean } | null = null;
   b.update = (v: Row) => { op = { kind: "update", v }; return b; };
   b.insert = (v: Row | Row[]) => { op = { kind: "insert", v }; return b; };
-  b.upsert = () => b;
+  b.upsert = (v: Row | Row[], opts?: { ignoreDuplicates?: boolean }) => { op = { kind: "upsert", v, ignoreDuplicates: !!opts?.ignoreDuplicates }; return b; };
   b.delete = () => { op = { kind: "delete" }; return b; };
   b.then = (resolve: (v: unknown) => void) => {
     if (op?.kind === "insert") {
-      const defaults: Row = table === "pull_list_items" ? { status: "pending", check_state: "open", quantity_needed: 1, checked_at: null, checked_by: null } : {};
+      const defaults: Row =
+        table === "pull_list_items"
+          ? { status: "pending", check_state: "open", quantity_needed: 1, checked_at: null, checked_by: null }
+          : table === "deleted_records"
+            ? { deleted_at: new Date().toISOString(), photo_paths: [], detail: null }
+            : {};
       const made = (Array.isArray(op.v) ? op.v : [op.v!]).map((r) => ({ id: `${table}-${Math.random().toString(36).slice(2, 8)}`, created_at: new Date().toISOString(), ...defaults, ...r }));
       DB[table] = [...(DB[table] ?? []), ...made];
       rows = made;
+    } else if (op?.kind === "upsert") {
+      // By id, as the restores use it: new rows go in as given, rows already
+      // there are left alone (ignoreDuplicates) or updated.
+      const table_ = DB[table] ?? [];
+      const touched: Row[] = [];
+      for (const r of Array.isArray(op.v) ? op.v : [op.v!]) {
+        const found = table_.find((x) => x.id === r.id);
+        if (!found) { table_.push({ ...r }); touched.push(r); }
+        else if (!op.ignoreDuplicates) { Object.assign(found, r); touched.push(found); }
+      }
+      DB[table] = table_;
+      rows = touched;
     } else if (op?.kind === "update") {
       for (const r of rows) Object.assign(r, op.v);
     } else if (op?.kind === "delete") {
       DB[table] = (DB[table] ?? []).filter((r) => !rows.includes(r));
+      cascade(table, rows.map((r) => r.id as string));
     }
     const data = rows.map((r) => embed(table, r, select));
     resolve({ data: head ? null : single ? (data[0] ?? null) : data, error: null, count: countMode ? rows.length : null });

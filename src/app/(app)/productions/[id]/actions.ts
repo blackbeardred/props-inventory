@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { trashPullList, trashPullListItem } from "@/lib/recently-deleted";
+import { withUndo } from "@/lib/undo-href";
 
 function fail(productionId: string, message: string): never {
   redirect(
@@ -40,16 +42,12 @@ export async function deletePullList(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("pull_lists")
-    .delete()
-    .eq("id", pullListId);
-
-  if (error) {
-    fail(productionId, error.message);
+  const result = await trashPullList(supabase, pullListId);
+  if (!result.ok) {
+    fail(productionId, result.message);
   }
 
-  redirect(`/productions/${productionId}`);
+  redirect(withUndo(`/productions/${productionId}`, result.recordId, result.label));
 }
 
 export async function addPullListItem(formData: FormData) {
@@ -155,14 +153,10 @@ export async function removePullListItem(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("pull_list_items")
-    .delete()
-    .eq("id", pullListItemId);
-
-  if (error) {
-    fail(productionId, error.message);
+  const result = await trashPullListItem(supabase, pullListItemId);
+  if (!result.ok) {
+    fail(productionId, result.message);
   }
 
-  redirect(`/productions/${productionId}`);
+  redirect(withUndo(`/productions/${productionId}`, result.recordId, result.label));
 }

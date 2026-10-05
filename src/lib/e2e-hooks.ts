@@ -6,4 +6,4 @@
  * back the way it started. Anywhere else resetFixtures is null and
  * /api/e2e/reset answers 404, so there's nothing to call in production.
  */
-export const resetFixtures: (() => void) | null = null;
+export const resetFixtures: ((options: URLSearchParams) => void) | null = null;

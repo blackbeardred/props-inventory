@@ -113,6 +113,7 @@ test("a pull-list line: Mark pulled, then Already pulled; the quantity box keeps
   expect(await items(page)).toEqual(["Mark pulled"]);
   await menu(page).getByRole("menuitem").first().click();
   await expect(line.locator('button[aria-pressed="true"]')).toHaveText("Pulled");
+  await expect(line.locator('button[value="pulled"]')).toBeDisabled();
   await line.locator("p").first().click({ button: "right" });
   expect(await items(page)).toEqual(["Already pulled"]);
   await expect(menu(page).getByRole("menuitem").first()).toBeDisabled();

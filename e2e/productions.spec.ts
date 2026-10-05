@@ -33,7 +33,14 @@ test.describe("pull list (phone)", () => {
     await expect(status(page, "Brass candlestick")).toHaveText("Pending");
     await row(page, "Brass candlestick").locator('button[value="returned"]').tap();
     await expect(status(page, "Brass candlestick")).toHaveText("Returned");
-    const after = await row(page, "Brass candlestick").locator('button[value="returned"]').boundingBox();
+    // Saved, not just shown: the current status's own button is disabled.
+    await expect(row(page, "Brass candlestick").locator('button[value="returned"]')).toBeDisabled();
+    await page.waitForLoadState("networkidle");
+    // The row is re-rendered by the save's refresh; measure the one on screen
+    // once it has settled.
+    const returned = row(page, "Brass candlestick").locator('button[value="returned"]');
+    await expect.poll(async () => (await returned.boundingBox()) !== null).toBe(true);
+    const after = await returned.boundingBox();
     expect(Math.round(after!.x)).toBe(Math.round(before!.x));
     expect(Math.round(after!.width)).toBe(Math.round(before!.width));
   });

@@ -282,7 +282,7 @@ export default async function EditItemPage({
       <form action={deleteItem} className="mt-10 border-t border-rule pt-6">
         <input type="hidden" name="itemId" value={typedItem.id} />
         <DeleteButton
-          confirmMessage={`Delete "${typedItem.name}"? This can’t be undone.`}
+          confirmMessage={`Delete "${typedItem.name}"? You can restore it from Theatre → Recently deleted for 30 days.`}
         >
           Delete item
         </DeleteButton>

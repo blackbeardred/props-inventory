@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { trashProduction } from "@/lib/recently-deleted";
+import { withUndo } from "@/lib/undo-href";
 
 function fail(productionId: string, message: string): never {
   redirect(
@@ -57,16 +59,10 @@ export async function deleteProduction(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("productions")
-    .delete()
-    .eq("id", productionId);
-
-  if (error) {
-    redirect(
-      `/productions/${productionId}/edit?error=${encodeURIComponent(error.message)}`
-    );
+  const result = await trashProduction(supabase, productionId);
+  if (!result.ok) {
+    redirect(`/productions/${productionId}/edit?error=${encodeURIComponent(result.message)}`);
   }
 
-  redirect("/productions");
+  redirect(withUndo("/productions", result.recordId, result.label));
 }

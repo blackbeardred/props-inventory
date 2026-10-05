@@ -824,3 +824,55 @@ as $$
   order by e.embedding <=> query_embedding
   limit least(greatest(coalesce(match_count, 5), 1), 50)
 $$;
+
+-- ─────────────────────────────────────────────────────────────
+-- Recently Deleted (migration 007)
+--
+-- A snapshot of each deleted item, place, production, pull list or pull-list
+-- line, with everything the delete took with it, so it can be restored for
+-- 30 days. Restoring re-inserts the rows with their original ids. Nothing
+-- else in this file knows about it: every other table and function behaves
+-- exactly as before. See src/lib/recently-deleted.ts.
+-- ─────────────────────────────────────────────────────────────
+create table if not exists deleted_records (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references organizations(id) on delete cascade,
+  kind text not null
+    check (kind in ('item', 'location', 'production', 'pull_list', 'pull_list_item')),
+  -- What the list shows: the thing's name, and a line about what went with it.
+  label text not null,
+  detail text,
+  -- The deleted row and its dependants, as read just before the delete.
+  snapshot jsonb not null,
+  -- Storage paths (item photos) the snapshot still points at, removed from
+  -- the photos bucket when the snapshot is purged rather than at delete time.
+  photo_paths text[] not null default '{}',
+  deleted_at timestamptz not null default now(),
+  deleted_by uuid references profiles(id) on delete set null
+);
+
+create index if not exists deleted_records_org_deleted_at_idx
+  on deleted_records (org_id, deleted_at desc);
+
+-- ── Part 2: who can see and touch it ───────────────────────────────────
+
+alter table deleted_records enable row level security;
+
+drop policy if exists "org members can read their deleted records" on deleted_records;
+create policy "org members can read their deleted records" on deleted_records
+  for select using (org_id = auth_org_id());
+
+-- Written by the person deleting, in their own theatre, under their own name.
+drop policy if exists "org members can record their deletions" on deleted_records;
+create policy "org members can record their deletions" on deleted_records
+  for insert with check (org_id = auth_org_id() and deleted_by = auth.uid());
+
+-- Restoring removes the snapshot, so any member can delete one; deleting
+-- forever before the 30 days are up is limited to owners in the app. (A
+-- member could already delete the original rows outright under the existing
+-- policies, so this is no wider than what they had.)
+drop policy if exists "org members can clear their deleted records" on deleted_records;
+create policy "org members can clear their deleted records" on deleted_records
+  for delete using (org_id = auth_org_id());
+
+-- No update policy: a snapshot is never edited, only restored or cleared.
