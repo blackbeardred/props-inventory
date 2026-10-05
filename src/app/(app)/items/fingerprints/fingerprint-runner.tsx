@@ -35,21 +35,37 @@ export function FingerprintRunner({ orgId }: { orgId: string }) {
   // captured in a closure would still say false long after the click.
   const stopping = useRef(false);
 
+  const settle = useCallback((result: Promise<FingerprintTally>, isCurrent: () => boolean = () => true) => {
+    return result.then(
+      (next) => {
+        if (!isCurrent()) return;
+        setTally(next);
+        setPhase("ready");
+      },
+      (problem) => {
+        if (!isCurrent()) return;
+        setError(problem instanceof Error ? problem.message : "Couldn't read the inventory.");
+        setPhase("failed");
+      }
+    );
+  }, []);
+
+  /** A recount after a run: back to "counting" first, then the tally. */
   const count = useCallback(async () => {
     setPhase("counting");
     setError(null);
-    try {
-      setTally(await takeFingerprintTally());
-      setPhase("ready");
-    } catch (problem) {
-      setError(problem instanceof Error ? problem.message : "Couldn't read the inventory.");
-      setPhase("failed");
-    }
-  }, []);
+    await settle(takeFingerprintTally());
+  }, [settle]);
 
+  // The first count. The phase already starts as "counting", and state is
+  // only set once the tally answers — and not at all if the page has gone.
   useEffect(() => {
-    void count();
-  }, [count]);
+    let current = true;
+    void settle(takeFingerprintTally(), () => current);
+    return () => {
+      current = false;
+    };
+  }, [settle]);
 
   async function start() {
     if (!tally) return;

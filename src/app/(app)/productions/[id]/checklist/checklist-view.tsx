@@ -41,6 +41,9 @@ function Row({
   pending: boolean;
 }) {
   const [offset, setOffset] = useState(0);
+  // State, not read off the ref during render: whether the row follows the
+  // finger (no transition) or springs back (with one).
+  const [dragging, setDragging] = useState(false);
   const gesture = useRef<{ x: number; y: number; swiping: boolean } | null>(null);
   const travelled = useRef(0);
 
@@ -64,6 +67,7 @@ function Row({
       }
       if (Math.abs(dx) < SWIPE_SLOP || Math.abs(dx) <= Math.abs(dy)) return;
       start.swiping = true;
+      setDragging(true);
     }
 
     // Leftwards only: clearing is the one thing a swipe does here.
@@ -80,6 +84,7 @@ function Row({
     const start = gesture.current;
     gesture.current = null;
     if (!start?.swiping) return;
+    setDragging(false);
 
     if (travelled.current >= SWIPE_THRESHOLD) {
       onSet("cleared");
@@ -122,7 +127,7 @@ function Row({
         onTouchCancel={onTouchEnd}
         style={{
           transform: `translateX(${offset}px)`,
-          transition: gesture.current?.swiping ? "none" : "transform 160ms ease-out",
+          transition: dragging ? "none" : "transform 160ms ease-out",
         }}
         className="relative flex items-center gap-3 bg-surface px-3 py-2.5"
       >

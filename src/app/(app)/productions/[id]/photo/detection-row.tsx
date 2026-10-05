@@ -70,6 +70,9 @@ export function DetectionRow({
 }) {
   const [offset, setOffset] = useState(0);
   const [leaving, setLeaving] = useState(false);
+  // State, not read off the ref during render: whether the row follows the
+  // finger (no transition) or springs back (with one).
+  const [dragging, setDragging] = useState(false);
   const gesture = useRef<{ x: number; y: number; swiping: boolean } | null>(null);
   // How far the row has travelled, kept outside React as well as in state.
   // A flick can deliver its last move and its release in the same tick, and
@@ -99,6 +102,7 @@ export function DetectionRow({
       }
       if (Math.abs(dx) < SWIPE_SLOP || Math.abs(dx) <= Math.abs(dy)) return;
       start.swiping = true;
+      setDragging(true);
     }
 
     // Both ways, with the last stretch resisting, so it's clear you've gone
@@ -114,6 +118,7 @@ export function DetectionRow({
     const start = gesture.current;
     gesture.current = null;
     if (!start?.swiping) return;
+    setDragging(false);
 
     // Away to the left and it's gone; to the right it springs back with the
     // row now set to be added, so the name field is there to correct.
@@ -132,7 +137,6 @@ export function DetectionRow({
     setOffset(0);
   }
 
-  const dragging = gesture.current?.swiping === true;
 
   // A right-click on a computer offers both of the row's swipes.
   const context = useContextMenu(name || detection.name, () => [

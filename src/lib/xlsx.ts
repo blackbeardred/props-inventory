@@ -285,12 +285,6 @@ function columnIndex(reference: string | undefined): number | null {
   return seen ? index - 1 : null;
 }
 
-function rowNumber(reference: string | undefined): number | null {
-  if (!reference) return null;
-  const digits = /(\d+)\s*$/.exec(reference);
-  return digits ? Number(digits[1]) : null;
-}
-
 /**
  * Turns a worksheet part into a rectangular table, honouring each cell's own
  * row and column reference. Gaps matter: a blank row 7 has to stay row 7 so

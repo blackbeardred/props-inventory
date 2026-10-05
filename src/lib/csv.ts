@@ -201,18 +201,6 @@ const ALIASES_BY_LENGTH = Object.keys(HEADER_ALIASES).sort(
   (a, b) => b.length - a.length
 );
 
-/** Exact header match, then the longest alias contained within it. */
-function matchHeader(header: string): ImportField | undefined {
-  const normalised = normaliseHeader(header);
-  if (!normalised) return undefined;
-  const exact = HEADER_ALIASES[normalised];
-  if (exact) return exact;
-  const contained = ALIASES_BY_LENGTH.find(
-    (alias) => alias.length >= 3 && normalised.includes(alias)
-  );
-  return contained ? HEADER_ALIASES[contained] : undefined;
-}
-
 /**
  * Guesses which item field each column holds. Returns one entry per column,
  * null where nothing matched, and never maps two columns to the same field —

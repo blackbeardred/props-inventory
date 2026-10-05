@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { markFingerprintsDue } from "@/lib/fingerprint-device";
 import { takeHandedOffPhoto } from "@/lib/photo-handoff";
 
@@ -47,10 +47,18 @@ export function PhotoField({
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [natural, setNatural] = useState<Natural | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  // Where the photo was dragged to. What's drawn is this clamped to the
+  // window (`offset`, below), so changing the zoom can never leave a gap.
+  const [rawOffset, setOffset] = useState({ x: 0, y: 0 });
   const [cropping, setCropping] = useState(false);
   const [cropped, setCropped] = useState(false);
-  const [canCrop, setCanCrop] = useState(true);
+  const [cropRefused, setCropRefused] = useState(false);
+  // Cropping rewrites the input's FileList, which needs DataTransfer. If a
+  // browser won't allow that, the field still works — it just uploads the
+  // photo as taken, rather than pretending to crop and silently not. Read
+  // from the browser, not set from an effect; the server assumes it can.
+  const supportsCrop = useSyncExternalStore(subscribeNever, browserCanCrop, () => true);
+  const canCrop = supportsCrop && !cropRefused;
 
   // Object URLs are a resource, not a string: let go of each one before
   // replacing it, and on unmount.
@@ -60,17 +68,6 @@ export function PhotoField({
       if (sourceUrl?.startsWith("blob:")) URL.revokeObjectURL(sourceUrl);
     };
   }, [previewUrl, sourceUrl]);
-
-  useEffect(() => {
-    // Cropping rewrites the input's FileList, which needs DataTransfer. If a
-    // browser won't allow that, the field still works — it just uploads the
-    // photo as taken, rather than pretending to crop and silently not.
-    try {
-      setCanCrop(typeof DataTransfer !== "undefined" && !!new DataTransfer());
-    } catch {
-      setCanCrop(false);
-    }
-  }, []);
 
   useEffect(() => {
     if (!acceptHandoff) return;
@@ -106,10 +103,8 @@ export function PhotoField({
     [displayW, displayH]
   );
 
-  useEffect(() => {
-    // Keep the image covering the window whenever the zoom changes.
-    setOffset((current) => clamp(current.x, current.y));
-  }, [clamp]);
+  // Keeps the image covering the window whenever the zoom changes.
+  const offset = clamp(rawOffset.x, rawOffset.y);
 
   function onFile(file: File | undefined) {
     if (!file) return;
@@ -194,7 +189,7 @@ export function PhotoField({
           transfer.items.add(file);
           input.files = transfer.files;
         } catch {
-          setCanCrop(false);
+          setCropRefused(true);
           return;
         }
         if (previewUrl?.startsWith("blob:") && previewUrl !== sourceUrl) {
@@ -342,4 +337,16 @@ export function PhotoField({
       </div>
     </div>
   );
+}
+
+function subscribeNever() {
+  return () => {};
+}
+
+function browserCanCrop(): boolean {
+  try {
+    return typeof DataTransfer !== "undefined" && !!new DataTransfer();
+  } catch {
+    return false;
+  }
 }

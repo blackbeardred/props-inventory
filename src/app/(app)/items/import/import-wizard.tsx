@@ -65,7 +65,7 @@ export function ImportWizard({
     [locationNames]
   );
 
-  const valid = parsed?.rows.filter((row) => row.errors.length === 0) ?? [];
+  const valid = useMemo(() => parsed?.rows.filter((row) => row.errors.length === 0) ?? [], [parsed]);
   const broken = parsed?.rows.filter((row) => row.errors.length > 0) ?? [];
 
   const missingLocations = useMemo(() => {
