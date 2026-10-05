@@ -7,6 +7,9 @@ import {
   pickObvious,
   picturesDisagree,
   MAX_MERGED,
+  SAME_PICTURE_SIMILARITY,
+  STRONG_SIMILARITY,
+  worthKeepingAsReference,
 } from "./visual-match.ts";
 
 let pass = 0, fail = 0;
@@ -145,6 +148,18 @@ console.log("── picturesDisagree");
   const nothing = mergeCandidates([], [hit("c", "Chalice", 0.97)]);
   is("no name match at all is not a disagreement", picturesDisagree("goblet", nothing), false);
 }
+
+console.log("");
+console.log("── worthKeepingAsReference");
+is("a different photo of the same thing is kept", worthKeepingAsReference(0.86), true);
+is("a weak but confirmed match is kept (a person said so)", worthKeepingAsReference(0.41), true);
+is("a match made by name alone is kept", worthKeepingAsReference(null), true);
+is("…and one with no score at all", worthKeepingAsReference(undefined), true);
+is("the item's own photo chosen again is not", worthKeepingAsReference(0.999), false);
+is("the line sits exactly at SAME_PICTURE_SIMILARITY", worthKeepingAsReference(SAME_PICTURE_SIMILARITY), false);
+is("just under it is kept", worthKeepingAsReference(SAME_PICTURE_SIMILARITY - 0.001), true);
+is("a nonsense score doesn't throw a photo away", worthKeepingAsReference(Number.NaN), true);
+is("…and the line is above 'almost certainly'", SAME_PICTURE_SIMILARITY > STRONG_SIMILARITY, true);
 
 console.log("");
 console.log(`════ ${pass} passed, ${fail} failed ════`);

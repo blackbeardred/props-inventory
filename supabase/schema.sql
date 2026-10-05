@@ -205,6 +205,32 @@ create table item_photo_embeddings (
 
 create index item_photo_embeddings_org_idx on item_photo_embeddings (org_id);
 
+-- ─────────────────────────────────────────────────────────────
+-- More pictures of each item (migration 008)
+--
+-- A photograph someone took that the app matched to an item, and a person
+-- confirmed ("That's it" on Find by photo, or a ticked match on the
+-- prop-table screen). Never shown; match_items compares against these as
+-- well as the item's own photo, and they are labelled examples for any
+-- future custom-trained model. embedding is null until a device holding the
+-- recognition model fingerprints it.
+-- ─────────────────────────────────────────────────────────────
+create table item_reference_photos (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references items(id) on delete cascade,
+  org_id uuid not null references organizations(id) on delete cascade,
+  photo_path text not null,
+  source text not null check (source in ('find_by_photo', 'prop_table')),
+  similarity real,
+  model text not null default 'clip-vit-base-patch32',
+  embedding extensions.vector(512),
+  created_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index item_reference_photos_item_idx on item_reference_photos (item_id);
+create index item_reference_photos_org_idx on item_reference_photos (org_id);
+
 -- No similarity index on purpose: at a few thousand items an exact scan is a
 -- few milliseconds, and an approximate index would trade exactness for speed
 -- that isn't needed.
@@ -221,6 +247,7 @@ alter table productions enable row level security;
 alter table pull_lists enable row level security;
 alter table pull_list_items enable row level security;
 alter table item_photo_embeddings enable row level security;
+alter table item_reference_photos enable row level security;
 
 create or replace function auth_org_ids()
 returns setof uuid
@@ -302,6 +329,20 @@ create policy "org members can read their item embeddings" on item_photo_embeddi
   for select using (org_id = auth_org_id());
 
 create policy "org members can manage their item embeddings" on item_photo_embeddings
+  for all
+  using (org_id = auth_org_id())
+  with check (
+    org_id = auth_org_id()
+    and exists (
+      select 1 from items i
+      where i.id = item_id and i.org_id = auth_org_id()
+    )
+  );
+
+create policy "org members can read their reference photos" on item_reference_photos
+  for select using (org_id = auth_org_id());
+
+create policy "org members can manage their reference photos" on item_reference_photos
   for all
   using (org_id = auth_org_id())
   with check (
@@ -818,10 +859,20 @@ language sql
 stable
 set search_path = public, extensions
 as $$
-  select e.item_id, 1 - (e.embedding <=> query_embedding) as similarity
-  from item_photo_embeddings e
-  where e.model = 'clip-vit-base-patch32'
-  order by e.embedding <=> query_embedding
+  -- Each item scores as its closest picture: its own photo, or any of the
+  -- confirmed ones in item_reference_photos (migration 008).
+  select p.item_id, max(1 - (p.embedding <=> query_embedding)) as similarity
+  from (
+    select e.item_id, e.embedding
+    from item_photo_embeddings e
+    where e.model = 'clip-vit-base-patch32'
+    union all
+    select r.item_id, r.embedding
+    from item_reference_photos r
+    where r.model = 'clip-vit-base-patch32' and r.embedding is not null
+  ) p
+  group by p.item_id
+  order by 2 desc
   limit least(greatest(coalesce(match_count, 5), 1), 50)
 $$;
 

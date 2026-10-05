@@ -156,3 +156,22 @@ export function picturesDisagree<T extends BaseCandidate>(
     pickObvious(seenName, candidates) === null
   );
 }
+
+/**
+ * At or above this, a confirmed photo is the same picture the item already
+ * has: someone chose the item's own photo from their library, or a second
+ * copy of it. Kept as an extra reference picture it would add nothing, and
+ * would make the item look better recognised than it is.
+ */
+export const SAME_PICTURE_SIMILARITY = 0.985;
+
+/**
+ * Whether a photo a person has just confirmed as an item is worth keeping as
+ * another picture of it (migration 008). Only the confirmation makes it
+ * eligible at all; this only weeds out copies. A match made by name alone has
+ * no score, and is kept: it's a picture nobody had compared yet.
+ */
+export function worthKeepingAsReference(similarity: number | null | undefined): boolean {
+  if (similarity === null || similarity === undefined || !Number.isFinite(similarity)) return true;
+  return similarity < SAME_PICTURE_SIMILARITY;
+}

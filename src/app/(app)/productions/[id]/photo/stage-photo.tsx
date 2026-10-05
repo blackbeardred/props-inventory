@@ -8,6 +8,7 @@ import { deviceMayFingerprint, markFingerprintsDue, optIn } from "@/lib/fingerpr
 import { isMissingFingerprintSchema, matchEmbedding } from "@/lib/fingerprints";
 import { mergeCandidates, pickObvious } from "@/lib/visual-match";
 import { takeHandedOffPhoto } from "@/lib/photo-handoff";
+import { keepReferencePhoto } from "@/lib/reference-photos";
 import type { Category } from "@/lib/inventory";
 import {
   applyStagePhoto,
@@ -134,6 +135,10 @@ export function StagePhoto({ productionId }: { productionId: string }) {
   // may re-rank the dropdown but must never change a choice someone made.
   const touched = useRef(new Set<string>());
   const listedRef = useRef<string[]>([]);
+  // Each crop's fingerprint, once the picture pass has taken one, so a crop
+  // confirmed as an item can be kept as another picture of it without being
+  // fingerprinted twice.
+  const cropEmbeddings = useRef<Record<string, number[]>>({});
   // Bumped per photo, so a slow picture pass for the last photo can't write
   // its results into the review of this one.
   const passId = useRef(0);
@@ -175,6 +180,7 @@ export function StagePhoto({ productionId }: { productionId: string }) {
         const embedding = await embedImage(dataUrlToBlob(cropsByKey[row.key]));
         const lookalikes = await matchEmbedding(embedding, PICTURE_MATCHES);
         if (stale()) return;
+        cropEmbeddings.current[row.key] = embedding;
         if (lookalikes.length > 0) anyFingerprints = true;
 
         const hits: PictureHit[] = lookalikes.map((match) => ({
@@ -253,6 +259,7 @@ export function StagePhoto({ productionId }: { productionId: string }) {
       setCounts(nextCounts);
       setNames(nextNames);
       setPictureHits({});
+      cropEmbeddings.current = {};
       touched.current = new Set();
       listedRef.current = outcome.listedItemIds;
       setPhase("reviewing");
@@ -330,6 +337,33 @@ export function StagePhoto({ productionId }: { productionId: string }) {
       await uploadImportedPhotos(outcome.orgId, uploads, () => {});
       // The production page this goes to fingerprints them, or asks to.
       markFingerprintsDue();
+    }
+
+    // Anything ticked as one of the theatre's own items was just confirmed by
+    // a person, so its crop is another picture of that item, from wherever
+    // the photo was taken. It's kept against the item (never shown) so the
+    // next photo of it has more to match against (migration 008). Ones the
+    // picture pass didn't fingerprint are fingerprinted later, like any new
+    // photo. A failure here costs nothing the reviewer asked for.
+    if (outcome.userId) {
+      const who = { userId: outcome.userId, orgId: outcome.orgId };
+      const kept = await Promise.all(
+        decisions.flatMap((decision) => {
+          const crop = crops[decision.key];
+          if (!decision.itemId || !crop) return [];
+          const hit = pictureHits[decision.key]?.find((match) => match.id === decision.itemId);
+          return [
+            keepReferencePhoto(who, {
+              itemId: decision.itemId,
+              photo: dataUrlToBlob(crop),
+              source: "prop_table",
+              similarity: hit?.similarity ?? null,
+              embedding: cropEmbeddings.current[decision.key] ?? null,
+            }),
+          ];
+        })
+      );
+      if (kept.some((result) => result.kept && !result.fingerprinted)) markFingerprintsDue();
     }
 
     router.push(`/productions/${productionId}?marked=${outcome.marked}`);

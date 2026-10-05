@@ -39,6 +39,8 @@ function seed(): Record<string, Row[]> {
     pull_lists: [{ id: "pl1", production_id: "prod1", name: "Pull List", created_at: now }],
     pull_list_items: [],
     deleted_records: [],
+    item_photo_embeddings: [],
+    item_reference_photos: [],
   };
   names.forEach((name, i) => {
     DB.items.push({
@@ -124,6 +126,10 @@ function embed(table: string, row: Row, select: string): Row {
   if (table === "memberships" && select.includes("organizations(")) {
     out.organizations = DB.organizations.find((x) => x.id === row.org_id) ?? null;
   }
+  if (table === "item_reference_photos" && select.includes("items(")) {
+    const item = DB.items.find((x) => x.id === row.item_id);
+    out.items = item ? { name: item.name } : null;
+  }
   if (table === "memberships" && select.includes("profiles(")) {
     out.profiles = DB.profiles.find((x) => x.id === row.user_id) ?? null;
   }
@@ -143,6 +149,7 @@ function cascade(table: string, gone: string[]) {
   if (table === "items") {
     drop("pull_list_items", "item_id", gone);
     drop("item_photo_embeddings", "item_id", gone);
+    drop("item_reference_photos", "item_id", gone);
   }
   if (table === "locations") {
     for (const l of DB.locations) if (gone.includes(l.parent_location_id as string)) l.parent_location_id = null;
@@ -250,7 +257,18 @@ export function rpc(name: string, args: Record<string, unknown>) {
     });
     return Promise.resolve({ data, error: null });
   }
+  if (name === "match_items") {
+    // Opt-in, so every other page keeps "nothing fingerprinted yet": a test
+    // sets window.__matchItems = [{ item_id, similarity }, ...] in the page.
+    const wanted = (globalThis as unknown as { __matchItems?: Row[] }).__matchItems ?? [];
+    return Promise.resolve({ data: wanted.slice(0, Number(args.match_count) || 5), error: null });
+  }
   return Promise.resolve({ data: [], error: null });
+}
+
+function storageLog() {
+  const g = globalThis as unknown as { __storage?: { uploaded: string[]; removed: string[] } };
+  return (g.__storage ??= { uploaded: [], removed: [] });
 }
 
 export function storageFrom() {
@@ -258,7 +276,9 @@ export function storageFrom() {
     createSignedUrls: async (paths: string[]) => ({ data: paths.map((path) => ({ path, signedUrl: photoFor(path), error: null })), error: null }),
     createSignedUrl: async (path: string) => ({ data: { signedUrl: photoFor(path) }, error: null }),
     download: async () => ({ data: null, error: { message: "stub" } }),
-    upload: async () => ({ data: null, error: null }),
-    remove: async () => ({ data: null, error: null }),
+    // Uploads and removals are noted on globalThis.__storage, so a test can
+    // see which files were written to (and taken out of) the photos bucket.
+    upload: async (path: string) => { storageLog().uploaded.push(path); return { data: { path }, error: null }; },
+    remove: async (paths: string[]) => { storageLog().removed.push(...paths); return { data: null, error: null }; },
   };
 }

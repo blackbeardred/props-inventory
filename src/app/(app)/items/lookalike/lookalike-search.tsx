@@ -19,9 +19,10 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { Notice } from "@/components/ui";
 import type { LoadProgress } from "@/lib/embedding";
-import { loadEmbedder } from "@/lib/embedding";
+import { embedImage, loadEmbedder } from "@/lib/embedding";
 import { optIn } from "@/lib/fingerprint-device";
-import { describeSimilarity, findLookalikes, type Lookalike } from "@/lib/fingerprints";
+import { describeSimilarity, matchEmbedding, type Lookalike } from "@/lib/fingerprints";
+import { keepReferencePhoto, whoAmI } from "@/lib/reference-photos";
 
 const WORDS: Record<ReturnType<typeof describeSimilarity>, string> = {
   strong: "Almost certainly this",
@@ -36,6 +37,14 @@ export function LookalikeSearch() {
   const [matches, setMatches] = useState<Lookalike[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const objectUrl = useRef<string | null>(null);
+  // The photo being searched with and its fingerprint, kept so that "That's
+  // it" can keep the photo as another picture of the item it turned out to be.
+  const searched = useRef<{ file: File; embedding: number[] } | null>(null);
+  // Which result the person said it was, and how keeping it went.
+  const [confirmed, setConfirmed] = useState<{
+    itemId: string;
+    state: "saving" | "saved" | "failed";
+  } | null>(null);
 
   async function onPick(file: File | undefined) {
     if (!file) return;
@@ -45,6 +54,8 @@ export function LookalikeSearch() {
     setPreview(objectUrl.current);
     setMatches(null);
     setError(null);
+    setConfirmed(null);
+    searched.current = null;
     setBusy(true);
 
     try {
@@ -54,7 +65,9 @@ export function LookalikeSearch() {
       // now on as well.
       optIn();
       await loadEmbedder(setLoad);
-      setMatches(await findLookalikes(file, 5));
+      const embedding = await embedImage(file);
+      searched.current = { file, embedding };
+      setMatches(await matchEmbedding(embedding, 5));
     } catch (problem) {
       setError(
         problem instanceof Error ? problem.message : "Couldn’t read that photo. Try another."
@@ -63,6 +76,33 @@ export function LookalikeSearch() {
       setBusy(false);
       setLoad(null);
     }
+  }
+
+  /**
+   * The person says this is the one. The photo they searched with becomes
+   * another picture of that item, so the next photo of it, from whatever
+   * angle, has more to match against. Nothing is shown of that beyond the
+   * answer being noted: the pictures are the app's, not another thing to
+   * manage.
+   */
+  async function confirm(match: Lookalike) {
+    const search = searched.current;
+    if (!search || confirmed) return;
+    setConfirmed({ itemId: match.id, state: "saving" });
+    const who = await whoAmI();
+    const outcome = who
+      ? await keepReferencePhoto(who, {
+          itemId: match.id,
+          photo: search.file,
+          source: "find_by_photo",
+          similarity: match.similarity,
+          embedding: search.embedding,
+        })
+      : ({ kept: false, reason: "failed" } as const);
+    // A copy of the item's own photo isn't kept, and doesn't need to be:
+    // the answer was still right.
+    const ok = outcome.kept || outcome.reason === "same-picture";
+    setConfirmed({ itemId: match.id, state: ok ? "saved" : "failed" });
   }
 
   return (
@@ -143,49 +183,83 @@ export function LookalikeSearch() {
             <img src={preview} alt="" className="mt-2 w-full rounded-lg object-cover" />
           </div>
 
-          <ul className="space-y-3">
-            {matches.map((match) => {
-              const verdict = describeSimilarity(match.similarity);
-              return (
-                <li
-                  key={match.id}
-                  className="flex items-center gap-4 rounded-lg border border-rule bg-surface px-4 py-3"
-                >
-                  {match.photoUrl ? (
-                    <Image
-                      src={match.photoUrl}
-                      alt=""
-                      width={64}
-                      height={64}
-                      unoptimized
-                      className="h-16 w-16 rounded object-cover"
-                    />
-                  ) : (
-                    <div className="h-16 w-16 rounded bg-rule" />
-                  )}
+          <div>
+            <p className="mb-3 font-body text-sm text-muted">
+              Found it? Tap <span className="font-medium text-foreground">That’s it</span> on the
+              right one, and it’ll be quicker to find from a photo next time.
+            </p>
+            <ul className="space-y-3">
+              {matches.map((match) => {
+                const verdict = describeSimilarity(match.similarity);
+                return (
+                  <li
+                    key={match.id}
+                    className="flex flex-wrap items-center gap-4 rounded-lg border border-rule bg-surface px-4 py-3"
+                  >
+                    {match.photoUrl ? (
+                      <Image
+                        src={match.photoUrl}
+                        alt=""
+                        width={64}
+                        height={64}
+                        unoptimized
+                        className="h-16 w-16 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="h-16 w-16 rounded bg-rule" />
+                    )}
 
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/items/${match.id}/edit`} className="font-body font-semibold text-accent hover:underline">
-                      {match.name}
-                    </Link>
-                    <p className="font-body text-sm text-muted">
-                      {match.locationName ?? "No shelf assigned"}
-                      {match.quantity > 1 ? ` · ${match.quantity} owned` : ""}
-                    </p>
-                  </div>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/items/${match.id}/edit`}
+                        className="inline-flex min-h-11 items-center font-body font-semibold text-accent-ink hover:underline md:min-h-0"
+                      >
+                        {match.name}
+                      </Link>
+                      <p className="font-body text-sm text-muted">
+                        {match.locationName ?? "No shelf assigned"}
+                        {match.quantity > 1 ? ` · ${match.quantity} owned` : ""}
+                      </p>
+                    </div>
 
-                  <div className="text-right">
-                    <p className="font-body text-sm font-semibold text-foreground">
-                      {WORDS[verdict]}
-                    </p>
-                    <p className="font-body text-xs text-muted">
-                      {Math.round(match.similarity * 100)}% alike
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                    <div className="text-right">
+                      <p className="font-body text-sm font-semibold text-foreground">
+                        {WORDS[verdict]}
+                      </p>
+                      <p className="font-body text-xs text-muted">
+                        {Math.round(match.similarity * 100)}% alike
+                      </p>
+                    </div>
+
+                    <div className="basis-full sm:basis-auto">
+                      {confirmed?.itemId === match.id ? (
+                        <p
+                          role="status"
+                          data-confirmed-match
+                          className="inline-flex min-h-11 items-center font-body text-sm font-medium text-accent-ink md:min-h-0"
+                        >
+                          {confirmed.state === "saving"
+                            ? "Noting it…"
+                            : confirmed.state === "saved"
+                              ? "✓ That’s it — thanks"
+                              : "✓ That’s it"}
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={confirmed !== null}
+                          onClick={() => void confirm(match)}
+                          className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-rule bg-background px-3 font-body text-sm font-medium text-foreground hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto md:min-h-9"
+                        >
+                          That’s it
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </div>
       ) : null}
     </div>

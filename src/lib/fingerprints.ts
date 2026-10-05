@@ -28,6 +28,9 @@ export type FingerprintTarget = {
   photoUrl: string;
   /** When the item was added, so the newest can go first. */
   createdAt: string;
+  /** Set when this is one of the item's extra pictures (migration 008)
+   *  rather than its own photo: the item_reference_photos row to fill in. */
+  referenceId?: string;
 };
 
 export type FingerprintFailure = { name: string; reason: string };
@@ -94,7 +97,39 @@ export async function takeFingerprintTally(): Promise<FingerprintTally> {
     }
   }
 
+  outstanding.push(...(await referencesWithoutFingerprints()));
+
   return { withPhotos: rows.length, current, outstanding };
+}
+
+/**
+ * Extra pictures kept from confirmed matches (migration 008) that were saved
+ * on a device without the model, and so still have no fingerprint. They join
+ * the same queue as item photos. Read separately and forgivingly: a theatre
+ * that hasn't run 008 yet simply has none, which mustn't stop its item photos
+ * being fingerprinted.
+ */
+async function referencesWithoutFingerprints(): Promise<FingerprintTarget[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("item_reference_photos")
+    .select("id, item_id, photo_path, created_at, items(name)")
+    .is("embedding", null);
+  if (error || !data) return [];
+
+  return (data as unknown as {
+    id: string;
+    item_id: string;
+    photo_path: string;
+    created_at: string;
+    items: { name: string } | null;
+  }[]).map((row) => ({
+    id: row.item_id,
+    name: row.items?.name ?? "Another picture",
+    photoUrl: row.photo_path,
+    createdAt: row.created_at,
+    referenceId: row.id,
+  }));
 }
 
 /**
@@ -121,6 +156,16 @@ export async function fingerprintItem(
   const embedding = await embedImage(blob, onProgress);
 
   const supabase = createClient();
+
+  if (target.referenceId) {
+    const { error } = await supabase
+      .from("item_reference_photos")
+      .update({ model: EMBEDDING_MODEL, embedding: toVectorLiteral(embedding) })
+      .eq("id", target.referenceId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
   const { error } = await supabase.from("item_photo_embeddings").upsert(
     {
       item_id: target.id,

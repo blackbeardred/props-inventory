@@ -190,6 +190,9 @@ export type ApplyOutcome =
       marked: number;
       createdItems: { itemId: string; key: string }[];
       orgId: string;
+      /** Who confirmed the matches, so the browser can keep their crops as
+       *  more pictures of the items (src/lib/reference-photos.ts). */
+      userId: string;
     }
   | { ok: false; error: string };
 
@@ -316,5 +319,5 @@ export async function applyStagePhoto(
   revalidatePath(`/productions/${productionId}`);
   revalidatePath("/inventory");
 
-  return { ok: true, marked: rows.length, createdItems, orgId };
+  return { ok: true, marked: rows.length, createdItems, orgId, userId: user.id };
 }

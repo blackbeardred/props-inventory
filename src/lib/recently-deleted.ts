@@ -99,11 +99,15 @@ export async function trashItem(supabase: Client, itemId: string): Promise<Trash
   if (!item) return { ok: false, message: "That item isn’t there any more." };
   const row = item as Row;
 
-  const [{ data: lines }, { data: embedding }, { data: locations }] = await Promise.all([
+  const [{ data: lines }, { data: embedding }, { data: locations }, { data: references }] = await Promise.all([
     supabase.from("pull_list_items").select("*").eq("item_id", itemId),
     supabase.from("item_photo_embeddings").select("*").eq("item_id", itemId).maybeSingle(),
     supabase.from("locations").select("id, name, parent_location_id"),
+    // Its extra pictures (migration 008), which the delete cascades away.
+    // Before 008 is run this reads nothing, which is right: there are none.
+    supabase.from("item_reference_photos").select("*").eq("item_id", itemId),
   ]);
+  const extraPictures = (references ?? []) as Row[];
   const place = row.location_id
     ? (locationPaths((locations ?? []) as LocationNode[]).get(String(row.location_id)) ?? null)
     : null;
@@ -113,9 +117,18 @@ export async function trashItem(supabase: Client, itemId: string): Promise<Trash
     kind: "item",
     label: String(row.name),
     detail: itemDetail(place, (lines ?? []).length),
-    snapshot: { kind: "item", item: row, lines: (lines ?? []) as Row[], embedding: (embedding as Row | null) ?? null },
-    // Kept until the snapshot is purged, so a restored item has its picture.
-    photoPaths: row.photo_url ? [String(row.photo_url)] : [],
+    snapshot: {
+      kind: "item",
+      item: row,
+      lines: (lines ?? []) as Row[],
+      embedding: (embedding as Row | null) ?? null,
+      references: extraPictures,
+    },
+    // Kept until the snapshot is purged, so a restored item has its pictures.
+    photoPaths: [
+      ...(row.photo_url ? [String(row.photo_url)] : []),
+      ...extraPictures.map((picture) => String(picture.photo_path)),
+    ],
   });
   if ("message" in kept) return { ok: false, message: kept.message };
 
@@ -300,6 +313,10 @@ export async function restoreRecord(supabase: Client, recordId: string): Promise
       // Best effort: a missing fingerprint is redone by the next catch-up.
       await putBack(supabase, "item_photo_embeddings", [snap.embedding]).catch(() => null);
     }
+    if (!failure && snap.references?.length) {
+      // Best effort too: they're extra pictures, and the item is what was asked for.
+      await putBack(supabase, "item_reference_photos", snap.references).catch(() => null);
+    }
     href = `/items/${String(item.id)}/edit`;
   } else if (snap.kind === "location") {
     const location = { ...snap.location };
@@ -377,8 +394,16 @@ export async function restoreRecord(supabase: Client, recordId: string): Promise
 /** Removes photos only the cleared snapshots still pointed at. */
 async function removeOrphanedPhotos(supabase: Client, paths: string[]) {
   if (!paths.length) return;
-  const { data: used } = await supabase.from("items").select("photo_url").in("photo_url", paths);
-  const orphans = orphanedPhotos(paths, ((used ?? []) as Row[]).map((r) => String(r.photo_url)));
+  const [{ data: used }, { data: usedByPictures }] = await Promise.all([
+    supabase.from("items").select("photo_url").in("photo_url", paths),
+    // An extra picture still in use (its item was restored, then deleted
+    // again and restored again, say) keeps its file too.
+    supabase.from("item_reference_photos").select("photo_path").in("photo_path", paths),
+  ]);
+  const orphans = orphanedPhotos(paths, [
+    ...((used ?? []) as Row[]).map((r) => String(r.photo_url)),
+    ...((usedByPictures ?? []) as Row[]).map((r) => String(r.photo_path)),
+  ]);
   if (orphans.length) await supabase.storage.from(PHOTOS_BUCKET).remove(orphans);
 }
 

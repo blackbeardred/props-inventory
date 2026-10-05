@@ -22,7 +22,10 @@ redirect rules are the real code. Only seven modules are swapped (see
 - **`fixtures/db.ts`**: an in-memory sample theatre (SPARC: 8 places, 22
   items, *Noises Off!* with three pull-list lines) standing in for Supabase.
   It's put back the way it started before every test (`POST /api/e2e/reset`,
-  which is a 404 in any normal build).
+  which is a 404 in any normal build). The browser keeps its own copy, fresh
+  on every page load, on `window.__fixtureDB`; files it uploads or removes are
+  listed on `window.__storage`. Picture matching (`match_items`) finds nothing
+  unless a test sets `window.__matchItems = [{ item_id, similarity }]` first.
 - **`fixtures/proxy-session.ts`**: everyone is signed in as the owner, unless
   the request carries an `e2e-signed-out` cookie.
 - **`fixtures/see-items.ts`**: the prop-table photo always "contains" the same
