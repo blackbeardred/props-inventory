@@ -13,14 +13,8 @@ import {
 } from "@/lib/offline-queue";
 import { setCheckState } from "./actions";
 import { useContextMenu } from "@/components/context-menu";
-
-/** How far a row travels before letting go clears it. */
-const SWIPE_THRESHOLD = 110;
-const SWIPE_SLOP = 12;
-
-function startedOnAControl(target: EventTarget | null): boolean {
-  return Boolean(target instanceof Element && target.closest("button, input, a, select"));
-}
+import { SwipeStrip } from "@/components/swipe-strip";
+import { useSwipeLeft } from "@/lib/use-swipe";
 
 /**
  * One line of the walk.
@@ -40,67 +34,25 @@ function Row({
   onSet: (state: CheckState) => void;
   pending: boolean;
 }) {
-  const [offset, setOffset] = useState(0);
-  // State, not read off the ref during render: whether the row follows the
-  // finger (no transition) or springs back (with one).
-  const [dragging, setDragging] = useState(false);
-  const gesture = useRef<{ x: number; y: number; swiping: boolean } | null>(null);
-  const travelled = useRef(0);
-
-  function onTouchStart(event: React.TouchEvent) {
-    if (startedOnAControl(event.target)) return;
-    const touch = event.touches[0];
-    gesture.current = { x: touch.clientX, y: touch.clientY, swiping: false };
-  }
-
-  function onTouchMove(event: React.TouchEvent) {
-    const start = gesture.current;
-    if (!start) return;
-    const touch = event.touches[0];
-    const dx = touch.clientX - start.x;
-    const dy = touch.clientY - start.y;
-
-    if (!start.swiping) {
-      if (Math.abs(dy) > SWIPE_SLOP && Math.abs(dy) > Math.abs(dx)) {
-        gesture.current = null;
-        return;
-      }
-      if (Math.abs(dx) < SWIPE_SLOP || Math.abs(dx) <= Math.abs(dy)) return;
-      start.swiping = true;
-      setDragging(true);
-    }
-
-    // Leftwards only: clearing is the one thing a swipe does here.
-    const distance = Math.max(0, -dx);
-    const eased =
-      distance > SWIPE_THRESHOLD
-        ? SWIPE_THRESHOLD + (distance - SWIPE_THRESHOLD) * 0.35
-        : distance;
-    travelled.current = eased;
-    setOffset(-eased);
-  }
-
-  function onTouchEnd() {
-    const start = gesture.current;
-    gesture.current = null;
-    if (!start?.swiping) return;
-    setDragging(false);
-
-    if (travelled.current >= SWIPE_THRESHOLD) {
-      onSet("cleared");
-    }
-    travelled.current = 0;
-    setOffset(0);
-  }
+  const checked = row.checkState === "checked";
+  // Left, like every swipe in the app, and to do the row's "yes": checked.
+  // "Not needed" stays on its button and the right-click menu, where a slip
+  // of the thumb can't take a line off the list.
+  const swipe = useSwipeLeft(() => {
+    if (!checked && !pending) onSet("checked");
+  });
 
   const open = row.checkState === "open";
   const cleared = row.checkState === "cleared";
 
-  // A right-click on a computer offers what the swipe does, and its undo.
+  // A right-click on a computer offers what the swipe does, and the rest.
   const context = useContextMenu(row.name, () =>
     pending
       ? []
       : [
+          checked
+            ? { label: "Already checked", disabled: true, onSelect: () => {} }
+            : { label: "Mark checked", onSelect: () => onSet("checked") },
           cleared
             ? { label: "Put back on the list", onSelect: () => onSet("open") }
             : { label: "Not needed", onSelect: () => onSet("cleared") },
@@ -109,26 +61,18 @@ function Row({
 
   return (
     <li className="relative overflow-hidden border-b border-rule last:border-b-0">
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 flex items-center justify-end bg-warning/20 pr-4"
-      >
-        <span className="font-body text-sm font-medium text-warning-ink">
-          Not needed
-        </span>
-      </div>
+      <SwipeStrip
+        armed={swipe.armed}
+        label="Mark checked"
+        armedLabel="Let go to mark checked"
+        done={checked ? "Already checked" : null}
+      />
 
       {context.menu}
       <div
+        {...swipe.handlers}
         onContextMenu={context.onContextMenu}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onTouchCancel={onTouchEnd}
-        style={{
-          transform: `translateX(${offset}px)`,
-          transition: dragging ? "none" : "transform 160ms ease-out",
-        }}
+        style={swipe.style}
         className="relative flex items-center gap-3 bg-surface px-3 py-2.5"
       >
         {/* The box itself is 24px; the label around it is the 44px a

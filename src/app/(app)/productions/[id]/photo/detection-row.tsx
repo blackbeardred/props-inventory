@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
 import { describeSimilarity, picturesDisagree, type Ranked } from "@/lib/visual-match";
 import type { Candidate, Detection } from "./actions";
 import { useContextMenu } from "@/components/context-menu";
+import { SwipeStrip } from "@/components/swipe-strip";
+import { useSwipeLeft } from "@/lib/use-swipe";
 
 /** A candidate with what the picture thought of it, if it was asked. */
 export type RankedCandidate = Ranked<Candidate>;
@@ -28,19 +29,6 @@ export type Choice =
   | { kind: "skip" }
   | { kind: "item"; itemId: string }
   | { kind: "new" };
-
-/** How far a row has to travel before letting go acts on it. */
-const SWIPE_THRESHOLD = 110;
-
-/** Movement below this is a tap or the start of a scroll, not a swipe. */
-const SWIPE_SLOP = 12;
-
-/** Dragging a row that starts on a control would fight the control. */
-function startedOnAControl(target: EventTarget | null): boolean {
-  return Boolean(
-    target instanceof Element && target.closest("select, input, button, textarea, a")
-  );
-}
 
 export function DetectionRow({
   detection,
@@ -68,79 +56,20 @@ export function DetectionRow({
   onRemove: () => void;
   onAddToInventory: () => void;
 }) {
-  const [offset, setOffset] = useState(0);
-  const [leaving, setLeaving] = useState(false);
-  // State, not read off the ref during render: whether the row follows the
-  // finger (no transition) or springs back (with one).
-  const [dragging, setDragging] = useState(false);
-  const gesture = useRef<{ x: number; y: number; swiping: boolean } | null>(null);
-  // How far the row has travelled, kept outside React as well as in state.
-  // A flick can deliver its last move and its release in the same tick, and
-  // the released handler would then still be reading an offset of zero.
-  const travelled = useRef(0);
+  // Left, like every swipe in the app, and to do the row's "yes": add it to
+  // the inventory, springing back with the name field there to correct.
+  // Removing a row stays on its × and the right-click menu, where a slip of
+  // the thumb can't do it (and it can be undone anyway).
+  const adding = choice.kind === "new";
+  const swipe = useSwipeLeft(() => {
+    if (!adding) onAddToInventory();
+  });
 
-  function onTouchStart(event: React.TouchEvent) {
-    if (startedOnAControl(event.target)) return;
-    const touch = event.touches[0];
-    gesture.current = { x: touch.clientX, y: touch.clientY, swiping: false };
-  }
-
-  function onTouchMove(event: React.TouchEvent) {
-    const start = gesture.current;
-    if (!start) return;
-
-    const touch = event.touches[0];
-    const dx = touch.clientX - start.x;
-    const dy = touch.clientY - start.y;
-
-    // Until it's clear which way this is going, do nothing — deciding early
-    // would either swallow scrolls or make the list feel sticky.
-    if (!start.swiping) {
-      if (Math.abs(dy) > SWIPE_SLOP && Math.abs(dy) > Math.abs(dx)) {
-        gesture.current = null;
-        return;
-      }
-      if (Math.abs(dx) < SWIPE_SLOP || Math.abs(dx) <= Math.abs(dy)) return;
-      start.swiping = true;
-      setDragging(true);
-    }
-
-    // Both ways, with the last stretch resisting, so it's clear you've gone
-    // far enough rather than the row sliding off unannounced.
-    const past = Math.abs(dx) - SWIPE_THRESHOLD;
-    const distance =
-      past > 0 ? SWIPE_THRESHOLD + past * 0.35 : Math.abs(dx);
-    travelled.current = Math.sign(dx) * distance;
-    setOffset(travelled.current);
-  }
-
-  function onTouchEnd() {
-    const start = gesture.current;
-    gesture.current = null;
-    if (!start?.swiping) return;
-    setDragging(false);
-
-    // Away to the left and it's gone; to the right it springs back with the
-    // row now set to be added, so the name field is there to correct.
-    if (travelled.current <= -SWIPE_THRESHOLD) {
-      setLeaving(true);
-      setOffset(-400);
-      window.setTimeout(onRemove, 160);
-      return;
-    }
-
-    if (travelled.current >= SWIPE_THRESHOLD) {
-      onAddToInventory();
-    }
-
-    travelled.current = 0;
-    setOffset(0);
-  }
-
-
-  // A right-click on a computer offers both of the row's swipes.
+  // A right-click on a computer offers what the swipe does, and removing.
   const context = useContextMenu(name || detection.name, () => [
-    { label: "Add to inventory", detail: "As a new item, named as below", onSelect: onAddToInventory },
+    adding
+      ? { label: "Being added to inventory", disabled: true, onSelect: () => {} }
+      : { label: "Add to inventory", detail: "As a new item, named as below", onSelect: onAddToInventory },
     { label: "Remove from this list", onSelect: onRemove },
   ]);
 
@@ -149,43 +78,19 @@ export function DetectionRow({
 
   return (
     <li className="relative overflow-hidden rounded-lg">
-      {/* Revealed as the row slides. Both sit underneath rather than in the
-          flow, so nothing reflows while a finger is down, and only the one
-          being uncovered is legible. */}
-      <div
-        aria-hidden="true"
-        className={`absolute inset-0 flex items-center justify-between rounded-lg px-4 ${
-          offset < 0 ? "bg-danger/15" : offset > 0 ? "bg-success/20" : ""
-        }`}
-      >
-        <span
-          className={`font-body text-sm font-medium text-success-ink transition-opacity ${
-            offset > 0 ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          Add to inventory
-        </span>
-        <span
-          className={`font-body text-sm font-medium text-danger-ink transition-opacity ${
-            offset < 0 ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          Remove
-        </span>
-      </div>
+      <SwipeStrip
+        rounded
+        armed={swipe.armed}
+        label="Add to inventory"
+        armedLabel="Let go to add to inventory"
+        done={adding ? "Being added to inventory" : null}
+      />
 
       {context.menu}
       <div
+        {...swipe.handlers}
         onContextMenu={context.onContextMenu}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onTouchCancel={onTouchEnd}
-        style={{
-          transform: `translateX(${offset}px)`,
-          transition: dragging ? "none" : "transform 160ms ease-out",
-          opacity: leaving ? 0 : 1,
-        }}
+        style={swipe.style}
         className="relative flex gap-3 rounded-lg border border-rule bg-surface p-3"
       >
       {/* The crop is the whole point of the row: it's how someone tells at a
@@ -312,8 +217,8 @@ export function DetectionRow({
         ) : null}
         </div>
 
-        {/* The swipe is a shortcut, not the only way out: a mouse has no
-            swipe, and neither does a screen reader. */}
+        {/* Removing is a button, never a swipe: the photo review's only
+            swipe adds to the inventory. */}
         <button
           type="button"
           onClick={onRemove}

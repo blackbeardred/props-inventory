@@ -1,8 +1,12 @@
 import { test, expect, PHONE, DESKTOP, open, swipe, LIST_CELLS } from "./helpers";
+import path from "node:path";
 import type { Page } from "@playwright/test";
 
-// Swiping left: an inventory item onto a production's pull list (ask once,
-// then remember), and a pull-list line to "Pulled".
+// Every swipe goes left and does the row's "yes": an inventory item onto a
+// production's pull list (ask once, then remember), a pull-list line to
+// "Pulled", a checklist line to "Checked", a photo-review row to "Add to
+// inventory". Nothing is removed or cleared by a swipe, and a rightward drag
+// does nothing anywhere.
 
 const cell = (page: Page, name: string) =>
   page.locator(LIST_CELLS, { has: page.locator("h3", { hasText: new RegExp(`^${name.replace(/[()]/g, "\\$&")}$`) }) });
@@ -132,6 +136,77 @@ test.describe("pull list (phone)", () => {
     await open(page, "/productions/prod1");
     await swipe(page, row(page, "Brass candlestick"), -170, { fromX: 388 });
     await expect(pressed(page, "Brass candlestick")).toHaveText("Pulled");
+  });
+});
+
+test.describe("checklist (phone)", () => {
+  test.use(PHONE);
+  const line = (page: Page, name: string) => page.locator("main li", { hasText: name }).first();
+  const box = (page: Page, name: string) => line(page, name).locator("input[type=checkbox]");
+
+  test("a left swipe marks a line checked; on one already checked it says so", async ({ page }) => {
+    await open(page, "/productions/prod1/checklist");
+    await expect(box(page, "Brass candlestick")).not.toBeChecked();
+    // From the name: the row's right-hand end is its Not needed button.
+    await swipe(page, line(page, "Brass candlestick").locator("p").first(), -160, {
+      during: async () => {
+        await expect(line(page, "Brass candlestick")).toContainText("Let go to mark checked");
+      },
+    });
+    await expect(box(page, "Brass candlestick")).toBeChecked();
+    await expect(line(page, "Brass candlestick")).not.toContainText("NOT CHECKED");
+    await swipe(page, line(page, "Brass candlestick").locator("p").first(), -160, {
+      during: async () => {
+        await expect(line(page, "Brass candlestick")).toContainText("Already checked");
+      },
+    });
+    await expect(box(page, "Brass candlestick")).toBeChecked();
+  });
+
+  test("no swipe takes a line off the list: right and short drags do nothing", async ({ page }) => {
+    await open(page, "/productions/prod1/checklist");
+    await swipe(page, line(page, "Fishing Net").locator("p").first(), 160);
+    await swipe(page, line(page, "Fishing Net").locator("p").first(), -60);
+    await page.waitForTimeout(400);
+    await expect(line(page, "Fishing Net")).not.toContainText("Not needed after all");
+    await expect(box(page, "Fishing Net")).not.toBeChecked();
+    // The button still does it.
+    await line(page, "Fishing Net").getByRole("button", { name: "Not needed" }).click();
+    await expect(line(page, "Fishing Net")).toContainText("Not needed after all");
+  });
+});
+
+test.describe("photo review (phone)", () => {
+  test.use(PHONE);
+  const PROP_TABLE = path.join(__dirname, "fixtures", "prop-table.jpg");
+  const rows = (page: Page) => page.locator('main li:has(select[aria-label^="Which item"])');
+  const goblet = (page: Page) => rows(page).filter({ has: page.locator('select[aria-label="Which item is “goblet”"]') });
+
+  test("a left swipe sets a row to be added to the inventory; a right swipe does nothing", async ({ page }) => {
+    await open(page, "/productions/prod1/photo");
+    await page.locator("input[type=file]").first().setInputFiles(PROP_TABLE);
+    await expect(rows(page)).toHaveCount(4, { timeout: 20_000 });
+    const select = page.locator('select[aria-label="Which item is “goblet”"]');
+    await expect(select).toHaveValue("");
+
+    await swipe(page, goblet(page).locator("figure").first(), 160);
+    await expect(rows(page)).toHaveCount(4);
+    await expect(select).toHaveValue("");
+
+    await swipe(page, goblet(page).locator("figure").first(), -160, {
+      during: async () => {
+        await expect(goblet(page)).toContainText("Let go to add to inventory");
+      },
+    });
+    await expect(select).toHaveValue("__new");
+    // Still there: a swipe never removes a row.
+    await expect(rows(page)).toHaveCount(4);
+    await swipe(page, goblet(page).locator("figure").first(), -160, {
+      during: async () => {
+        await expect(goblet(page)).toContainText("Being added to inventory");
+      },
+    });
+    await expect(rows(page)).toHaveCount(4);
   });
 });
 

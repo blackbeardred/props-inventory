@@ -121,22 +121,26 @@ test("a pull-list line: Mark pulled, then Already pulled; the quantity box keeps
   expect(await taken(line.locator("input[type=number]"))).toBe(false);
 });
 
-test("a checklist line: Not needed, then Put back", async ({ page }) => {
+test("a checklist line: Mark checked (what the swipe does), Not needed, then Put back", async ({ page }) => {
   await open(page, "/productions/prod1/checklist");
   const line = page.locator("main li", { hasText: "Brass candlestick" }).first();
   await line.locator("p").first().click({ button: "right" });
-  expect(await items(page)).toEqual(["Not needed"]);
-  await menu(page).getByRole("menuitem").first().click();
+  expect(await items(page)).toEqual(["Mark checked", "Not needed"]);
+  await menu(page).getByRole("menuitem", { name: "Not needed" }).click();
   await expect(line).toContainText("Not needed after all");
   // No menu while a change is still saving; wait for it to land.
   await expect(line.getByRole("button", { name: "Put back" })).toBeEnabled();
   await line.locator("p").first().click({ button: "right" });
-  expect(await items(page)).toEqual(["Put back on the list"]);
-  await menu(page).getByRole("menuitem").first().click();
+  expect(await items(page)).toEqual(["Mark checked", "Put back on the list"]);
+  await menu(page).getByRole("menuitem", { name: "Put back on the list" }).click();
   await expect(line).not.toContainText("Not needed after all");
+  await expect(line.getByRole("button", { name: "Not needed" })).toBeEnabled();
+  await line.locator("p").first().click({ button: "right" });
+  await menu(page).getByRole("menuitem", { name: "Mark checked" }).click();
+  await expect(line.locator("input[type=checkbox]")).toBeChecked();
 });
 
-test("a photo-review row offers both of its swipes", async ({ page }) => {
+test("a photo-review row offers what its swipe does, and removing", async ({ page }) => {
   await open(page, "/productions/prod1/photo");
   await page.locator("input[type=file]").first().setInputFiles(PROP_TABLE);
   const rows = page.locator('main li:has(select[aria-label^="Which item"])');

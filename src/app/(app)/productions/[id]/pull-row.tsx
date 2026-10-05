@@ -4,6 +4,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { PULL_LIST_ITEM_STATUS_LABELS, type PullListItemStatus } from "@/lib/inventory";
 import { useSwipeLeft } from "@/lib/use-swipe";
+import { SwipeStrip } from "@/components/swipe-strip";
 import { useContextMenu } from "@/components/context-menu";
 import { updatePullListItemStatus } from "./actions";
 
@@ -72,18 +73,12 @@ export function PullRow({
       data-status={showPulled ? "pulled" : status}
       className="relative overflow-hidden"
     >
-      <div
-        aria-hidden="true"
-        className={`absolute inset-0 flex items-center justify-end pr-5 transition-colors ${
-          already ? "bg-rule/40" : swipe.armed ? "bg-accent/30" : "bg-accent/15"
-        }`}
-      >
-        <span
-          className={`font-body text-sm font-medium ${already ? "text-muted" : "text-accent-ink"}`}
-        >
-          {already ? "Already pulled" : swipe.armed ? "Let go to mark pulled" : "Mark pulled"}
-        </span>
-      </div>
+      <SwipeStrip
+        armed={swipe.armed}
+        label="Mark pulled"
+        armedLabel="Let go to mark pulled"
+        done={already ? "Already pulled" : null}
+      />
 
       {context.menu}
       <div

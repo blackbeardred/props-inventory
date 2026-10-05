@@ -513,8 +513,8 @@ export function StagePhoto({ productionId }: { productionId: string }) {
             </h2>
             <p className="mt-1 font-body text-sm text-muted">
               Pick which of your items each one is; anything left as “Skip” is
-              ignored. On a phone, swipe a row left to clear out what it got
-              wrong, or right to add it to your inventory as something new.
+              ignored. On a phone, swipe a row left to add it to your inventory
+              as something new; × takes out anything it got wrong.
             </p>
 
             <PicturePassNotice
