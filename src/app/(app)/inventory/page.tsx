@@ -12,6 +12,7 @@ import { ItemTile, ViewTab } from "@/components/item-tile";
 import { ItemCell, type ItemCellData } from "@/components/item-cell";
 import { locationPaths, type LocationNode } from "@/lib/locations";
 import { SearchBar } from "../search/search-bar";
+import { AddToProduction } from "@/components/add-to-production";
 import { searchItemsLive } from "../search/actions";
 
 /*
@@ -435,8 +436,10 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
         </ul>
       ) : (
         /* One cell per item; columns from lg up (see Day 22). The column gap
-           is wide enough for the hexagon, which sits half outside its card. */
-        <ul className="grid items-start gap-x-6 gap-y-2.5 lg:grid-cols-2 2xl:grid-cols-3">
+           is wide enough for the hexagon, which sits half outside its card;
+           so is the 12px pulled back on the left, which lets the list clip
+           sideways — a card swiped right would otherwise widen the page. */
+        <ul className="-ml-3 grid items-start gap-x-6 gap-y-2.5 overflow-x-clip pl-3 lg:grid-cols-2 2xl:grid-cols-3">
           {items.map((item) => (
             <ItemCell
               key={item.id}
@@ -541,6 +544,10 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           </Notice>
         </div>
       ) : null}
+
+      {/* Answers a swipe on any item below (and their "Add to a production"
+          buttons): the production picker and the bar after each add. */}
+      <AddToProduction />
 
       <SearchBar
         locations={locations.map((location) => ({

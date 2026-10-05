@@ -15,6 +15,9 @@ import {
   pluralize,
 } from "@/lib/inventory";
 import { describeMatch } from "@/lib/search-reason";
+import { useSwipeRight } from "@/lib/use-swipe";
+import { SwipeReveal } from "@/components/swipe-reveal";
+import { requestAddToProduction } from "@/components/add-to-production";
 import { searchItemsLive, type SearchResultItem } from "./actions";
 
 type LocationOption = {
@@ -99,6 +102,7 @@ function ResultRow({
   expanded,
   reason,
   onSelect,
+  swipeable = false,
 }: {
   item: SearchResultItem;
   selected: boolean;
@@ -107,15 +111,27 @@ function ResultRow({
   /** Why it's here, when its name doesn't say. */
   reason?: string | null;
   onSelect: () => void;
+  /** Browsing, not choosing: a right swipe on a phone adds it to a
+   *  production, as it does on the Inventory list. */
+  swipeable?: boolean;
 }) {
+  const swipe = useSwipeRight(
+    () => requestAddToProduction({ id: item.id, name: item.name }),
+    { enabled: swipeable, startOnControls: true }
+  );
   return (
-    <li className="border-b border-rule last:border-b-0">
+    <li className="relative overflow-hidden border-b border-rule last:border-b-0">
+      <SwipeReveal armed={swipe.armed} offset={swipe.offset} rounded={false} />
       <button
         type="button"
-        onClick={onSelect}
+        {...swipe.handlers}
+        style={swipe.style}
+        onClick={() => {
+          if (!swipe.justSwiped()) onSelect();
+        }}
         aria-current={selected ? "true" : undefined}
         aria-expanded={expanded}
-        className={`flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
+        className={`relative flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left transition-[background-color] ${
           expanded
             ? "bg-accent-soft/15"
             : selected
@@ -239,12 +255,21 @@ function ItemDetail({ item, inline = false }: { item: SearchResultItem; inline?:
           )}
         </p>
 
-        <Link
-          href={`/items/${item.id}/edit`}
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm text-foreground transition-colors hover:bg-background"
-        >
-          Open this item
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/items/${item.id}/edit`}
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm text-foreground transition-colors hover:bg-background md:min-h-0"
+          >
+            Open this item
+          </Link>
+          <button
+            type="button"
+            onClick={() => requestAddToProduction({ id: item.id, name: item.name })}
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm text-foreground transition-colors hover:bg-background md:min-h-0"
+          >
+            Add to a production
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -684,6 +709,7 @@ export function SearchBar({
                     <Fragment key={item.id}>
                       <ResultRow
                         item={item}
+                        swipeable
                         selected={item.id === selected?.id}
                         expanded={item.id === selectedId}
                         reason={describeMatch(

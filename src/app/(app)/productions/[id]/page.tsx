@@ -20,10 +20,7 @@ import { findPullIssues } from "@/lib/checklist";
 import { loadChecklistRows } from "@/lib/checklist-data";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import {
-  NEXT_PULL_LIST_ITEM_ACTION_LABEL,
-  NEXT_PULL_LIST_ITEM_STATUS,
   PRODUCTION_STATUS_LABELS,
-  PULL_LIST_ITEM_STATUS_LABELS,
   formatDateRange,
   type ProductionRow,
   type ProductionStatus,
@@ -38,6 +35,7 @@ import {
   updatePullListItemQuantity,
   updatePullListItemStatus,
 } from "./actions";
+import { PullRow, StatusSwitch } from "./pull-row";
 
 export const metadata: Metadata = {
   title: "Production · Props & Costume Inventory",
@@ -282,9 +280,11 @@ export default async function ProductionDetailPage({
                         pullListItem.status === "pulled" &&
                         (pullListItem.check_state ?? "open") === "open";
                       return (
-                        <li
+                        <PullRow
                           key={pullListItem.id}
-                          className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3"
+                          productionId={typedProduction.id}
+                          pullListItemId={pullListItem.id}
+                          status={pullListItem.status}
                         >
                           {/* What it is and where it lives, as on the checklist. */}
                           <div className="flex min-w-0 flex-1 basis-56 items-center gap-3">
@@ -302,12 +302,40 @@ export default async function ProductionDetailPage({
                               <p className="truncate font-body text-sm font-medium text-foreground">
                                 {pullListItem.items?.name ?? "Unknown item"}
                               </p>
-                              <p className="truncate font-mono text-[11px] text-muted">{where}</p>
+                              <p className="truncate font-mono text-[11px] text-muted">
+                                {where}
+                                {/* The checklist's NOT CHECKED, said here too, so
+                                    the two pages tell the same story: out of
+                                    storage, but nobody has confirmed it on the
+                                    walk round. Under the name rather than among
+                                    the buttons, where coming and going it moved
+                                    them. */}
+                                {notChecked ? (
+                                  <>
+                                    {" · "}
+                                    <Link
+                                      href={`/productions/${typedProduction.id}/checklist`}
+                                      className="font-body font-medium text-danger-ink hover:underline"
+                                    >
+                                      not checked
+                                    </Link>
+                                  </>
+                                ) : null}
+                              </p>
                             </div>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-2">
-                            <form action={updatePullListItemQuantity}>
+                          {/* Every control in a fixed place, whatever the
+                              status: on a phone the three statuses get a row of
+                              their own and quantity and Remove the row below;
+                              from md up it's one line. */}
+                          <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 md:flex md:w-auto">
+                            <form action={updatePullListItemStatus} className="col-span-3 md:order-2">
+                              <input type="hidden" name="productionId" value={typedProduction.id} />
+                              <input type="hidden" name="pullListItemId" value={pullListItem.id} />
+                              <StatusSwitch status={pullListItem.status} />
+                            </form>
+                            <form action={updatePullListItemQuantity} className="md:order-1">
                               <input type="hidden" name="productionId" value={typedProduction.id} />
                               <input type="hidden" name="pullListItemId" value={pullListItem.id} />
                               <QuantityField
@@ -316,41 +344,7 @@ export default async function ProductionDetailPage({
                                 label={`How many ${pullListItem.items?.name ?? "of this item"}`}
                               />
                             </form>
-                            <Badge
-                              tone={
-                                pullListItem.status === "pulled"
-                                  ? "accent"
-                                  : pullListItem.status === "returned"
-                                    ? "muted"
-                                    : "neutral"
-                              }
-                            >
-                              {PULL_LIST_ITEM_STATUS_LABELS[pullListItem.status]}
-                            </Badge>
-                            {/* The checklist's NOT CHECKED, said here too, so the
-                                two pages tell the same story: out of storage,
-                                but nobody has confirmed it on the walk round. */}
-                            {notChecked ? (
-                              <Link
-                                href={`/productions/${typedProduction.id}/checklist`}
-                                className="inline-flex min-h-11 items-center font-body text-xs font-medium text-danger-ink hover:underline md:min-h-0"
-                              >
-                                not checked
-                              </Link>
-                            ) : null}
-                            <form action={updatePullListItemStatus}>
-                              <input type="hidden" name="productionId" value={typedProduction.id} />
-                              <input type="hidden" name="pullListItemId" value={pullListItem.id} />
-                              <input
-                                type="hidden"
-                                name="newStatus"
-                                value={NEXT_PULL_LIST_ITEM_STATUS[pullListItem.status]}
-                              />
-                              <SubmitButton variant="ghost" pendingText="Saving…">
-                                {NEXT_PULL_LIST_ITEM_ACTION_LABEL[pullListItem.status]}
-                              </SubmitButton>
-                            </form>
-                            <form action={removePullListItem}>
+                            <form action={removePullListItem} className="col-start-3 md:order-3">
                               <input type="hidden" name="productionId" value={typedProduction.id} />
                               <input type="hidden" name="pullListItemId" value={pullListItem.id} />
                               <DeleteButton
@@ -360,7 +354,7 @@ export default async function ProductionDetailPage({
                               </DeleteButton>
                             </form>
                           </div>
-                        </li>
+                        </PullRow>
                       );
                     })}
                   </ul>

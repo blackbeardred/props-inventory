@@ -98,19 +98,6 @@ export const PULL_LIST_ITEM_STATUS_LABELS: Record<PullListItemStatus, string> = 
   returned: "Returned",
 };
 
-/** The status a pull-list item moves to when its action button is pressed. */
-export const NEXT_PULL_LIST_ITEM_STATUS: Record<PullListItemStatus, PullListItemStatus> = {
-  pending: "pulled",
-  pulled: "returned",
-  returned: "pending",
-};
-
-export const NEXT_PULL_LIST_ITEM_ACTION_LABEL: Record<PullListItemStatus, string> = {
-  pending: "Mark pulled",
-  pulled: "Mark returned",
-  returned: "Mark pending",
-};
-
 const DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
