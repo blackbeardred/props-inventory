@@ -74,7 +74,6 @@ export function ItemCell({ item }: { item: ItemCellData }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
 
-  const condition = item.condition;
   const place = item.locationId ? (item.locationName ?? "Unknown location") : "Unassigned";
 
   return (
@@ -184,83 +183,97 @@ export function ItemCell({ item }: { item: ItemCellData }) {
         style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
       >
         <div className="overflow-hidden">
-          {/* Two content-width columns rather than two halves. Equal halves
-              push the right-hand pair out to the middle of the card and
-              reintroduce exactly the long eye-travel the tight pairs were
-              meant to remove. */}
-          <dl className="mt-2.5 grid grid-cols-1 gap-x-10 gap-y-1 border-t border-dashed border-rule pt-2.5 sm:grid-cols-[auto_auto] sm:justify-start">
-            {item.inUse ? (
-              <Pair label="Production">
-                <Link
-                  href={`/productions/${item.inUse.productionId}`}
-                  className="-my-3.5 inline-block py-3.5 text-accent-ink underline-offset-2 hover:underline"
-                >
-                  {item.inUse.productionName}
-                </Link>
-                <span className="ml-1.5 font-mono text-[11px] font-normal text-muted">
-                  {formatDateRange(item.inUse.startDate, item.inUse.endDate)}
-                </span>
-              </Pair>
-            ) : (
-              <Pair label="Production">
-                <span className="font-normal text-muted">Not pulled for anything</span>
-              </Pair>
-            )}
-
-            <Pair label="Condition">
-              {condition ? (
-                <Badge tone={CONDITION_TONE[condition] ?? "muted"}>
-                  {CONDITION_LABELS[condition] ?? condition}
-                </Badge>
-              ) : (
-                <span className="font-normal text-muted">Not recorded</span>
-              )}
-            </Pair>
-
-            <Pair label="Qty">{item.quantity}</Pair>
-
-            <Pair label="Kept in">
-              {item.locationId ? (
-                <Link
-                  href={`/inventory?place=${item.locationId}`}
-                  // The padding widens what a thumb can hit without moving
-                  // the line; the negative margin gives the space back.
-                  className="-my-3.5 inline-block py-3.5 text-accent-ink underline-offset-2 hover:underline"
-                >
-                  {item.locationName ?? "Unknown location"}
-                </Link>
-              ) : (
-                <span className="font-normal text-muted">Unassigned</span>
-              )}
-            </Pair>
-
-            <Pair label="Added">{formatDate(item.createdAt)}</Pair>
-
-            <Pair label="Category">
-              <Badge tone={item.category === "costume" ? "accent" : "neutral"}>
-                {CATEGORY_LABELS[item.category] ?? item.category}
-              </Badge>
-            </Pair>
-
-            {item.description ? (
-              <div className="max-w-[80ch] sm:col-span-2">
-                <Pair label="Notes">
-                  <span className="font-normal">{item.description}</span>
-                </Pair>
-              </div>
-            ) : null}
-          </dl>
-
-          <p className="mt-2">
-            <Link
-              href={`/items/${item.id}/edit`}
-              className="inline-flex min-h-11 items-center font-mono text-[11px] text-accent underline-offset-2 hover:underline"
-            >
-              Edit this item →
-            </Link>
-          </p>
+          <ItemDetails item={item} />
         </div>
       </div>
     </li>
+  );
+}
+
+/**
+ * Everything about an item past its name: the facts under an opened list
+ * cell, and the same under an opened grid tile. One component so the two
+ * views can't drift apart.
+ */
+export function ItemDetails({ item }: { item: ItemCellData }) {
+  const condition = item.condition;
+  return (
+    <>
+      {/* Two content-width columns rather than two halves. Equal halves
+          push the right-hand pair out to the middle of the card and
+          reintroduce exactly the long eye-travel the tight pairs were
+          meant to remove. */}
+      <dl className="mt-2.5 grid grid-cols-1 gap-x-10 gap-y-1 border-t border-dashed border-rule pt-2.5 sm:grid-cols-[auto_auto] sm:justify-start">
+        {item.inUse ? (
+          <Pair label="Production">
+            <Link
+              href={`/productions/${item.inUse.productionId}`}
+              className="-my-3.5 inline-block py-3.5 text-accent-ink underline-offset-2 hover:underline"
+            >
+              {item.inUse.productionName}
+            </Link>
+            <span className="ml-1.5 font-mono text-[11px] font-normal text-muted">
+              {formatDateRange(item.inUse.startDate, item.inUse.endDate)}
+            </span>
+          </Pair>
+        ) : (
+          <Pair label="Production">
+            <span className="font-normal text-muted">Not pulled for anything</span>
+          </Pair>
+        )}
+
+        <Pair label="Condition">
+          {condition ? (
+            <Badge tone={CONDITION_TONE[condition] ?? "muted"}>
+              {CONDITION_LABELS[condition] ?? condition}
+            </Badge>
+          ) : (
+            <span className="font-normal text-muted">Not recorded</span>
+          )}
+        </Pair>
+
+        <Pair label="Qty">{item.quantity}</Pair>
+
+        <Pair label="Kept in">
+          {item.locationId ? (
+            <Link
+              href={`/inventory?place=${item.locationId}`}
+              // The padding widens what a thumb can hit without moving
+              // the line; the negative margin gives the space back.
+              className="-my-3.5 inline-block py-3.5 text-accent-ink underline-offset-2 hover:underline"
+            >
+              {item.locationName ?? "Unknown location"}
+            </Link>
+          ) : (
+            <span className="font-normal text-muted">Unassigned</span>
+          )}
+        </Pair>
+
+        <Pair label="Added">{formatDate(item.createdAt)}</Pair>
+
+        <Pair label="Category">
+          <Badge tone={item.category === "costume" ? "accent" : "neutral"}>
+            {CATEGORY_LABELS[item.category] ?? item.category}
+          </Badge>
+        </Pair>
+
+        {item.description ? (
+          <div className="max-w-[80ch] sm:col-span-2">
+            <Pair label="Notes">
+              <span className="font-normal">{item.description}</span>
+            </Pair>
+          </div>
+        ) : null}
+      </dl>
+
+      <p className="mt-2">
+        <Link
+          href={`/items/${item.id}/edit`}
+          className="inline-flex min-h-11 items-center font-mono text-[11px] text-accent underline-offset-2 hover:underline"
+        >
+          Edit this item →
+        </Link>
+      </p>
+    </>
   );
 }

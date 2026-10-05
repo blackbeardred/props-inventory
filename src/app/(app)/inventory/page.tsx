@@ -422,21 +422,14 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
       ) : view === "grid" ? (
         /* Pictures first. Names in a props store are approximate — "the small
            urn", "the good candlestick" — so a wall of photographs is often
-           the faster way to find a thing than a column of text. */
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+           the faster way to find a thing than a column of text. Dense, so
+           an opened tile taking a whole row doesn't leave a hole in the row
+           it came from: the tiles after it close the gap. */
+        <ul className="grid grid-flow-row-dense grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {items.map((item) => (
             <ItemTile
               key={item.id}
-              href={`/items/${item.id}/edit`}
-              name={item.name}
-              photoUrl={item.photo_url ? photoUrlByPath.get(item.photo_url) : undefined}
-              locationName={
-                item.location_id
-                  ? (pathById.get(item.location_id) ?? item.locations?.name ?? "Unknown location")
-                  : null
-              }
-              quantity={item.quantity}
-              inUseIn={inUseByItem.get(item.id)?.production.name}
+              item={toCellData(item, inUseByItem.get(item.id), photoUrlByPath, pathById)}
             />
           ))}
         </ul>
