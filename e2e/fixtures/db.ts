@@ -186,7 +186,9 @@ export function query(table: string) {
       const defaults: Row =
         table === "pull_list_items"
           ? { status: "pending", check_state: "open", quantity_needed: 1, checked_at: null, checked_by: null }
-          : table === "deleted_records"
+          : table === "items"
+            ? { auto_tags: [], import_data: {}, quantity: 1, category: "prop", condition: null, description: null, photo_url: null, location_id: null }
+            : table === "deleted_records"
             ? { deleted_at: new Date().toISOString(), photo_paths: [], detail: null }
             : {};
       const made = (Array.isArray(op.v) ? op.v : [op.v!]).map((r) => ({ id: `${table}-${Math.random().toString(36).slice(2, 8)}`, created_at: new Date().toISOString(), ...defaults, ...r }));

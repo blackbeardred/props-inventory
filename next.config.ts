@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 /**
  * E2E_FIXTURES=1 builds the app against an in-memory sample theatre instead
- * of Supabase, for the end-to-end tests (e2e/, see e2e/README.md). Five
+ * of Supabase, for the end-to-end tests (e2e/, see e2e/README.md). Seven
  * modules are swapped for the stand-ins in e2e/fixtures/; everything else —
  * every page, server action and the proxy's redirect rules — is the real
  * code. A fixture build goes to .next-e2e, so it never overwrites the normal
@@ -41,6 +41,7 @@ const nextConfig: NextConfig = {
             "@/lib/supabase/proxy-session": "./e2e/fixtures/proxy-session.ts",
             "@/lib/embedding": "./e2e/fixtures/embedding.ts",
             "@/lib/ai/see-items": "./e2e/fixtures/see-items.ts",
+            "@/lib/ai/describe-item": "./e2e/fixtures/describe-item.ts",
             "@/lib/e2e-hooks": "./e2e/fixtures/hooks.ts",
           },
         },

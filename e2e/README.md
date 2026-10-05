@@ -16,7 +16,7 @@ before it reached Vercel.
 
 These drive the real app in Chromium, at phone and desktop sizes, with
 real touch events for the swipes. Every page, server action and the proxy's
-redirect rules are the real code. Only six modules are swapped (see
+redirect rules are the real code. Only seven modules are swapped (see
 `next.config.ts`, under `E2E_FIXTURES`):
 
 - **`fixtures/db.ts`**: an in-memory sample theatre (SPARC: 8 places, 22
@@ -27,6 +27,9 @@ redirect rules are the real code. Only six modules are swapped (see
   the request carries an `e2e-signed-out` cookie.
 - **`fixtures/see-items.ts`**: the prop-table photo always "contains" the same
   four things, so no Anthropic API call is made.
+- **`fixtures/describe-item.ts`**: any photo of a new item reads as "White
+  cup" (a file under 200 bytes can't be read), so filling in the add-item
+  form from a photo makes no API call either.
 - **`fixtures/embedding.ts`**: no 40MB model download.
 
 A fixture build goes to `.next-e2e/`, so it never touches your normal `.next`,

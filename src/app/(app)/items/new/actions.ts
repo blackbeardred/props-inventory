@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 import { generateTags } from "@/lib/ai/tag-item";
+import { describeItemPhoto, type DescribeResult } from "@/lib/ai/describe-item";
+import { cleanTags, mergeTags } from "@/lib/ai/describe-item-parse";
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
@@ -150,7 +152,16 @@ export async function createItem(formData: FormData) {
 
   // Tags come from what the item *is*, so every item gets them — a photo
   // just gives the model more to go on. Best-effort: never blocks the save.
-  autoTags = await generateTags({
+  // When the form was filled in from the photo, that reading's tags are kept
+  // too (after these, without repeats). They come back from the browser, so
+  // they're cleaned like any other input.
+  let photoTags: string[] = [];
+  try {
+    photoTags = cleanTags(JSON.parse(String(formData.get("photoTags") ?? "[]")));
+  } catch {
+    photoTags = [];
+  }
+  const savedTags = await generateTags({
     name,
     category,
     description,
@@ -161,6 +172,7 @@ export async function createItem(formData: FormData) {
         }
       : null,
   });
+  autoTags = mergeTags(savedTags, photoTags);
 
   const { error: insertError } = await supabase.from("items").insert({
     id: itemId,
@@ -181,4 +193,24 @@ export async function createItem(formData: FormData) {
 
   // Back to wherever it was filed, so it's there to see.
   redirect(resolvedLocationId ? `/inventory?place=${resolvedLocationId}` : "/inventory");
+}
+
+/**
+ * Reads a new item's photo the moment it's chosen, so the form can fill in
+ * its name, category, description and hidden tags (src/lib/ai/describe-
+ * item.ts). Only ever suggests; nothing is saved here. Signed-in people only,
+ * since every call costs an API request.
+ */
+export async function suggestFromPhoto(formData: FormData): Promise<DescribeResult> {
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || photo.size === 0) return { ok: false, reason: "unsupported" };
+  if (!(photo.type in ALLOWED_PHOTO_TYPES) || photo.size > MAX_PHOTO_BYTES) {
+    return { ok: false, reason: "unsupported" };
+  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, reason: "off" };
+  return describeItemPhoto({ bytes: new Uint8Array(await photo.arrayBuffer()), mediaType: photo.type });
 }

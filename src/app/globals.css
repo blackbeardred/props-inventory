@@ -160,6 +160,14 @@ body {
   }
 }
 
+/* A field the add-item form filled in from the photo (PhotoAutofill), until
+ * someone edits it: a green edge and a faint wash, so it's plain which values
+ * came from the picture and want checking. */
+[data-autofilled] {
+  border-color: var(--accent-soft) !important;
+  background-color: color-mix(in srgb, var(--accent) 7%, var(--surface)) !important;
+}
+
 /* A grid tile opening (ItemTile). Each tile is named only while the morph
  * runs, so the browser can match its old box to its new one; the rest of the
  * page stays as it is. Names come from a custom property set on the

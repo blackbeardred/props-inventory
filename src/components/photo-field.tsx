@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { markFingerprintsDue } from "@/lib/fingerprint-device";
 import { takeHandedOffPhoto } from "@/lib/photo-handoff";
 
+/** Raised on the photo input, bubbling, whenever a new photo is chosen or
+ *  handed over (not when the same one is cropped). */
+export const PHOTO_PICKED = "photo-picked";
+
 // The crop window is square because every place a photo is shown — the items
 // list thumbnail, the edit page, the member avatars — is square. Cropping to
 // the shape it will actually be displayed in is the whole point.
@@ -118,6 +122,10 @@ export function PhotoField({
     setZoom(1);
     setNatural(null);
     setCropping(false);
+    // Tells the rest of the form a new photo is here — the add-item form's
+    // PhotoAutofill reads it to fill in the name and the rest. An event
+    // rather than a callback prop, so server-rendered forms can use it.
+    inputRef.current?.dispatchEvent(new CustomEvent<File>(PHOTO_PICKED, { bubbles: true, detail: file }));
   }
 
   function onImageLoad() {

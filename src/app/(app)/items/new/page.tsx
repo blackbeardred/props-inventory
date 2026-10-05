@@ -9,6 +9,7 @@ import {
 } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { SubmitShortcut } from "@/components/submit-shortcut";
+import { PhotoAutofill } from "@/components/photo-autofill";
 import { PhotoField } from "@/components/photo-field";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
@@ -52,7 +53,7 @@ export default async function NewItemPage({
     <>
       <PageHeading
         title="Add an item"
-        intro="A prop or costume, where it lives, and (optionally) a photo."
+        intro="A prop or costume and where it lives. Start with a photo and most of it fills itself in."
       />
 
       {error ? (
@@ -62,15 +63,19 @@ export default async function NewItemPage({
       ) : null}
 
       <form action={createItem} className="max-w-lg space-y-5">
-        <TextField label="Name" name="name" required />
-
+        {/* The photo first: choosing one fills in the name, category,
+            description and hidden search tags (PhotoAutofill), so the rest
+            of the form is mostly checking. */}
         <PhotoField
           acceptHandoff
           label="Photo"
           name="photo"
           accept="image/png,image/jpeg,image/webp,image/gif"
-          helpText="JPG, PNG, GIF, or WEBP — up to 8MB. Crop it square so it matches how it’s shown in your lists."
+          helpText="JPG, PNG, GIF, or WEBP — up to 8MB. The name and details fill themselves in from it; crop it square so it matches your lists."
         />
+        <PhotoAutofill />
+
+        <TextField label="Name" name="name" required />
 
         <div className="grid grid-cols-2 gap-4">
           <SelectField label="Category" name="category" defaultValue="prop">
