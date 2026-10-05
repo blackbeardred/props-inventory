@@ -119,18 +119,28 @@ export function ItemCell({ item }: { item: ItemCellData }) {
         </button>
       </span>
 
-      <div className="flex items-start gap-3">
+      {/* On a phone, opening the card grows the photo to the card's full
+          width and the name and everything else drop beneath it — at 48px a
+          prop is a smudge, and the picture is how you know it's the right
+          one. Only the width animates: the box is square in both states, so
+          its height follows, and flex-wrap moves the text below once the
+          photo needs the whole row. From md up the cells sit in columns
+          beside each other and the thumbnail stays a thumbnail. */}
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-3">
         {item.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- signed URL from a private bucket
           <img
             src={item.photoUrl}
-            alt=""
+            alt={open ? item.name : ""}
             loading="lazy"
-            className="h-12 w-12 shrink-0 rounded object-cover"
+            data-cell-photo
+            className={`aspect-square shrink-0 rounded object-cover transition-[width,border-radius] duration-300 ease-out motion-reduce:transition-none ${
+              open ? "w-full rounded-lg md:w-12 md:rounded" : "w-12"
+            }`}
           />
         ) : null}
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[9rem] flex-1">
           {/* Plain text, not a link to the edit page: the name is the
               biggest thing on the card, so it's what gets tapped, and a tap
               should open the card rather than leave the list. Editing is
