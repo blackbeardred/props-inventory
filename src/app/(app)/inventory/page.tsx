@@ -499,7 +499,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
               Import spreadsheet
             </Link>
             <Link href={here ? `/items/new?location=${here}` : "/items/new"} className={PRIMARY}>
-              {place ? "Add item here" : "Add item"}
+              {/* Same words everywhere; inside a place it still files the
+                  new item there. */}
+              Add item
             </Link>
           </div>
         }

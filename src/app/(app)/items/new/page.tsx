@@ -38,7 +38,7 @@ export default async function NewItemPage({
 
   const params = await searchParams;
   const error = first(params.error);
-  // Arriving from a place in Inventory ("Add item here") files it there.
+  // Arriving from a place in Inventory (its "Add item") files it there.
   const startIn = first(params.location) ?? "";
 
   const supabase = await createClient();

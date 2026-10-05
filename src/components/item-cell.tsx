@@ -140,8 +140,9 @@ export function ItemCell({ item }: { item: ItemCellData }) {
             prop is a smudge, and the picture is how you know it's the right
             one. Only the width animates: the box is square in both states, so
             its height follows, and flex-wrap moves the text below once the
-            photo needs the whole row. From md up the cells sit in columns
-            beside each other and the thumbnail stays a thumbnail. */}
+            photo needs the whole row. From md up it grows to a 192px square
+            with the name beside it, which is big enough to tell two brass
+            candlesticks apart without crowding the columns of cells. */}
         <div className="flex flex-wrap items-start gap-x-3 gap-y-3">
           {item.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- signed URL from a private bucket
@@ -151,7 +152,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
               loading="lazy"
               data-cell-photo
               className={`aspect-square shrink-0 rounded object-cover transition-[width,border-radius] duration-300 ease-out motion-reduce:transition-none ${
-                open ? "w-full rounded-lg md:w-12 md:rounded" : "w-12"
+                open ? "w-full rounded-lg md:w-48" : "w-12"
               }`}
             />
           ) : null}
