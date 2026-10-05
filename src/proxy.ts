@@ -1,6 +1,6 @@
-import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
+import { refreshSession } from "@/lib/supabase/proxy-session";
 
 // Routes that don't require a signed-in session.
 const PUBLIC_PATHS = new Set([
@@ -14,42 +14,16 @@ const PUBLIC_PATHS = new Set([
 const AUTH_PATHS = new Set(["/login", "/signup"]);
 
 // Refreshes the Supabase auth session on every request so it doesn't
-// expire silently, and redirects based on sign-in state.
-// See: https://supabase.com/docs/guides/auth/server-side/nextjs
+// expire silently (src/lib/supabase/proxy-session.ts), and redirects based on
+// sign-in state.
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
-
   // Before .env.local is filled in (Day 1, step 3), skip the session
   // refresh entirely instead of crashing every request.
   if (!supabaseConfigured) {
-    return response;
+    return NextResponse.next({ request });
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  // Touch the session so it refreshes if needed.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, response } = await refreshSession(request);
 
   const { pathname } = request.nextUrl;
 

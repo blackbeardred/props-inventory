@@ -1,0 +1,66 @@
+# Runs on every push to main and on every pull request: lint, types and the
+# unit tests in one job, the end-to-end browser tests in another. A red
+# check here means something broke before it reached Vercel. See
+# e2e/README.md for running the same things on your own machine.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, types, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # --ignore-scripts: onnxruntime-node's postinstall downloads a binary
+      # nothing here needs (the recognition model runs in the browser).
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+
+  e2e:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      # The app built against the in-memory sample theatre instead of
+      # Supabase (see next.config.ts). A step of its own so a build failure
+      # reads as one.
+      - name: Build the fixture app
+        run: npx next build
+        env:
+          E2E_FIXTURES: "1"
+      - run: npx playwright test
+      - name: Keep the report when something fails
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

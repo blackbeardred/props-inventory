@@ -44,6 +44,12 @@ Visit http://localhost:3000 — you should see the placeholder homepage.
    **Project Settings → Environment Variables** (same values as `.env.local`).
 3. Deploy. You now have a live URL.
 
+## Tests
+
+`npm test` runs lint, types, the unit tests and the browser tests; GitHub
+Actions runs the same on every push to `main`. How they work, and how to run
+one at a time, is in [`e2e/README.md`](e2e/README.md).
+
 ## What's already wired up
 
 - Next.js 15, App Router, TypeScript, Tailwind CSS
