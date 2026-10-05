@@ -25,7 +25,11 @@ redirect rules are the real code. Only seven modules are swapped (see
   which is a 404 in any normal build). The browser keeps its own copy, fresh
   on every page load, on `window.__fixtureDB`; files it uploads or removes are
   listed on `window.__storage`. Picture matching (`match_items`) finds nothing
-  unless a test sets `window.__matchItems = [{ item_id, similarity }]` first.
+  unless a test sets `window.__matchItems = [{ item_id, similarity }]` first,
+  and downloading a photo fails unless it sets `window.__downloads = true`.
+  Reset options (`test.use({ fixtureOptions: "…" })`): `role=member`,
+  `deleted=old`, `pictures=1` (it6 has two confirmed pictures) and `twins=1`
+  (the two brass candlesticks, it5 and it6, are twins).
 - **`fixtures/proxy-session.ts`**: everyone is signed in as the owner, unless
   the request carries an `e2e-signed-out` cookie.
 - **`fixtures/see-items.ts`**: the prop-table photo always "contains" the same

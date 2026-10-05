@@ -272,6 +272,12 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
             >
               Find an item by photo
             </Link>
+            <Link
+              href="/items/training-set"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface md:min-h-0"
+            >
+              Training set
+            </Link>
           </div>
         </Section>
 

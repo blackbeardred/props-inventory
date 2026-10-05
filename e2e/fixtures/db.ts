@@ -304,7 +304,13 @@ export function storageFrom() {
   return {
     createSignedUrls: async (paths: string[]) => ({ data: paths.map((path) => ({ path, signedUrl: photoFor(path), error: null })), error: null }),
     createSignedUrl: async (path: string) => ({ data: { signedUrl: photoFor(path) }, error: null }),
-    download: async () => ({ data: null, error: { message: "stub" } }),
+    // Fails unless a test sets window.__downloads = true, so the fingerprint
+    // catch-up stays quiet everywhere else. A path with "missing" in it
+    // always fails.
+    download: async (path: string) =>
+      (globalThis as unknown as { __downloads?: boolean }).__downloads && !path.includes("missing")
+        ? { data: new Blob([`picture of ${path}`], { type: "image/jpeg" }), error: null }
+        : { data: null, error: { message: "stub" } },
     // Uploads and removals are noted on globalThis.__storage, so a test can
     // see which files were written to (and taken out of) the photos bucket.
     upload: async (path: string) => { storageLog().uploaded.push(path); return { data: { path }, error: null }; },
