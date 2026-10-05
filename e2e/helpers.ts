@@ -110,11 +110,12 @@ export async function swipe(
  *  a thumb (40px) — buttons, links, fields. */
 export async function smallTapTargets(page: Page): Promise<string[]> {
   return page.evaluate(() =>
-    [...document.querySelectorAll("a, button, input:not([type=hidden]), select, summary, label:has(input[type=checkbox])")]
+    [...document.querySelectorAll("a, button, input:not([type=hidden]), select, summary, label:has(input[type=checkbox]), label:has(input[type=radio])")]
       .filter((e) => {
         if (!e.getClientRects().length) return false;
         if (e.closest(".sr-only") || e.classList.contains("sr-only")) return false;
-        if (e.matches("input[type=checkbox]")) return false;
+        // A tick box or radio button is tapped through its label, checked above.
+        if (e.matches("input[type=checkbox], input[type=radio]")) return false;
         // The hexagon controls are deliberately small and sit on a larger
         // tappable card.
         if (e.matches("[data-cell-button], [data-hex-toggle], [data-tile-button]")) return false;

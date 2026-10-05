@@ -71,6 +71,11 @@ check "match_items is the 006 version before" "0" \
   "$(q "select count(*) from pg_proc where proname='match_items' and prosrc like '%item_reference_photos%'")"
 apply() { psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/008_item_reference_photos.sql" 2>&1 | grep -i "^ERROR" | head -2; }
 check "applies" "" "$(apply)"
+# A table made by the first copy of 008 allowed only two sources.
+q "alter table item_reference_photos drop constraint item_reference_photos_source_check; alter table item_reference_photos add constraint item_reference_photos_source_check check (source in ('find_by_photo','prop_table'));" >/dev/null
+check "re-running brings an early 008 table up to date" "" "$(apply)"
+check "…so 'duplicate' is now allowed" "1" \
+  "$(q "select count(*) from pg_constraint where conname='item_reference_photos_source_check' and pg_get_constraintdef(oid) like '%duplicate%'")"
 check "applies a second time" "" "$(apply)"
 check "row-level security is on" "t" "$(q "select relrowsecurity from pg_class where relname='item_reference_photos'")"
 check "two policies, after two runs" "2" "$(q "select count(*) from pg_policies where tablename='item_reference_photos'")"
@@ -163,6 +168,18 @@ check "a picture from a different model isn't mixed in" "Pewter tankard" \
   "$(q "insert into item_reference_photos (item_id, org_id, photo_path, source, model, embedding) values ('$TANKARD','$ORGA','m.jpg','prop_table','other-model', test_vec(1,0)); set role authenticated; set request.jwt.claim.sub='$ALICE'; select i.name from match_items(test_vec(0,1), 1) m join items i on i.id = m.item_id;" | tail -1)"
 check "another theatre's pictures never come back" "Bear head" \
   "$(as_user $BOB "select string_agg(i.name, ',') from match_items(test_vec(0.6,0.8), 5) m join items i on i.id = m.item_id;")"
+
+echo ""
+echo "── Giving a duplicate's pictures to its twin"
+check "a picture can be moved to another of the theatre's items" "UPDATE 1" \
+  "$(as_user $AMY "update item_reference_photos set item_id='$TANKARD' where photo_path like '%ref-1.jpg';")"
+check "…and back" "UPDATE 1" \
+  "$(as_user $AMY "update item_reference_photos set item_id='$GLOBE' where photo_path like '%ref-1.jpg';")"
+check "…but not to another theatre's item" "1" \
+  "$(as_user_full $AMY "update item_reference_photos set item_id='$BEAR' where photo_path like '%ref-1.jpg';" | grep -c 'violates row-level security')"
+check "a duplicate's photo is accepted as a picture of the twin" "INSERT 0 1" \
+  "$(as_user $AMY "insert into item_reference_photos (item_id, org_id, photo_path, source, created_by) values ('$TANKARD','$ORGA','$ORGA/$TANKARD/ref-dup.jpg','duplicate','$AMY');")"
+q "delete from item_reference_photos where source='duplicate';" >/dev/null
 
 echo ""
 echo "── Deleting and restoring"

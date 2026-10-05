@@ -11,15 +11,18 @@ import { useFormStatus } from "react-dom";
 export function DeleteButton({
   children,
   confirmMessage,
+  disabled = false,
 }: {
   children: string;
   confirmMessage?: string;
+  /** Not ready to delete yet (a choice in the form still needs making). */
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       aria-busy={pending}
       onClick={(event) => {
         if (confirmMessage && !window.confirm(confirmMessage)) {

@@ -8,6 +8,9 @@
 -- screen. A match nobody confirmed is never kept, so a wrong guess can't
 -- teach the app the wrong thing.
 --
+-- Deleting an item as a duplicate of another (Delete item › "This is a
+-- duplicate of…") moves its pictures, and its own photo, to that twin.
+--
 -- These pictures are never shown anywhere. They exist for two reasons:
 --   1. Matching uses them straight away. match_items now compares a new
 --      photo against every picture of an item and keeps the closest, so an
@@ -34,8 +37,10 @@ create table if not exists item_reference_photos (
   -- Where the picture is, in the item-photos bucket, under the item's own
   -- folder: {org}/{item}/ref-{uuid}.jpg.
   photo_path text not null,
-  -- How it was confirmed.
-  source text not null check (source in ('find_by_photo', 'prop_table')),
+  -- How it was confirmed: "That's it" on Find by photo, a ticked match on
+  -- the prop-table screen, or a duplicate item deleted with this one named as
+  -- its twin (its photos come here).
+  source text not null check (source in ('find_by_photo', 'prop_table', 'duplicate')),
   -- How alike the app thought it was when it was confirmed, 0..1. Null when
   -- the match was made by name alone.
   similarity real,
@@ -46,6 +51,13 @@ create table if not exists item_reference_photos (
   created_by uuid references profiles(id) on delete set null,
   created_at timestamptz not null default now()
 );
+
+-- A table made by an earlier copy of this file allowed only the first two
+-- sources. `create table if not exists` leaves an existing table alone, so
+-- the rule is replaced here; on a table made just above it's a no-op.
+alter table item_reference_photos drop constraint if exists item_reference_photos_source_check;
+alter table item_reference_photos add constraint item_reference_photos_source_check
+  check (source in ('find_by_photo', 'prop_table', 'duplicate'));
 
 create index if not exists item_reference_photos_item_idx
   on item_reference_photos (item_id);

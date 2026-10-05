@@ -210,7 +210,8 @@ create index item_photo_embeddings_org_idx on item_photo_embeddings (org_id);
 --
 -- A photograph someone took that the app matched to an item, and a person
 -- confirmed ("That's it" on Find by photo, or a ticked match on the
--- prop-table screen). Never shown; match_items compares against these as
+-- prop-table screen), or the photos of a duplicate deleted with this item
+-- named as its twin. Never shown; match_items compares against these as
 -- well as the item's own photo, and they are labelled examples for any
 -- future custom-trained model. embedding is null until a device holding the
 -- recognition model fingerprints it.
@@ -220,7 +221,7 @@ create table item_reference_photos (
   item_id uuid not null references items(id) on delete cascade,
   org_id uuid not null references organizations(id) on delete cascade,
   photo_path text not null,
-  source text not null check (source in ('find_by_photo', 'prop_table')),
+  source text not null check (source in ('find_by_photo', 'prop_table', 'duplicate')),
   similarity real,
   model text not null default 'clip-vit-base-patch32',
   embedding extensions.vector(512),

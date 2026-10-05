@@ -13,7 +13,8 @@ import { SubmitShortcut } from "@/components/submit-shortcut";
 import { PhotoField } from "@/components/photo-field";
 import { LocationField } from "@/components/location-field";
 import type { LocationNode } from "@/lib/locations";
-import { DeleteButton } from "@/components/delete-button";
+import { locationPaths } from "@/lib/locations";
+import { loadTwinChoice } from "@/lib/twin-suggestions";
 import { ImportDataPanel } from "@/components/import-data-panel";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
@@ -24,6 +25,7 @@ import {
 } from "@/lib/inventory";
 import { PHOTOS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
 import { deleteItem, regenerateTags, updateItem } from "./actions";
+import { DeleteItemForm } from "./delete-item-form";
 
 export const metadata: Metadata = {
   title: "Edit item · Props & Costume Inventory",
@@ -94,6 +96,12 @@ export default async function EditItemPage({
   const pulled = listRows.filter((row) => row.status === "pulled");
   const pulledQuantity = pulled.reduce((total, row) => total + row.quantity_needed, 0);
   const unchecked = listRows.filter((row) => (row.check_state ?? "open") === "open");
+
+  // For "Is this a duplicate?" on Delete item: what there is to hand over,
+  // and which items it most likely duplicates.
+  const twinChoice = await loadTwinChoice(supabase, typedItem, (locations ?? []) as LocationNode[]);
+  const placeNames = locationPaths((locations ?? []) as LocationNode[]);
+  const searchPlaces = [...placeNames].map(([placeId, name]) => ({ id: placeId, name }));
 
   let currentPhotoUrl: string | null = null;
   if (typedItem.photo_url) {
@@ -188,7 +196,7 @@ export default async function EditItemPage({
         />
 
         {currentPhotoUrl ? (
-          <label className="flex items-center gap-2 font-body text-sm text-muted">
+          <label className="flex min-h-11 w-fit items-center gap-2 font-body text-sm text-muted md:min-h-0">
             <input type="checkbox" name="removePhoto" />
             Remove current photo
           </label>
@@ -279,14 +287,13 @@ export default async function EditItemPage({
 
       <ImportDataPanel data={typedItem.import_data} />
 
-      <form action={deleteItem} className="mt-10 border-t border-rule pt-6">
-        <input type="hidden" name="itemId" value={typedItem.id} />
-        <DeleteButton
-          confirmMessage={`Delete "${typedItem.name}"? You can restore it from Theatre → Recently deleted for 30 days.`}
-        >
-          Delete item
-        </DeleteButton>
-      </form>
+      <DeleteItemForm
+        action={deleteItem}
+        itemId={typedItem.id}
+        itemName={typedItem.name}
+        choice={twinChoice}
+        locations={searchPlaces}
+      />
     </>
   );
 }

@@ -11,6 +11,7 @@
 
 import type { createClient } from "@/lib/supabase/server";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
+import { EMBEDDING_MODEL } from "@/lib/embedding";
 import { locationPaths, type LocationNode } from "@/lib/locations";
 import { pluralize } from "@/lib/inventory";
 import {
@@ -92,12 +93,124 @@ async function unkeep(supabase: Client, recordId: string) {
   await supabase.from("deleted_records").delete().eq("id", recordId);
 }
 
+// ── Giving a duplicate's photos to its twin ─────────────────────────────
+
+type Twin = { id: string; name: string };
+
+/** What giveToTwin did, so it can be undone if the delete then fails. */
+type Handover = { movedIds: string[]; copied: { rowId: string; path: string } | null };
+
+/**
+ * A duplicate's photos go to the item it duplicated, so that item can still
+ * be found from them: its extra pictures move across as they are, and its own
+ * photo is copied in as one more (with its fingerprint, when there is a
+ * current one). A copy rather than a shared file, so the twin's picture can't
+ * vanish if the duplicate is restored and later given a new photo.
+ *
+ * All or nothing: if any step fails, what was done is undone and the reason
+ * comes back, and the caller doesn't delete.
+ */
+async function giveToTwin(
+  supabase: Client,
+  item: Row,
+  twin: Twin,
+  pictures: Row[],
+  embedding: Row | null
+): Promise<{ ok: true; handover: Handover } | { ok: false; message: string }> {
+  const handover: Handover = { movedIds: [], copied: null };
+
+  if (pictures.length) {
+    const movedIds = pictures.map((picture) => String(picture.id));
+    const { error } = await supabase
+      .from("item_reference_photos")
+      .update({ item_id: twin.id })
+      .in("id", movedIds);
+    if (error) return { ok: false, message: error.message };
+    handover.movedIds = movedIds;
+  }
+
+  if (item.photo_url) {
+    const from = String(item.photo_url);
+    const extension = /\.([a-z0-9]+)$/i.exec(from)?.[1]?.toLowerCase() ?? "jpg";
+    const to = `${String(item.org_id)}/${twin.id}/ref-${crypto.randomUUID()}.${extension}`;
+    const { error: copyError } = await supabase.storage.from(PHOTOS_BUCKET).copy(from, to);
+    if (copyError) {
+      await takeBack(supabase, item, handover);
+      return { ok: false, message: copyError.message };
+    }
+
+    const fingerprint =
+      embedding && embedding.photo_url === item.photo_url && embedding.embedding ? embedding : null;
+    const { data, error } = await supabase
+      .from("item_reference_photos")
+      .insert({
+        item_id: twin.id,
+        org_id: item.org_id,
+        photo_path: to,
+        source: "duplicate",
+        similarity: null,
+        model: fingerprint ? String(fingerprint.model ?? EMBEDDING_MODEL) : EMBEDDING_MODEL,
+        embedding: fingerprint ? fingerprint.embedding : null,
+        created_by: await currentUserId(supabase),
+      })
+      .select("id")
+      .single();
+    if (error || !data) {
+      await supabase.storage.from(PHOTOS_BUCKET).remove([to]);
+      await takeBack(supabase, item, handover);
+      return { ok: false, message: error?.message ?? "Couldn’t add its photo to the other item." };
+    }
+    handover.copied = { rowId: String((data as Row).id), path: to };
+  }
+
+  return { ok: true, handover };
+}
+
+/** Undoes giveToTwin, when the delete it was for didn't go through. */
+async function takeBack(supabase: Client, item: Row, handover: Handover) {
+  if (handover.movedIds.length) {
+    await supabase.from("item_reference_photos").update({ item_id: item.id }).in("id", handover.movedIds);
+  }
+  if (handover.copied) {
+    await supabase.from("item_reference_photos").delete().eq("id", handover.copied.rowId);
+    await supabase.storage.from(PHOTOS_BUCKET).remove([handover.copied.path]);
+  }
+}
+
 // ── Deleting ────────────────────────────────────────────────────────────
 
-export async function trashItem(supabase: Client, itemId: string): Promise<TrashResult> {
+/**
+ * `twinId`: the item this one is a duplicate of, when the person deleting
+ * said so. Its photos go there (giveToTwin) and stay there even if this one
+ * is restored.
+ */
+export async function trashItem(
+  supabase: Client,
+  itemId: string,
+  options: { twinId?: string | null } = {}
+): Promise<TrashResult> {
   const { data: item } = await supabase.from("items").select("*").eq("id", itemId).maybeSingle();
   if (!item) return { ok: false, message: "That item isn’t there any more." };
   const row = item as Row;
+
+  let twin: Twin | null = null;
+  if (options.twinId) {
+    if (options.twinId === itemId) {
+      return { ok: false, message: "An item can’t be a duplicate of itself. Nothing was deleted." };
+    }
+    const { data: found } = await supabase
+      .from("items")
+      .select("id, name, org_id")
+      .eq("id", options.twinId)
+      .maybeSingle();
+    if (!found || (found as Row).org_id !== row.org_id) {
+      return {
+        ok: false,
+        message: "The item you said this duplicates isn’t there any more. Nothing was deleted.",
+      };
+    }
+    twin = { id: String((found as Row).id), name: String((found as Row).name) };
+  }
 
   const [{ data: lines }, { data: embedding }, { data: locations }, { data: references }] = await Promise.all([
     supabase.from("pull_list_items").select("*").eq("item_id", itemId),
@@ -116,13 +229,16 @@ export async function trashItem(supabase: Client, itemId: string): Promise<Trash
     orgId: String(row.org_id),
     kind: "item",
     label: String(row.name),
-    detail: itemDetail(place, (lines ?? []).length),
+    detail: twin
+      ? `${itemDetail(place, (lines ?? []).length)} · a duplicate of ${twin.name}`
+      : itemDetail(place, (lines ?? []).length),
     snapshot: {
       kind: "item",
       item: row,
       lines: (lines ?? []) as Row[],
       embedding: (embedding as Row | null) ?? null,
       references: extraPictures,
+      twin,
     },
     // Kept until the snapshot is purged, so a restored item has its pictures.
     photoPaths: [
@@ -132,8 +248,22 @@ export async function trashItem(supabase: Client, itemId: string): Promise<Trash
   });
   if ("message" in kept) return { ok: false, message: kept.message };
 
+  let handover: Handover | null = null;
+  if (twin && (extraPictures.length || row.photo_url)) {
+    const given = await giveToTwin(supabase, row, twin, extraPictures, (embedding as Row | null) ?? null);
+    if (!given.ok) {
+      await unkeep(supabase, kept.id);
+      return {
+        ok: false,
+        message: `Couldn’t give its photos to ${twin.name}, so nothing was deleted. ${given.message}`.trim(),
+      };
+    }
+    handover = given.handover;
+  }
+
   const { error } = await supabase.from("items").delete().eq("id", itemId);
   if (error) {
+    if (handover) await takeBack(supabase, row, handover);
     await unkeep(supabase, kept.id);
     return { ok: false, message: error.message };
   }
@@ -314,8 +444,13 @@ export async function restoreRecord(supabase: Client, recordId: string): Promise
       await putBack(supabase, "item_photo_embeddings", [snap.embedding]).catch(() => null);
     }
     if (!failure && snap.references?.length) {
-      // Best effort too: they're extra pictures, and the item is what was asked for.
+      // Best effort too: they're extra pictures, and the item is what was
+      // asked for. Pictures that went to a twin are still there under the
+      // same ids, so this leaves them where they are.
       await putBack(supabase, "item_reference_photos", snap.references).catch(() => null);
+    }
+    if (!failure && snap.twin) {
+      notes.push(`Its photos stay with ${snap.twin.name}, the item it was deleted as a duplicate of.`);
     }
     href = `/items/${String(item.id)}/edit`;
   } else if (snap.kind === "location") {

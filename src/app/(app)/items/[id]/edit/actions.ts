@@ -299,7 +299,10 @@ export async function deleteItem(formData: FormData) {
 
   // Into Recently Deleted for 30 days, photo included: the picture stays in
   // storage until the snapshot is cleared (src/lib/recently-deleted.ts).
-  const result = await trashItem(supabase, itemId);
+  // When the person said it's a duplicate of another item, its photos go to
+  // that one first.
+  const twinId = String(formData.get("twinId") ?? "").trim() || null;
+  const result = await trashItem(supabase, itemId, { twinId });
   if (!result.ok) {
     redirect(`/items/${itemId}/edit?error=${encodeURIComponent(result.message)}`);
   }

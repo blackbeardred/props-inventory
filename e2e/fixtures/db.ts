@@ -77,6 +77,7 @@ export const DB: Record<string, Row[]> = new Proxy({} as Record<string, Row[]>, 
  *   role=member   the signed-in person is a member, not the owner
  *   deleted=old   Recently Deleted already holds two things: one deleted
  *                 10 days ago, one 40 days ago (past its 30, due a purge)
+ *   pictures=1    the second brass candlestick (it6) has two extra pictures
  */
 export function resetFixtures(options?: URLSearchParams): void {
   const db = seed();
@@ -89,6 +90,13 @@ export function resetFixtures(options?: URLSearchParams): void {
       { id: "dr-expired", org_id: "org1", kind: "item", label: "Broken umbrella", detail: "Unassigned", photo_paths: ["org1/umbrella.jpg"], deleted_by: "u1", deleted_at: daysAgo(40),
         snapshot: { kind: "item", item: { id: "it-umbrella", org_id: "org1", name: "Broken umbrella" }, lines: [], embedding: null } }
     );
+  }
+  if (options?.get("pictures") === "1") {
+    // The second brass candlestick (it6) has two extra pictures, kept from
+    // confirmed photo matches (migration 008).
+    for (const n of [1, 2]) {
+      db.item_reference_photos.push({ id: `ref-it6-${n}`, item_id: "it6", org_id: "org1", photo_path: `org1/it6/ref-${n}.jpg`, source: "find_by_photo", similarity: 0.8, model: "clip-vit-base-patch32", embedding: null, created_by: "u1", created_at: now });
+    }
   }
   store.__fixtureDB = db;
 }
@@ -267,8 +275,10 @@ export function rpc(name: string, args: Record<string, unknown>) {
 }
 
 function storageLog() {
-  const g = globalThis as unknown as { __storage?: { uploaded: string[]; removed: string[] } };
-  return (g.__storage ??= { uploaded: [], removed: [] });
+  const g = globalThis as unknown as { __storage?: { uploaded: string[]; removed: string[]; copied: string[][] } };
+  g.__storage ??= { uploaded: [], removed: [], copied: [] };
+  g.__storage.copied ??= [];
+  return g.__storage;
 }
 
 export function storageFrom() {
@@ -280,5 +290,6 @@ export function storageFrom() {
     // see which files were written to (and taken out of) the photos bucket.
     upload: async (path: string) => { storageLog().uploaded.push(path); return { data: { path }, error: null }; },
     remove: async (paths: string[]) => { storageLog().removed.push(...paths); return { data: null, error: null }; },
+    copy: async (from: string, to: string) => { storageLog().copied.push([from, to]); return { data: { path: to }, error: null }; },
   };
 }
