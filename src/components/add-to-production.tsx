@@ -8,6 +8,7 @@ import {
   type PullTarget,
 } from "@/app/(app)/inventory/actions";
 import { lastProduction } from "@/lib/recent-places";
+import type { MenuItem } from "@/components/context-menu";
 
 /**
  * Adding an inventory item to a production's pull list, from a swipe (or the
@@ -33,8 +34,32 @@ const KEEP_MS = 12 * 60 * 60 * 1000;
 const BAR_MS = 6000;
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
-export function requestAddToProduction(item: ItemRef): void {
-  window.dispatchEvent(new CustomEvent<ItemRef>(EVENT, { detail: item }));
+type Request = ItemRef & {
+  /** Ask which production even when one is remembered ("Add to another…"). */
+  choose?: boolean;
+};
+
+export function requestAddToProduction(item: ItemRef, options: { choose?: boolean } = {}): void {
+  window.dispatchEvent(new CustomEvent<Request>(EVENT, { detail: { ...item, ...options } }));
+}
+
+/**
+ * The right-click menu's version of the swipe: "Add to Noises Off!" when a
+ * production is remembered, plus a way to pick another; "Add to a
+ * production…" when the swipe would ask.
+ */
+export function addToProductionMenu(item: ItemRef): MenuItem[] {
+  const target = readTarget();
+  if (!target) {
+    return [{ label: "Add to a production…", onSelect: () => requestAddToProduction(item) }];
+  }
+  return [
+    { label: `Add to ${target.label}`, onSelect: () => requestAddToProduction(item) },
+    {
+      label: "Add to another production…",
+      onSelect: () => requestAddToProduction(item, { choose: true }),
+    },
+  ];
 }
 
 function readTarget(): PullTarget | null {
@@ -167,9 +192,10 @@ export function AddToProduction() {
 
   useEffect(() => {
     function onRequest(event: Event) {
-      const item = (event as CustomEvent<ItemRef>).detail;
-      if (!item || !ID.test(item.id)) return;
-      const target = readTarget();
+      const request = (event as CustomEvent<Request>).detail;
+      if (!request || !ID.test(request.id)) return;
+      const item: ItemRef = { id: request.id, name: request.name };
+      const target = request.choose ? null : readTarget();
       if (target) void add(item, target);
       else void openPicker(item);
     }

@@ -4,6 +4,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { PULL_LIST_ITEM_STATUS_LABELS, type PullListItemStatus } from "@/lib/inventory";
 import { useSwipeLeft } from "@/lib/use-swipe";
+import { useContextMenu } from "@/components/context-menu";
 import { updatePullListItemStatus } from "./actions";
 
 /** In the order things happen to a prop, which is also the order on screen. */
@@ -32,24 +33,34 @@ export function PullRow({
   productionId,
   pullListItemId,
   status,
+  name,
   children,
 }: {
   productionId: string;
   pullListItemId: string;
   status: PullListItemStatus;
+  /** For the right-click menu's heading. */
+  name: string;
   children: ReactNode;
 }) {
   const [saving, startSaving] = useTransition();
   const [sent, setSent] = useState(false);
   const already = status === "pulled";
 
-  const swipe = useSwipeLeft(() => {
+  function markPulled() {
     if (already) return;
     setSent(true);
     startSaving(async () => {
       await updatePullListItemStatus(statusForm(productionId, pullListItemId, "pulled"));
     });
-  });
+  }
+  const swipe = useSwipeLeft(markPulled);
+  // A right-click on a computer offers what the swipe does.
+  const context = useContextMenu(name, () => [
+    already
+      ? { label: "Already pulled", disabled: true, onSelect: () => {} }
+      : { label: "Mark pulled", onSelect: markPulled },
+  ]);
 
   // Shown as pulled from the moment the finger lifts, until the page comes
   // back with the saved state.
@@ -74,8 +85,10 @@ export function PullRow({
         </span>
       </div>
 
+      {context.menu}
       <div
         {...swipe.handlers}
+        onContextMenu={context.onContextMenu}
         style={swipe.style}
         className={`relative flex flex-wrap items-center gap-x-4 gap-y-2 bg-background px-5 py-3 transition-opacity md:px-0 ${
           showPulled ? "opacity-60" : ""

@@ -12,6 +12,7 @@ import {
   type QueuedTick,
 } from "@/lib/offline-queue";
 import { setCheckState } from "./actions";
+import { useContextMenu } from "@/components/context-menu";
 
 /** How far a row travels before letting go clears it. */
 const SWIPE_THRESHOLD = 110;
@@ -90,6 +91,17 @@ function Row({
   const open = row.checkState === "open";
   const cleared = row.checkState === "cleared";
 
+  // A right-click on a computer offers what the swipe does, and its undo.
+  const context = useContextMenu(row.name, () =>
+    pending
+      ? []
+      : [
+          cleared
+            ? { label: "Put back on the list", onSelect: () => onSet("open") }
+            : { label: "Not needed", onSelect: () => onSet("cleared") },
+        ]
+  );
+
   return (
     <li className="relative overflow-hidden border-b border-rule last:border-b-0">
       <div
@@ -101,7 +113,9 @@ function Row({
         </span>
       </div>
 
+      {context.menu}
       <div
+        onContextMenu={context.onContextMenu}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}

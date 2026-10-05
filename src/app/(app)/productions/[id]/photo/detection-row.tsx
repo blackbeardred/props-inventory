@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { describeSimilarity, picturesDisagree, type Ranked } from "@/lib/visual-match";
 import type { Candidate, Detection } from "./actions";
+import { useContextMenu } from "@/components/context-menu";
 
 /** A candidate with what the picture thought of it, if it was asked. */
 export type RankedCandidate = Ranked<Candidate>;
@@ -133,6 +134,12 @@ export function DetectionRow({
 
   const dragging = gesture.current?.swiping === true;
 
+  // A right-click on a computer offers both of the row's swipes.
+  const context = useContextMenu(name || detection.name, () => [
+    { label: "Add to inventory", detail: "As a new item, named as below", onSelect: onAddToInventory },
+    { label: "Remove from this list", onSelect: onRemove },
+  ]);
+
   const chosen =
     choice.kind === "item" ? candidates.find((candidate) => candidate.id === choice.itemId) : null;
 
@@ -163,7 +170,9 @@ export function DetectionRow({
         </span>
       </div>
 
+      {context.menu}
       <div
+        onContextMenu={context.onContextMenu}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}

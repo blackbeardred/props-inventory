@@ -4,7 +4,8 @@ import { useId, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { SwipeReveal } from "@/components/swipe-reveal";
-import { requestAddToProduction } from "@/components/add-to-production";
+import { addToProductionMenu, requestAddToProduction } from "@/components/add-to-production";
+import { useContextMenu } from "@/components/context-menu";
 import { useSwipeLeft } from "@/lib/use-swipe";
 import {
   CATEGORY_LABELS,
@@ -78,14 +79,20 @@ export function ItemCell({ item }: { item: ItemCellData }) {
   const panelId = useId();
   // On a phone, a swipe to the left puts it on a production's pull list.
   const swipe = useSwipeLeft(() => requestAddToProduction({ id: item.id, name: item.name }));
+  // …and on a computer, a right-click offers the same.
+  const context = useContextMenu(item.name, () =>
+    addToProductionMenu({ id: item.id, name: item.name })
+  );
 
   const place = item.locationId ? (item.locationName ?? "Unknown location") : "Unassigned";
 
   return (
     <li className="relative">
       <SwipeReveal armed={swipe.armed} offset={swipe.offset} />
+      {context.menu}
       <div
         {...swipe.handlers}
+        onContextMenu={context.onContextMenu}
         // Padded on the left to leave the cell button its own margin, so the
         // hexagon sits half outside the card the way a tab does.
         className="relative cursor-pointer rounded-lg border border-rule bg-surface py-3 pl-6 pr-3.5 sm:pl-7"

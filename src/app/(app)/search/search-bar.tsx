@@ -17,7 +17,8 @@ import {
 import { describeMatch } from "@/lib/search-reason";
 import { useSwipeLeft } from "@/lib/use-swipe";
 import { SwipeReveal } from "@/components/swipe-reveal";
-import { requestAddToProduction } from "@/components/add-to-production";
+import { addToProductionMenu, requestAddToProduction } from "@/components/add-to-production";
+import { useContextMenu } from "@/components/context-menu";
 import { searchItemsLive, type SearchResultItem } from "./actions";
 
 type LocationOption = {
@@ -119,12 +120,17 @@ function ResultRow({
     () => requestAddToProduction({ id: item.id, name: item.name }),
     { enabled: swipeable, startOnControls: true }
   );
+  const context = useContextMenu(item.name, () =>
+    swipeable ? addToProductionMenu({ id: item.id, name: item.name }) : []
+  );
   return (
     <li className="relative overflow-hidden border-b border-rule last:border-b-0">
       <SwipeReveal armed={swipe.armed} offset={swipe.offset} rounded={false} />
+      {context.menu}
       <button
         type="button"
         {...swipe.handlers}
+        onContextMenu={context.onContextMenu}
         style={swipe.style}
         onClick={() => {
           if (!swipe.justSwiped()) onSelect();

@@ -288,6 +288,7 @@ export default async function ProductionDetailPage({
                           productionId={typedProduction.id}
                           pullListItemId={pullListItem.id}
                           status={pullListItem.status}
+                          name={pullListItem.items?.name ?? "Unknown item"}
                         >
                           {/* What it is and where it lives, as on the checklist. */}
                           <div className="flex min-w-0 flex-1 basis-56 items-center gap-3">

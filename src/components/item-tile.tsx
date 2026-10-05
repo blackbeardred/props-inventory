@@ -6,7 +6,8 @@ import type { CSSProperties, ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { ItemDetails, type ItemCellData } from "@/components/item-cell";
 import { SwipeReveal } from "@/components/swipe-reveal";
-import { requestAddToProduction } from "@/components/add-to-production";
+import { addToProductionMenu, requestAddToProduction } from "@/components/add-to-production";
+import { useContextMenu } from "@/components/context-menu";
 import { useSwipeLeft } from "@/lib/use-swipe";
 import { CATEGORY_LABELS } from "@/lib/inventory";
 
@@ -61,6 +62,10 @@ export function ItemTile({ item }: { item: ItemCellData }) {
   const ref = useRef<HTMLLIElement>(null);
   // On a phone, a swipe to the left puts it on a production's pull list.
   const swipe = useSwipeLeft(() => requestAddToProduction({ id: item.id, name: item.name }));
+  // …and on a computer, a right-click offers the same.
+  const context = useContextMenu(item.name, () =>
+    addToProductionMenu({ id: item.id, name: item.name })
+  );
 
   const place = item.locationId ? (item.locationName ?? "Unknown location") : "Unassigned";
 
@@ -124,8 +129,10 @@ export function ItemTile({ item }: { item: ItemCellData }) {
       className={`relative overflow-hidden rounded-lg ${open ? "col-span-full" : "h-full"}`}
     >
       <SwipeReveal armed={swipe.armed} offset={swipe.offset} />
+      {context.menu}
       <div
         {...swipe.handlers}
+        onContextMenu={context.onContextMenu}
         style={swipe.style}
         className={`relative cursor-pointer overflow-hidden rounded-lg border border-rule bg-surface transition-colors hover:border-accent-soft ${
           open ? "sm:flex sm:items-start" : "flex h-full flex-col"
