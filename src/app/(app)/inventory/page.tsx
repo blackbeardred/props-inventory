@@ -170,7 +170,9 @@ function inventoryHref({
 
 const BUTTON =
   "inline-flex min-h-11 items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface md:min-h-0";
-/** A breadcrumb step: thumb-sized on a phone, plain text from tablet up. */
+/** A breadcrumb step: thumb-sized on a phone, plain text from tablet up. The
+ *  row is pulled in by the extra height (-my-2.5 on the nav), so the bigger
+ *  targets overlap the heading's margin instead of pushing the list down. */
 const CRUMB =
   "inline-flex min-h-11 items-center text-accent-ink hover:underline md:min-h-0";
 /** The same button, but only from tablet width up: on a phone the hexagon
@@ -458,7 +460,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
         intro={
           // The breadcrumb: where you are, and every step back up.
           place ? (
-            <nav aria-label="Where you are" className="flex flex-wrap items-center gap-x-1.5">
+            <nav aria-label="Where you are" className="-my-2.5 flex flex-wrap items-center gap-x-1.5 md:my-0">
               <Link href={inventoryHref({})} className={CRUMB}>
                 Inventory
               </Link>
