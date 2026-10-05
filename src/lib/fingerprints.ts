@@ -238,6 +238,9 @@ export type Lookalike = {
   similarity: number;
   /** A short-lived URL for showing the stored photo beside the new one. */
   photoUrl: string | null;
+  /** The set of twins it belongs to (migration 009), or null. Twins share
+   *  their pictures, so every one of a set comes back with the same score. */
+  twinSet: string | null;
 };
 
 /** Signed URLs live this long — long enough to sit on a review screen. */
@@ -290,6 +293,15 @@ export async function matchEmbedding(embedding: number[], limit = 5): Promise<Lo
     }[]).map((item) => [item.id, item])
   );
 
+  // Which of them are twins. Forgiving: before migration 009 there are none.
+  const { data: twinRows } = await supabase
+    .from("item_twins")
+    .select("item_id, twin_set")
+    .in("item_id", [...byId.keys()]);
+  const setOf = new Map(
+    ((twinRows ?? []) as { item_id: string; twin_set: string }[]).map((row) => [row.item_id, row.twin_set])
+  );
+
   // One request for every photo rather than one per match.
   const paths = [...byId.values()]
     .map((item) => item.photo_url)
@@ -319,6 +331,7 @@ export async function matchEmbedding(embedding: number[], limit = 5): Promise<Lo
       quantity: item.quantity,
       similarity: match.similarity,
       photoUrl: item.photo_url ? (signedByPath.get(item.photo_url) ?? null) : null,
+      twinSet: setOf.get(item.id) ?? null,
     });
   }
 

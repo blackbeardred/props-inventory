@@ -41,6 +41,7 @@ function seed(): Record<string, Row[]> {
     deleted_records: [],
     item_photo_embeddings: [],
     item_reference_photos: [],
+    item_twins: [],
   };
   names.forEach((name, i) => {
     DB.items.push({
@@ -78,6 +79,7 @@ export const DB: Record<string, Row[]> = new Proxy({} as Record<string, Row[]>, 
  *   deleted=old   Recently Deleted already holds two things: one deleted
  *                 10 days ago, one 40 days ago (past its 30, due a purge)
  *   pictures=1    the second brass candlestick (it6) has two extra pictures
+ *   twins=1       the two brass candlesticks (it5, it6) are twins
  */
 export function resetFixtures(options?: URLSearchParams): void {
   const db = seed();
@@ -97,6 +99,13 @@ export function resetFixtures(options?: URLSearchParams): void {
     for (const n of [1, 2]) {
       db.item_reference_photos.push({ id: `ref-it6-${n}`, item_id: "it6", org_id: "org1", photo_path: `org1/it6/ref-${n}.jpg`, source: "find_by_photo", similarity: 0.8, model: "clip-vit-base-patch32", embedding: null, created_by: "u1", created_at: now });
     }
+  }
+  if (options?.get("twins") === "1") {
+    // The two brass candlesticks (it5, it6) are a pair: twins.
+    db.item_twins.push(
+      { item_id: "it5", org_id: "org1", twin_set: "set-candles", created_at: now },
+      { item_id: "it6", org_id: "org1", twin_set: "set-candles", created_at: now }
+    );
   }
   store.__fixtureDB = db;
 }
@@ -158,6 +167,7 @@ function cascade(table: string, gone: string[]) {
     drop("pull_list_items", "item_id", gone);
     drop("item_photo_embeddings", "item_id", gone);
     drop("item_reference_photos", "item_id", gone);
+    drop("item_twins", "item_id", gone);
   }
   if (table === "locations") {
     for (const l of DB.locations) if (gone.includes(l.parent_location_id as string)) l.parent_location_id = null;
@@ -191,10 +201,10 @@ export function query(table: string) {
   b.range = () => b;
   b.maybeSingle = () => { single = true; return b; };
   b.single = () => { single = true; return b; };
-  let op: { kind: "insert" | "update" | "delete" | "upsert"; v?: Row | Row[]; ignoreDuplicates?: boolean } | null = null;
+  let op: { kind: "insert" | "update" | "delete" | "upsert"; v?: Row | Row[]; ignoreDuplicates?: boolean; onConflict?: string } | null = null;
   b.update = (v: Row) => { op = { kind: "update", v }; return b; };
   b.insert = (v: Row | Row[]) => { op = { kind: "insert", v }; return b; };
-  b.upsert = (v: Row | Row[], opts?: { ignoreDuplicates?: boolean }) => { op = { kind: "upsert", v, ignoreDuplicates: !!opts?.ignoreDuplicates }; return b; };
+  b.upsert = (v: Row | Row[], opts?: { ignoreDuplicates?: boolean; onConflict?: string }) => { op = { kind: "upsert", v, ignoreDuplicates: !!opts?.ignoreDuplicates, onConflict: opts?.onConflict }; return b; };
   b.delete = () => { op = { kind: "delete" }; return b; };
   b.then = (resolve: (v: unknown) => void) => {
     if (op?.kind === "insert") {
@@ -210,12 +220,21 @@ export function query(table: string) {
       DB[table] = [...(DB[table] ?? []), ...made];
       rows = made;
     } else if (op?.kind === "upsert") {
-      // By id, as the restores use it: new rows go in as given, rows already
-      // there are left alone (ignoreDuplicates) or updated.
+      // By id (or the onConflict column), as the restores use it: new rows
+      // go in as given, rows already there are left alone (ignoreDuplicates)
+      // or updated.
       const table_ = DB[table] ?? [];
       const touched: Row[] = [];
-      for (const r of Array.isArray(op.v) ? op.v : [op.v!]) {
-        const found = table_.find((x) => x.id === r.id);
+      const key = op.onConflict ?? "id";
+      const incoming = Array.isArray(op.v) ? op.v : [op.v!];
+      // Like Postgres: conflicts can only be resolved on a column the rows
+      // have (item_photo_embeddings has no id, for one).
+      if (incoming.some((r) => r[key] === undefined)) {
+        resolve({ data: null, error: { message: "there is no unique or exclusion constraint matching the ON CONFLICT specification" }, count: null });
+        return;
+      }
+      for (const r of incoming) {
+        const found = table_.find((x) => x[key] !== undefined && x[key] === r[key]);
         if (!found) { table_.push({ ...r }); touched.push(r); }
         else if (!op.ignoreDuplicates) { Object.assign(found, r); touched.push(found); }
       }

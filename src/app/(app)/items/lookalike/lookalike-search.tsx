@@ -188,6 +188,12 @@ export function LookalikeSearch() {
               Found it? Tap <span className="font-medium text-foreground">That’s it</span> on the
               right one, and it’ll be quicker to find from a photo next time.
             </p>
+            {matches.some((match) => twinsIn(matches, match).length) ? (
+              <p data-twins-note className="mb-3 font-body text-sm text-foreground">
+                Twins look the same in any photo, so every one of them is listed. Their places tell
+                you where each one should be.
+              </p>
+            ) : null}
             <ul className="space-y-3">
               {matches.map((match) => {
                 const verdict = describeSimilarity(match.similarity);
@@ -220,6 +226,12 @@ export function LookalikeSearch() {
                         {match.locationName ?? "No shelf assigned"}
                         {match.quantity > 1 ? ` · ${match.quantity} owned` : ""}
                       </p>
+                      {twinsIn(matches, match).length ? (
+                        <p data-twin-of className="font-mono text-[11px] text-muted">
+                          <span aria-hidden="true" className="hex mr-1 inline-block w-2.5 bg-honey align-[-1px]" />
+                          Twin of {twinsIn(matches, match).map((twin) => twin.name).join(", ")}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="text-right">
@@ -264,4 +276,10 @@ export function LookalikeSearch() {
       ) : null}
     </div>
   );
+}
+
+/** The other results in the same set of twins as this one. */
+function twinsIn(matches: Lookalike[], match: Lookalike): Lookalike[] {
+  if (!match.twinSet) return [];
+  return matches.filter((other) => other.id !== match.id && other.twinSet === match.twinSet);
 }

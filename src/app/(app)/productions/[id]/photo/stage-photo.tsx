@@ -7,6 +7,7 @@ import { embedImage, loadEmbedder, type LoadProgress } from "@/lib/embedding";
 import { deviceMayFingerprint, markFingerprintsDue, optIn } from "@/lib/fingerprint-device";
 import { isMissingFingerprintSchema, matchEmbedding } from "@/lib/fingerprints";
 import { mergeCandidates, pickObvious } from "@/lib/visual-match";
+import { pickFreeTwins } from "@/lib/twins";
 import { takeHandedOffPhoto } from "@/lib/photo-handoff";
 import { keepReferencePhoto } from "@/lib/reference-photos";
 import type { Category } from "@/lib/inventory";
@@ -37,6 +38,62 @@ type PicturePass =
   | { kind: "nothing-to-compare" }
   | { kind: "not-set-up" }
   | { kind: "failed" };
+
+/**
+ * Twins (migration 009) look the same in any photo, so when a row is set to
+ * one of a set, any of them would be right. This moves untouched rows onto a
+ * twin that's free: not on this list, not pulled elsewhere, not already
+ * proposed for an earlier row (so a photo showing both marks both). Rows the
+ * reviewer chose are never changed. The rules are in src/lib/twins.ts.
+ */
+function spreadTwins(
+  choices: Record<string, Choice>,
+  rows: Detection[],
+  hits: Record<string, PictureHit[]>,
+  touched: Set<string>,
+  busy: Set<string>
+): Record<string, Choice> {
+  const sets = new Map<string, Set<string>>();
+  const options = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const all = mergeCandidates(row.candidates, hits[row.key] ?? []);
+    options.set(row.key, new Set(all.map((candidate) => candidate.id)));
+    for (const candidate of all) {
+      if (!candidate.twinSet) continue;
+      sets.set(candidate.twinSet, (sets.get(candidate.twinSet) ?? new Set()).add(candidate.id));
+    }
+  }
+  if (!sets.size) return choices;
+
+  const twinsOf = new Map<string, string[]>();
+  for (const members of sets.values()) {
+    const sorted = [...members].sort();
+    for (const id of sorted) twinsOf.set(id, sorted);
+  }
+
+  const picks = pickFreeTwins(
+    rows.map((row) => {
+      const choice = choices[row.key];
+      return {
+        key: row.key,
+        itemId: choice?.kind === "item" ? choice.itemId : null,
+        locked: touched.has(row.key) || choice?.kind !== "item",
+      };
+    }),
+    twinsOf,
+    busy
+  );
+
+  const out = { ...choices };
+  for (const row of rows) {
+    const choice = choices[row.key];
+    const pick = picks.get(row.key);
+    if (touched.has(row.key) || choice?.kind !== "item" || !pick || pick === choice.itemId) continue;
+    // Only ever to something this row's dropdown actually offers.
+    if (options.get(row.key)?.has(pick)) out[row.key] = { kind: "item", itemId: pick };
+  }
+  return out;
+}
 
 function choiceFor(name: string, candidates: RankedCandidate[]): Choice {
   const obvious = pickObvious(name, candidates);
@@ -135,6 +192,8 @@ export function StagePhoto({ productionId }: { productionId: string }) {
   // may re-rank the dropdown but must never change a choice someone made.
   const touched = useRef(new Set<string>());
   const listedRef = useRef<string[]>([]);
+  // Pulled for any production right now: a twin that's free is preferred.
+  const inUseRef = useRef(new Set<string>());
   // Each crop's fingerprint, once the picture pass has taken one, so a crop
   // confirmed as an item can be kept as another picture of it without being
   // fingerprinted twice.
@@ -160,6 +219,8 @@ export function StagePhoto({ productionId }: { productionId: string }) {
     const id = ++passId.current;
     const stale = () => passId.current !== id;
     const listed = new Set(listedItemIds);
+    const busy = new Set([...listedItemIds, ...inUseRef.current]);
+    const hitsSoFar: Record<string, PictureHit[]> = {};
     const withCrops = rows.filter((row) => cropsByKey[row.key]);
     if (withCrops.length === 0) {
       setPicturePass({ kind: "idle" });
@@ -190,16 +251,25 @@ export function StagePhoto({ productionId }: { productionId: string }) {
           locationName: match.locationName,
           quantity: match.quantity,
           alreadyListed: listed.has(match.id),
+          twinSet: match.twinSet,
+          inUse: inUseRef.current.has(match.id),
           photoUrl: match.photoUrl,
           similarity: match.similarity,
         }));
 
         setPictureHits((current) => ({ ...current, [row.key]: hits }));
+        hitsSoFar[row.key] = hits;
         if (!touched.current.has(row.key)) {
-          setChoices((current) => ({
-            ...current,
-            [row.key]: choiceFor(row.name, mergeCandidates(row.candidates, hits)),
-          }));
+          const snapshot = { ...hitsSoFar };
+          setChoices((current) =>
+            spreadTwins(
+              { ...current, [row.key]: choiceFor(row.name, mergeCandidates(row.candidates, hits)) },
+              rows,
+              snapshot,
+              touched.current,
+              busy
+            )
+          );
         }
       }
 
@@ -255,7 +325,16 @@ export function StagePhoto({ productionId }: { productionId: string }) {
       setDetections(outcome.detections);
       setRemoved([]);
       setCrops(nextCrops);
-      setChoices(nextChoices);
+      inUseRef.current = new Set(outcome.inUseItemIds);
+      setChoices(
+        spreadTwins(
+          nextChoices,
+          outcome.detections,
+          {},
+          new Set(),
+          new Set([...outcome.listedItemIds, ...outcome.inUseItemIds])
+        )
+      );
       setCounts(nextCounts);
       setNames(nextNames);
       setPictureHits({});
@@ -497,7 +576,16 @@ export function StagePhoto({ productionId }: { productionId: string }) {
                   count={counts[detection.key] ?? detection.quantity}
                   onChoice={(choice) => {
                     touched.current.add(detection.key);
-                    setChoices((current) => ({ ...current, [detection.key]: choice }));
+                    // Untouched rows step aside onto a free twin if needed.
+                    setChoices((current) =>
+                      spreadTwins(
+                        { ...current, [detection.key]: choice },
+                        detections,
+                        pictureHits,
+                        touched.current,
+                        new Set([...listedRef.current, ...inUseRef.current])
+                      )
+                    );
                   }}
                   onName={(name) =>
                     setNames((current) => ({ ...current, [detection.key]: name }))

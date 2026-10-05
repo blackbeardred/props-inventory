@@ -20,6 +20,7 @@ import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 import { seeItems, type SeenObject } from "@/lib/ai/see-items";
 import { type Category, type ItemRow } from "@/lib/inventory";
 import { locationPaths, type LocationNode } from "@/lib/locations";
+import { loadTwinRows } from "@/lib/twins-data";
 
 const CATEGORIES: Category[] = ["prop", "costume"];
 
@@ -40,6 +41,10 @@ export type Candidate = {
   /** A short-lived link to the item's own photo, so the review screen can
    *  put it beside the crop. Null when the item has none. */
   photoUrl: string | null;
+  /** The set of twins it belongs to (migration 009), or null. */
+  twinSet: string | null;
+  /** Pulled for a production right now. */
+  inUse: boolean;
 };
 
 /** Long enough to sit on a review screen while someone works down it. */
@@ -58,6 +63,9 @@ export type ReadOutcome =
       /** Everything already on this production's lists. The browser needs it
        *  for candidates the picture finds, which never pass through here. */
       listedItemIds: string[];
+      /** Everything pulled for any production right now, so a photo of one
+       *  of a pair of twins can mark the one that's free. */
+      inUseItemIds: string[];
     }
   | { ok: false; error: string };
 
@@ -141,6 +149,46 @@ export async function readStagePhoto(
     });
   }
 
+  // Twins (migration 009): the same prop owned more than once looks the
+  // same in any photo, so each of a set goes on offer whenever one is found,
+  // and the browser marks one that's free. Nothing here before 009 is run.
+  const twinRows = await loadTwinRows(
+    supabase,
+    [...new Set(searched.flatMap(({ items }) => items.map((item) => item.id)))]
+  );
+  const setOf = new Map(twinRows.map((row) => [row.item_id, row.twin_set]));
+  const membersOf = new Map<string, string[]>();
+  for (const row of twinRows) membersOf.set(row.twin_set, [...(membersOf.get(row.twin_set) ?? []), row.item_id]);
+  const known = new Set(searched.flatMap(({ items }) => items.map((item) => item.id)));
+  const missing = twinRows.map((row) => row.item_id).filter((id) => !known.has(id));
+  const extraById = new Map<string, ItemRow>();
+  if (missing.length) {
+    const { data: extra } = await supabase
+      .from("items")
+      .select("id, name, category, quantity, photo_url, location_id")
+      .in("id", missing);
+    for (const item of (extra ?? []) as unknown as ItemRow[]) extraById.set(item.id, item);
+  }
+  for (const entry of searched) {
+    const ids = new Set(entry.items.map((item) => item.id));
+    for (const item of [...entry.items]) {
+      const set = setOf.get(item.id);
+      for (const mate of set ? (membersOf.get(set) ?? []) : []) {
+        if (ids.has(mate)) continue;
+        const row = extraById.get(mate);
+        if (!row) continue;
+        entry.items.push(row);
+        ids.add(mate);
+      }
+    }
+  }
+
+  const { data: pulledRows } = await supabase
+    .from("pull_list_items")
+    .select("item_id")
+    .eq("status", "pulled");
+  const inUse = new Set(((pulledRows ?? []) as { item_id: string }[]).map((row) => row.item_id));
+
   // Every candidate's photo in one request, rather than one per candidate.
   const paths = [
     ...new Set(
@@ -170,10 +218,12 @@ export async function readStagePhoto(
       quantity: item.quantity,
       alreadyListed: listed.has(item.id),
       photoUrl: item.photo_url ? (signedByPath.get(item.photo_url) ?? null) : null,
+      twinSet: setOf.get(item.id) ?? null,
+      inUse: inUse.has(item.id),
     })),
   }));
 
-  return { ok: true, detections, listedItemIds: [...listed] };
+  return { ok: true, detections, listedItemIds: [...listed], inUseItemIds: [...inUse] };
 }
 
 export type MarkDecision = {

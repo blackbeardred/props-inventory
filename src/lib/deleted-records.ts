@@ -23,8 +23,8 @@ type Row = Record<string, unknown>;
 /** What a snapshot holds, by kind. Rows are as the database returned them. */
 export type Snapshot =
   // `references`: the item's extra pictures (migration 008). Absent from
-  // snapshots taken before it. `twin`: the item it was deleted as a duplicate
-  // of, which its photos went to.
+  // snapshots taken before it. `twin`: the twin its photos went to, and
+  // `twinSet` the set it was in (migration 009), so a restore rejoins it.
   | {
       kind: "item";
       item: Row;
@@ -32,6 +32,7 @@ export type Snapshot =
       embedding: Row | null;
       references?: Row[];
       twin?: { id: string; name: string } | null;
+      twinSet?: string | null;
     }
   | { kind: "location"; location: Row; childIds: string[]; itemIds: string[] }
   | { kind: "production"; production: Row; lists: Row[]; lines: Row[] }

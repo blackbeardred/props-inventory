@@ -7,6 +7,7 @@ import { trashItem } from "@/lib/recently-deleted";
 import { withUndo } from "@/lib/undo-href";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 import { generateTags } from "@/lib/ai/tag-item";
+import { leaveTwins, linkAsTwins } from "@/lib/twins-data";
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
@@ -299,13 +300,35 @@ export async function deleteItem(formData: FormData) {
 
   // Into Recently Deleted for 30 days, photo included: the picture stays in
   // storage until the snapshot is cleared (src/lib/recently-deleted.ts).
-  // When the person said it's a duplicate of another item, its photos go to
-  // that one first.
-  const twinId = String(formData.get("twinId") ?? "").trim() || null;
-  const result = await trashItem(supabase, itemId, { twinId });
+  // When it has twins, its pictures go to one of them first.
+  const result = await trashItem(supabase, itemId);
   if (!result.ok) {
     redirect(`/items/${itemId}/edit?error=${encodeURIComponent(result.message)}`);
   }
 
   redirect(withUndo("/inventory", result.recordId, result.label));
+}
+
+/** Links this item with another as twins: the same prop, owned twice. */
+export async function addTwin(formData: FormData) {
+  const itemId = String(formData.get("itemId") ?? "");
+  const twinId = String(formData.get("twinId") ?? "").trim();
+  if (!itemId) redirect("/inventory");
+  if (!twinId) fail(itemId, "Choose the item it’s a twin of.");
+
+  const supabase = await createClient();
+  const result = await linkAsTwins(supabase, itemId, twinId);
+  if (!result.ok) fail(itemId, result.message);
+  redirect(`/items/${itemId}/edit?notice=twin-linked&twin=${encodeURIComponent(result.twinName)}#twins`);
+}
+
+/** Takes this item out of its twins. They stay twins of one another. */
+export async function removeFromTwins(formData: FormData) {
+  const itemId = String(formData.get("itemId") ?? "");
+  if (!itemId) redirect("/inventory");
+
+  const supabase = await createClient();
+  const problem = await leaveTwins(supabase, itemId);
+  if (problem) fail(itemId, problem);
+  redirect(`/items/${itemId}/edit?notice=twin-unlinked#twins`);
 }

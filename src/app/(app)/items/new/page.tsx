@@ -11,6 +11,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { SubmitShortcut } from "@/components/submit-shortcut";
 import { PhotoAutofill } from "@/components/photo-autofill";
 import { PhotoField } from "@/components/photo-field";
+import { TwinOffer } from "@/components/twin-offer";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@/lib/inventory";
@@ -76,6 +77,9 @@ export default async function NewItemPage({
         <PhotoAutofill />
 
         <TextField label="Name" name="name" required />
+        {/* "Is this another one of those?": offered when the photo or the
+            name matches something already in the inventory (twins). */}
+        <TwinOffer />
 
         <div className="grid grid-cols-2 gap-4">
           <SelectField label="Category" name="category" defaultValue="prop">

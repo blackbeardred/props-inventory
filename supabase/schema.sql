@@ -221,7 +221,7 @@ create table item_reference_photos (
   item_id uuid not null references items(id) on delete cascade,
   org_id uuid not null references organizations(id) on delete cascade,
   photo_path text not null,
-  source text not null check (source in ('find_by_photo', 'prop_table', 'duplicate')),
+  source text not null check (source in ('find_by_photo', 'prop_table', 'duplicate', 'twin')),
   similarity real,
   model text not null default 'clip-vit-base-patch32',
   embedding extensions.vector(512),
@@ -231,6 +231,25 @@ create table item_reference_photos (
 
 create index item_reference_photos_item_idx on item_reference_photos (item_id);
 create index item_reference_photos_org_idx on item_reference_photos (org_id);
+
+-- ─────────────────────────────────────────────────────────────
+-- Twins (migration 009)
+--
+-- Props the theatre owns more than one of that look exactly alike: each a
+-- real item with its own shelf and pull-list life, but no photo can tell
+-- them apart. Items sharing a twin_set are twins; the uuid is the set.
+-- Pictures of one count for all (match_items), and deleting one gives its
+-- pictures to a remaining twin. Only ever linked by a person.
+-- ─────────────────────────────────────────────────────────────
+create table item_twins (
+  item_id uuid primary key references items(id) on delete cascade,
+  org_id uuid not null references organizations(id) on delete cascade,
+  twin_set uuid not null,
+  created_at timestamptz not null default now()
+);
+
+create index item_twins_set_idx on item_twins (twin_set);
+create index item_twins_org_idx on item_twins (org_id);
 
 -- No similarity index on purpose: at a few thousand items an exact scan is a
 -- few milliseconds, and an approximate index would trade exactness for speed
@@ -249,6 +268,7 @@ alter table pull_lists enable row level security;
 alter table pull_list_items enable row level security;
 alter table item_photo_embeddings enable row level security;
 alter table item_reference_photos enable row level security;
+alter table item_twins enable row level security;
 
 create or replace function auth_org_ids()
 returns setof uuid
@@ -342,6 +362,20 @@ create policy "org members can manage their item embeddings" on item_photo_embed
 
 create policy "org members can read their reference photos" on item_reference_photos
   for select using (org_id = auth_org_id());
+
+create policy "org members can read their twins" on item_twins
+  for select using (org_id = auth_org_id());
+
+create policy "org members can manage their twins" on item_twins
+  for all
+  using (org_id = auth_org_id())
+  with check (
+    org_id = auth_org_id()
+    and exists (
+      select 1 from items i
+      where i.id = item_id and i.org_id = auth_org_id()
+    )
+  );
 
 create policy "org members can manage their reference photos" on item_reference_photos
   for all
@@ -860,10 +894,10 @@ language sql
 stable
 set search_path = public, extensions
 as $$
-  -- Each item scores as its closest picture: its own photo, or any of the
-  -- confirmed ones in item_reference_photos (migration 008).
-  select p.item_id, max(1 - (p.embedding <=> query_embedding)) as similarity
-  from (
+  -- Each item scores as its closest picture: its own photo, any of the
+  -- confirmed ones in item_reference_photos (migration 008), or any picture
+  -- of one of its twins (migration 009), so every twin scores the same.
+  with pictures as (
     select e.item_id, e.embedding
     from item_photo_embeddings e
     where e.model = 'clip-vit-base-patch32'
@@ -871,9 +905,24 @@ as $$
     select r.item_id, r.embedding
     from item_reference_photos r
     where r.model = 'clip-vit-base-patch32' and r.embedding is not null
-  ) p
-  group by p.item_id
-  order by 2 desc
+  ),
+  scored as (
+    select p.item_id, max(1 - (p.embedding <=> query_embedding)) as similarity
+    from pictures p
+    group by p.item_id
+  ),
+  shared as (
+    select s.item_id, s.similarity from scored s
+    union all
+    select mate.item_id, s.similarity
+    from scored s
+    join item_twins mine on mine.item_id = s.item_id
+    join item_twins mate on mate.twin_set = mine.twin_set and mate.item_id <> s.item_id
+  )
+  select item_id, max(similarity) as similarity
+  from shared
+  group by item_id
+  order by 2 desc, 1
   limit least(greatest(coalesce(match_count, 5), 1), 50)
 $$;
 

@@ -263,7 +263,8 @@ export function DetectionRow({
               {candidate.name}
               {candidate.locationName ? ` · ${candidate.locationName}` : ""}
               {pictureWords(candidate)}
-              {candidate.alreadyListed ? " · already on this list" : ""}
+              {candidate.twinSet ? " · twin" : ""}
+              {candidate.alreadyListed ? " · already on this list" : candidate.inUse ? " · in use" : ""}
             </option>
           ))}
           <option value="__new">Not in the inventory — add it</option>

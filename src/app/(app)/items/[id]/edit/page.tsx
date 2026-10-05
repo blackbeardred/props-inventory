@@ -14,7 +14,8 @@ import { PhotoField } from "@/components/photo-field";
 import { LocationField } from "@/components/location-field";
 import type { LocationNode } from "@/lib/locations";
 import { locationPaths } from "@/lib/locations";
-import { loadTwinChoice } from "@/lib/twin-suggestions";
+import { loadTwinPanel } from "@/lib/twins-data";
+import { DeleteButton } from "@/components/delete-button";
 import { ImportDataPanel } from "@/components/import-data-panel";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
@@ -24,8 +25,8 @@ import {
   type ItemRow,
 } from "@/lib/inventory";
 import { PHOTOS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
-import { deleteItem, regenerateTags, updateItem } from "./actions";
-import { DeleteItemForm } from "./delete-item-form";
+import { addTwin, deleteItem, regenerateTags, removeFromTwins, updateItem } from "./actions";
+import { TwinsPanel } from "./twins-panel";
 
 export const metadata: Metadata = {
   title: "Edit item · Props & Costume Inventory",
@@ -51,6 +52,7 @@ export default async function EditItemPage({
   const { id } = await params;
   const error = first((await searchParams).error);
   const notice = first((await searchParams).notice);
+  const linkedTwin = first((await searchParams).twin);
 
   const supabase = await createClient();
 
@@ -97,9 +99,8 @@ export default async function EditItemPage({
   const pulledQuantity = pulled.reduce((total, row) => total + row.quantity_needed, 0);
   const unchecked = listRows.filter((row) => (row.check_state ?? "open") === "open");
 
-  // For "Is this a duplicate?" on Delete item: what there is to hand over,
-  // and which items it most likely duplicates.
-  const twinChoice = await loadTwinChoice(supabase, typedItem, (locations ?? []) as LocationNode[]);
+  // Its twins (the same prop, owned more than once), and likely ones.
+  const twinPanel = await loadTwinPanel(supabase, typedItem, (locations ?? []) as LocationNode[]);
   const placeNames = locationPaths((locations ?? []) as LocationNode[]);
   const searchPlaces = [...placeNames].map(([placeId, name]) => ({ id: placeId, name }));
 
@@ -132,7 +133,10 @@ export default async function EditItemPage({
                 {index > 0 ? ", " : ""}
                 <Link
                   href={`/productions/${row.pull_lists!.productions!.id}`}
-                  className="text-accent hover:underline"
+                  // Taller to the thumb than it looks: padding the
+                  // negative margin takes back, so the sentence keeps its
+                  // line height.
+                  className="-my-3.5 inline-block py-3.5 text-accent hover:underline md:my-0 md:py-0"
                 >
                   {row.pull_lists!.productions!.name}
                 </Link>
@@ -153,7 +157,10 @@ export default async function EditItemPage({
                 {index > 0 ? ", " : ""}
                 <Link
                   href={`/productions/${row.pull_lists!.productions!.id}/checklist`}
-                  className="text-accent hover:underline"
+                  // Taller to the thumb than it looks: padding the
+                  // negative margin takes back, so the sentence keeps its
+                  // line height.
+                  className="-my-3.5 inline-block py-3.5 text-accent hover:underline md:my-0 md:py-0"
                 >
                   {row.pull_lists!.productions!.name}
                 </Link>
@@ -164,6 +171,18 @@ export default async function EditItemPage({
         </div>
       ) : null}
 
+      {notice === "twin-linked" ? (
+        <div className="mb-6">
+          <Notice title={linkedTwin ? `Linked as a twin of ${linkedTwin}` : "Linked as twins"}>
+            A photo of either one now finds both.
+          </Notice>
+        </div>
+      ) : null}
+      {notice === "twin-unlinked" ? (
+        <div className="mb-6">
+          <Notice title="No longer a twin">Its photos only find this item now.</Notice>
+        </div>
+      ) : null}
       {notice === "tags-regenerated" ? (
         <div className="mb-6">
           <Notice title="Tags regenerated">
@@ -287,13 +306,37 @@ export default async function EditItemPage({
 
       <ImportDataPanel data={typedItem.import_data} />
 
-      <DeleteItemForm
-        action={deleteItem}
-        itemId={typedItem.id}
-        itemName={typedItem.name}
-        choice={twinChoice}
-        locations={searchPlaces}
-      />
+      {twinPanel.available ? (
+        <TwinsPanel
+          itemId={typedItem.id}
+          itemName={typedItem.name}
+          twins={twinPanel.twins}
+          suggestions={twinPanel.suggestions}
+          locations={searchPlaces}
+          addAction={addTwin}
+          removeAction={removeFromTwins}
+        />
+      ) : null}
+
+      <form action={deleteItem} className="mt-10 border-t border-rule pt-6">
+        <input type="hidden" name="itemId" value={typedItem.id} />
+        {twinPanel.twins.length && twinPanel.photoCount ? (
+          <p data-twin-handover className="mb-3 max-w-xl font-body text-sm text-muted">
+            Deleting it gives{" "}
+            {twinPanel.photoCount === 1 ? "its photo" : `its ${twinPanel.photoCount} photos`} to
+            its twin, {twinPanel.twins[0].name}, so that one is still easy to find from a photo.
+          </p>
+        ) : null}
+        <DeleteButton
+          confirmMessage={
+            twinPanel.twins.length
+              ? `Delete "${typedItem.name}"? Its photos will go to its twin. You can restore it from Theatre → Recently deleted for 30 days.`
+              : `Delete "${typedItem.name}"? You can restore it from Theatre → Recently deleted for 30 days.`
+          }
+        >
+          Delete item
+        </DeleteButton>
+      </form>
     </>
   );
 }

@@ -4,6 +4,14 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { suggestFromPhoto } from "@/app/(app)/items/new/actions";
 import { PHOTO_PICKED } from "@/components/photo-field";
 
+/** Raised (bubbling) on the form whenever this changes the fields, so other
+ *  parts of the form can react to the new name as they would to typing. */
+export const PHOTO_AUTOFILLED = "photo-autofilled";
+
+function announce(form: HTMLFormElement) {
+  form.dispatchEvent(new CustomEvent(PHOTO_AUTOFILLED, { bubbles: true }));
+}
+
 /**
  * Fills in a new item from its photo: drop this inside the add-item form,
  * after its PhotoField. The moment a photo is chosen (or handed over by the
@@ -166,6 +174,7 @@ export function PhotoAutofill() {
       const { suggestion } = result;
       last.current = suggestion;
       const filled = fill(form, suggestion, ours.current, before.current);
+      announce(form);
       setTags(suggestion.tags);
       setStatus(filled.length ? { kind: "filled", fields: filled } : { kind: "tagsOnly" });
     }
@@ -192,6 +201,7 @@ export function PhotoAutofill() {
     }
     ours.current.clear();
     before.current.clear();
+    announce(form);
     setTags([]);
     setStatus(last.current ? { kind: "undone" } : { kind: "idle" });
   }
@@ -200,6 +210,7 @@ export function PhotoAutofill() {
     const form = anchor.current?.closest("form");
     if (!form || !last.current) return;
     const filled = fill(form, last.current, ours.current, before.current);
+    announce(form);
     setTags(last.current.tags);
     setStatus(filled.length ? { kind: "filled", fields: filled } : { kind: "tagsOnly" });
   }

@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { findSameNamed, linkAsTwins, type TwinItem } from "@/lib/twins-data";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
@@ -191,6 +192,19 @@ export async function createItem(formData: FormData) {
     fail(insertError.message);
   }
 
+  // "Is this another one of those?" answered yes: linked as a twin of that
+  // item (migration 009). The item exists either way; if the link can't be
+  // made, its page says why rather than the add looking like it failed.
+  const twinOf = String(formData.get("twinOf") ?? "").trim();
+  if (twinOf) {
+    const linked = await linkAsTwins(supabase, itemId, twinOf);
+    if (!linked.ok) {
+      redirect(
+        `/items/${itemId}/edit?error=${encodeURIComponent(`Added, but couldn’t link it as a twin: ${linked.message}`)}`
+      );
+    }
+  }
+
   // Back to wherever it was filed, so it's there to see.
   redirect(resolvedLocationId ? `/inventory?place=${resolvedLocationId}` : "/inventory");
 }
@@ -213,4 +227,17 @@ export async function suggestFromPhoto(formData: FormData): Promise<DescribeResu
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, reason: "off" };
   return describeItemPhoto({ bytes: new Uint8Array(await photo.arrayBuffer()), mediaType: photo.type });
+}
+
+/**
+ * Items already in the inventory under the same name as the one being added,
+ * for Add item's "Is this another one of those?" (twins, migration 009).
+ */
+export async function sameNamedItems(name: string): Promise<TwinItem[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || typeof name !== "string") return [];
+  return findSameNamed(supabase, name.slice(0, 200));
 }
