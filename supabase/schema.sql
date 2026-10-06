@@ -346,6 +346,15 @@ create policy "org members can manage their items" on items
 -- The `exists` check on write is the part worth reading twice: without it, a
 -- caller could attach a fingerprint carrying their own org_id to another
 -- theatre's item_id, then read that item's name back out of a match result.
+--
+-- These two are the only policies this table should ever have (migration
+-- 010). The pre-006 draft used other names, and because policies are OR'd,
+-- its org-only write policy reopened that hole when it turned up alongside
+-- these on the live database. The drops are no-ops on a fresh database and
+-- are here so this file says the same as the migrations.
+drop policy if exists "org members read embeddings" on item_photo_embeddings;
+drop policy if exists "org members write embeddings" on item_photo_embeddings;
+
 create policy "org members can read their item embeddings" on item_photo_embeddings
   for select using (org_id = auth_org_id());
 
