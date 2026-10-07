@@ -273,8 +273,9 @@ export function rpc(name: string, args: Record<string, unknown>) {
     const data = DB.items.filter((it) => {
       if (scope && !scope.has(it.location_id as string)) return false;
       const hay = `${it.name} ${it.description ?? ""} ${(it.auto_tags as string[]).join(" ")} ${Object.values(it.import_data as object).join(" ")}`.toLowerCase();
-      // Like the real search (migration 004): words split on punctuation,
-      // plus a de-punctuated copy of each, so "P-014" can be typed back in.
+      // Like the real search: words split on punctuation, so "rust" finds
+      // "orange/rust" (migration 011), plus a de-punctuated copy of each, so
+      // "P-014" can be typed back in (migration 004).
       const words = hay.split(/[^a-z0-9]+/);
       const squashed = hay.split(/\s+/).map((w) => w.replace(/[^a-z0-9]/g, ""));
       return terms.every((t) => {

@@ -113,12 +113,19 @@ returns text
 language sql
 immutable
 as $$
-  -- The document is indexed twice: once as written, and once with
-  -- punctuation squeezed out of the middle of words. Search-as-you-type
-  -- strips punctuation from what the user types ("P-001" becomes the term
-  -- p001), and Postgres reads "P-001" as the two words p and 001, so without
-  -- the second copy an inventory number could never be typed back in.
-  select base || ' ' || regexp_replace(base, '[^[:alnum:][:space:]]+', '', 'g')
+  -- The document is indexed three times over:
+  --   1. as written;
+  --   2. with punctuation squeezed out of the middle of words. Search-as-
+  --      you-type strips punctuation from what the user types ("P-001"
+  --      becomes the term p001), and Postgres reads "P-001" as the two words
+  --      p and 001, so without this copy an inventory number could never be
+  --      typed back in;
+  --   3. with punctuation turned into spaces. Postgres reads "orange/rust" as
+  --      a file path, one word, so without this copy "rust" wouldn't find it
+  --      (migration 011).
+  select base
+    || ' ' || regexp_replace(base, '[^[:alnum:][:space:]]+', '', 'g')
+    || ' ' || regexp_replace(base, '[^[:alnum:][:space:]]+', ' ', 'g')
   from (
     select coalesce(p_name, '') || ' ' || coalesce(p_description, '') || ' '
       || coalesce(array_to_string(p_auto_tags, ' '), '') || ' '
