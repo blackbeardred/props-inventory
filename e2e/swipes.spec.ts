@@ -99,7 +99,10 @@ test.describe("inventory (phone)", () => {
     await expect(page.locator("[data-item-tile][data-open]")).toHaveCount(0);
     await page.locator("main input[type=text]").fill("map");
     await expect(page.locator("main li", { hasText: "Map (Aged)" }).first()).toBeVisible();
-    await page.locator("main input[type=text]").blur();
+    // Enter takes it as a search word, which closes the suggestions that
+    // would otherwise sit over the results (blurring doesn't close them).
+    await page.locator("main input[type=text]").press("Enter");
+    await expect(page.locator("main li", { hasText: "Map (Aged)" }).first()).toBeVisible();
     await swipe(page, page.locator("main li", { hasText: "Map (Aged)" }).first(), -150);
     await expect(bar(page)).toContainText(/Added\s+Map \(Aged\)/);
     await open(page, "/productions/prod1");
