@@ -160,3 +160,47 @@ export async function undoAddToPullList(pullListItemId: string): Promise<{ ok: b
   const { error } = await supabase.from("pull_list_items").delete().eq("id", pullListItemId);
   return { ok: !error };
 }
+
+// ── Add to room (the right-click "Add to room…") ────────────────────────
+
+export type PlaceNode = { id: string; name: string; parent_location_id: string | null };
+
+/** Every place, for the picker the menu opens. */
+export async function listPlaces(): Promise<{ ok: true; places: PlaceNode[] } | { ok: false; message: string }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("locations")
+    .select("id, name, parent_location_id")
+    .order("name");
+  if (error) return { ok: false, message: "Couldn’t load your places." };
+  return { ok: true, places: (data ?? []) as PlaceNode[] };
+}
+
+export type MoveResult =
+  | { ok: true; fromId: string | null; toId: string | null }
+  | { ok: false; message: string };
+
+/**
+ * Files an item in a place (or takes it out of one, with null), returning
+ * where it was so the bar's Undo can put it back. Both the item and the place
+ * are read through row-level security first, so neither can be another
+ * theatre's.
+ */
+export async function moveItemToPlace(itemId: string, locationId: string | null): Promise<MoveResult> {
+  if (!ID.test(itemId) || (locationId !== null && !ID.test(locationId))) {
+    return { ok: false, message: "That isn’t an item or a place." };
+  }
+  const supabase = await createClient();
+  const { data: item } = await supabase.from("items").select("id, location_id").eq("id", itemId).maybeSingle();
+  if (!item) return { ok: false, message: "That item isn’t there any more." };
+  if (locationId) {
+    const { data: place } = await supabase.from("locations").select("id").eq("id", locationId).maybeSingle();
+    if (!place) return { ok: false, message: "That place isn’t there any more." };
+  }
+  const fromId = ((item as { location_id: string | null }).location_id ?? null) as string | null;
+  if (fromId === locationId) return { ok: true, fromId, toId: locationId };
+
+  const { error } = await supabase.from("items").update({ location_id: locationId }).eq("id", itemId);
+  if (error) return { ok: false, message: "Couldn’t move it. Check the connection and try again." };
+  return { ok: true, fromId, toId: locationId };
+}

@@ -7,6 +7,7 @@ import { flushSync } from "react-dom";
 import { ItemDetails, type ItemCellData } from "@/components/item-cell";
 import { SwipeReveal } from "@/components/swipe-reveal";
 import { addToProductionMenu, requestAddToProduction } from "@/components/add-to-production";
+import { moveToPlaceMenu } from "@/components/move-to-place";
 import { useContextMenu } from "@/components/context-menu";
 import { useSwipeLeft } from "@/lib/use-swipe";
 import { CATEGORY_LABELS } from "@/lib/inventory";
@@ -63,9 +64,10 @@ export function ItemTile({ item }: { item: ItemCellData }) {
   // On a phone, a swipe to the left puts it on a production's pull list.
   const swipe = useSwipeLeft(() => requestAddToProduction({ id: item.id, name: item.name }));
   // …and on a computer, a right-click offers the same.
-  const context = useContextMenu(item.name, () =>
-    addToProductionMenu({ id: item.id, name: item.name })
-  );
+  const context = useContextMenu(item.name, () => [
+    ...addToProductionMenu({ id: item.id, name: item.name }),
+    ...moveToPlaceMenu(item),
+  ]);
 
   const place = item.locationId ? (item.locationName ?? "Unknown location") : "Unassigned";
 

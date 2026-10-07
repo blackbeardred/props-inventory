@@ -18,6 +18,7 @@ import { describeMatch } from "@/lib/search-reason";
 import { useSwipeLeft } from "@/lib/use-swipe";
 import { SwipeReveal } from "@/components/swipe-reveal";
 import { addToProductionMenu, requestAddToProduction } from "@/components/add-to-production";
+import { moveToPlaceMenu } from "@/components/move-to-place";
 import { useContextMenu } from "@/components/context-menu";
 import { searchItemsLive, type SearchResultItem } from "./actions";
 
@@ -121,7 +122,17 @@ function ResultRow({
     { enabled: swipeable, startOnControls: true }
   );
   const context = useContextMenu(item.name, () =>
-    swipeable ? addToProductionMenu({ id: item.id, name: item.name }) : []
+    swipeable
+      ? [
+          ...addToProductionMenu({ id: item.id, name: item.name }),
+          ...moveToPlaceMenu({
+            id: item.id,
+            name: item.name,
+            locationId: item.location_id,
+            locationName: item.locationName,
+          }),
+        ]
+      : []
   );
   return (
     <li className="relative overflow-hidden border-b border-rule last:border-b-0">

@@ -13,6 +13,7 @@ import { ItemCell, type ItemCellData } from "@/components/item-cell";
 import { locationPaths, type LocationNode } from "@/lib/locations";
 import { SearchBar } from "../search/search-bar";
 import { AddToProduction } from "@/components/add-to-production";
+import { MoveToPlace } from "@/components/move-to-place";
 import { searchItemsLive } from "../search/actions";
 
 /*
@@ -552,6 +553,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
       {/* Answers a swipe on any item below (and their "Add to a production"
           buttons): the production picker and the bar after each add. */}
       <AddToProduction />
+      <MoveToPlace />
 
       <SearchBar
         locations={locations.map((location) => ({

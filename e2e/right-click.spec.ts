@@ -26,7 +26,7 @@ test("an inventory item: ask, then remember, then offer another", async ({ page 
   await cell(page, "Bells").locator("h3").click({ button: "right" });
   await expect(menu(page)).toBeVisible();
   await expect(menu(page)).toContainText("Bells");
-  expect(await items(page)).toEqual(["Add to a production…"]);
+  expect(await items(page)).toEqual(["Add to a production…", "Add to room…"]);
   expect(await page.evaluate(() => document.activeElement?.getAttribute("role"))).toBe("menuitem");
   await expect(cell(page, "Bells").locator("[data-cell-button]")).toHaveAttribute("aria-expanded", "false");
   await menu(page).getByRole("menuitem").first().click();
@@ -34,7 +34,7 @@ test("an inventory item: ask, then remember, then offer another", async ({ page 
   await expect(bar(page)).toContainText(/Added\s+Bells\s+to Noises Off!/);
 
   await cell(page, "Crown (Prop)").locator("h3").click({ button: "right" });
-  expect(await items(page)).toEqual(["Add to Noises Off!", "Add to another production…"]);
+  expect(await items(page)).toEqual(["Add to Noises Off!", "Add to another production…", "Add to room…"]);
   await page.keyboard.press("Enter");
   await expect(bar(page)).toContainText(/Added\s+Crown \(Prop\)\s+to Noises Off!/);
 
@@ -104,6 +104,59 @@ test("grid tiles and search results have it too", async ({ page }) => {
   await page.locator("main input[type=text]").fill("map");
   await page.locator("main li", { hasText: "Map (Aged)" }).first().click({ button: "right" });
   await expect(menu(page)).toContainText("Map (Aged)");
+  await expect(menu(page).getByRole("menuitem", { name: /Add to room…/ })).toBeVisible();
+});
+
+test("Add to room…: any place, walked into if need be, with Undo", async ({ page }) => {
+  const moveBar = page.locator("[data-move-bar]");
+  const sheet = page.locator("[data-move-to-place]");
+  await open(page, "/inventory?view=list");
+  // Bells lives in Props Room A.
+  await cell(page, "Bells").locator("h3").click({ button: "right" });
+  await expect(menu(page).getByRole("menuitem", { name: /Add to room…/ })).toContainText("Now in Props Room A");
+  await menu(page).getByRole("menuitem", { name: /Add to room…/ }).click();
+  await expect(sheet).toContainText("Add Bells to…");
+  // Nothing to do until a different place is chosen.
+  await expect(sheet.getByRole("button", { name: "Move it here" })).toBeDisabled();
+
+  // Into a box two levels down: Props Room A › A › Shakespeare Box.
+  await sheet.locator('button[aria-haspopup="listbox"]').click();
+  await sheet.getByRole("combobox").fill("Shakespeare");
+  await sheet.getByRole("option", { name: /Shakespeare Box/ }).first().click();
+  await expect(sheet.locator('button[aria-haspopup="listbox"]')).toContainText("Shakespeare Box");
+  await sheet.getByRole("button", { name: "Move it here" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(moveBar).toContainText(/Moved\s+Bells\s+to Props Room A \/ A \/ Shakespeare Box/);
+
+  // It's there now, and no longer loose in the room.
+  await open(page, "/inventory?view=list&place=shake");
+  await expect(cell(page, "Bells")).toHaveCount(1);
+
+  // Undo puts it back where it was.
+  await open(page, "/inventory?view=list");
+  await cell(page, "Bells").locator("h3").click({ button: "right" });
+  await expect(menu(page).getByRole("menuitem", { name: /Add to room…/ })).toContainText("Now in");
+  await page.keyboard.press("Escape");
+  await cell(page, "Crown (Prop)").locator("h3").click({ button: "right" });
+  await menu(page).getByRole("menuitem", { name: /Add to room…/ }).click();
+  await sheet.locator('button[aria-haspopup="listbox"]').click();
+  await sheet.getByRole("combobox").fill("Loft");
+  await sheet.getByRole("option", { name: /Loft/ }).first().click();
+  await sheet.getByRole("button", { name: "Move it here" }).click();
+  await expect(moveBar).toContainText(/Moved\s+Crown \(Prop\)\s+to Loft/);
+  await moveBar.getByRole("button", { name: "Undo" }).click();
+  await expect(moveBar).toContainText(/Put\s+Crown \(Prop\)\s+back in/);
+  await open(page, "/inventory?view=list&place=loft");
+  await expect(cell(page, "Crown (Prop)")).toHaveCount(0);
+});
+
+test("Add to room… can be cancelled without moving anything", async ({ page }) => {
+  await open(page, "/inventory?view=list");
+  await cell(page, "Tea Set").locator("h3").click({ button: "right" });
+  await menu(page).getByRole("menuitem", { name: /Add to room…/ }).click();
+  await page.locator("[data-move-to-place]").getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.locator("[data-move-to-place]")).toHaveCount(0);
+  await expect(page.locator("[data-move-bar]")).toHaveCount(0);
 });
 
 test("a pull-list line: Mark pulled, then Already pulled; the quantity box keeps the browser menu", async ({ page }) => {
