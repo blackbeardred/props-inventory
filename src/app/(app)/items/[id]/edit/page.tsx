@@ -112,64 +112,102 @@ export default async function EditItemPage({
     currentPhotoUrl = signed?.signedUrl ?? null;
   }
 
+  // Where it lives, from the outermost room in: the breadcrumb under the title.
+  const placeRows = (locations ?? []) as LocationNode[];
+  const placeById = new Map(placeRows.map((place) => [place.id, place]));
+  const trail: LocationNode[] = [];
+  for (
+    let at = typedItem.location_id ? placeById.get(typedItem.location_id) : undefined, guard = 0;
+    at && guard < 50;
+    at = at.parent_location_id ? placeById.get(at.parent_location_id) : undefined, guard += 1
+  ) {
+    trail.unshift(at);
+  }
+  const tags = typedItem.auto_tags ?? [];
+
   return (
     <>
-      <PageHeading title="Edit item" intro={typedItem.name} />
-
-      {pulled.length > 0 ? (
-        <div className="mb-6 rounded-lg border border-rule bg-surface px-4 py-3">
-          <p className="font-body text-sm">
-            <span
-              aria-hidden="true"
-              className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-in-use align-[1px]"
-            />
-            <span className="text-foreground">
-              {typedItem.quantity > 1
-                ? `${pulledQuantity} of ${typedItem.quantity} pulled for `
-                : "Pulled for "}
-            </span>
-            {pulled.map((row, index) => (
-              <span key={row.id}>
-                {index > 0 ? ", " : ""}
+      {/* The item's own name is the title, and the breadcrumb says where it
+          is: what someone holding the prop wants to know first. */}
+      <div className="mb-6">
+        <nav aria-label="Where it’s kept" data-item-crumbs className="font-mono text-xs text-muted">
+          <Link href="/inventory" className="-my-3 inline-block py-3 text-accent-ink hover:underline md:my-0 md:py-0">
+            Inventory
+          </Link>
+          {trail.length ? (
+            trail.map((place) => (
+              <span key={place.id}>
+                {" › "}
                 <Link
-                  href={`/productions/${row.pull_lists!.productions!.id}`}
-                  // Taller to the thumb than it looks: padding the
-                  // negative margin takes back, so the sentence keeps its
-                  // line height.
-                  className="-my-3.5 inline-block py-3.5 text-accent hover:underline md:my-0 md:py-0"
+                  href={`/inventory?place=${place.id}`}
+                  className="-my-3 inline-block py-3 text-accent-ink hover:underline md:my-0 md:py-0"
                 >
-                  {row.pull_lists!.productions!.name}
+                  {place.name}
                 </Link>
               </span>
-            ))}
-            <span className="text-muted"> — out of storage.</span>
-          </p>
-        </div>
-      ) : null}
+            ))
+          ) : (
+            <span> › Not filed anywhere yet</span>
+          )}
+        </nav>
+        <h1 className="mt-1 font-display text-3xl leading-tight text-foreground">{typedItem.name}</h1>
 
-      {unchecked.length > 0 ? (
-        <div className="mb-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3">
-          <p className="font-body text-sm font-semibold text-danger-ink">NOT CHECKED</p>
-          <p className="mt-1 font-body text-sm text-foreground">
-            On the pull list for{" "}
-            {unchecked.map((row, index) => (
-              <span key={row.id}>
-                {index > 0 ? ", " : ""}
-                <Link
-                  href={`/productions/${row.pull_lists!.productions!.id}/checklist`}
-                  // Taller to the thumb than it looks: padding the
-                  // negative margin takes back, so the sentence keeps its
-                  // line height.
-                  className="-my-3.5 inline-block py-3.5 text-accent hover:underline md:my-0 md:py-0"
-                >
-                  {row.pull_lists!.productions!.name}
-                </Link>
+        {pulled.length || unchecked.length || twinPanel.twins.length ? (
+          <div data-item-status className="mt-3 flex flex-wrap gap-2">
+            {pulled.length ? (
+              <span className="inline-flex flex-wrap items-center gap-x-1 rounded-full border border-in-use/40 bg-in-use/10 px-3 py-1 font-body text-xs text-in-use-ink">
+                <span aria-hidden="true" className="mr-1 inline-block h-[7px] w-[7px] rounded-full bg-in-use" />
+                {typedItem.quantity > 1 ? `${pulledQuantity} of ${typedItem.quantity} pulled for` : "Pulled for"}
+                {pulled.map((row, index) => (
+                  <span key={row.id}>
+                    {index > 0 ? ", " : " "}
+                    <Link
+                      href={`/productions/${row.pull_lists!.productions!.id}`}
+                      // Taller to the thumb than it looks: padding the
+                      // negative margin takes back.
+                      className="-my-3.5 inline-block py-3.5 font-medium underline-offset-2 hover:underline md:my-0 md:py-0"
+                    >
+                      {row.pull_lists!.productions!.name}
+                    </Link>
+                  </span>
+                ))}
               </span>
-            ))}
-            , and nobody has confirmed it in the store yet.
-          </p>
-        </div>
-      ) : null}
+            ) : null}
+            {unchecked.length ? (
+              <span
+                title="On a pull list, and nobody has confirmed it in the store yet"
+                className="inline-flex flex-wrap items-center gap-x-1 rounded-full border border-danger/50 bg-danger/10 px-3 py-1 font-body text-xs font-semibold text-danger-ink"
+              >
+                NOT CHECKED
+                {unchecked.map((row, index) => (
+                  <span key={row.id} className="font-normal">
+                    {index > 0 ? ", " : " · "}
+                    <Link
+                      href={`/productions/${row.pull_lists!.productions!.id}/checklist`}
+                      className="-my-3.5 inline-block py-3.5 underline-offset-2 hover:underline md:my-0 md:py-0"
+                    >
+                      {row.pull_lists!.productions!.name}
+                    </Link>
+                  </span>
+                ))}
+              </span>
+            ) : null}
+            {twinPanel.twins.length ? (
+              <a
+                href="#twins"
+                className="-my-3 inline-flex items-center gap-1.5 py-3 md:my-0 md:py-0"
+              >
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-surface px-3 py-1 font-body text-xs text-accent-ink">
+                  <span aria-hidden="true" className="hex w-2.5 bg-honey" />
+                  {twinPanel.twins.length === 1
+                    ? `Twin of ${twinPanel.twins[0].name}`
+                    : `One of ${twinPanel.twins.length + 1} twins`}
+                </span>
+              </a>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       {notice === "twin-linked" ? (
         <div className="mb-6">
@@ -196,129 +234,131 @@ export default async function EditItemPage({
         </div>
       ) : null}
 
-      <form action={updateItem} className="max-w-lg space-y-5">
+      <form action={updateItem} data-item-form className="max-w-4xl">
         <input type="hidden" name="itemId" value={typedItem.id} />
 
-        <TextField
-          label="Name"
-          name="name"
-          defaultValue={typedItem.name}
-          required
-        />
+        {/* Two columns from md up: the photo on the left, its details on the
+            right. One column on a phone, photo first. */}
+        <div className="grid gap-6 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] md:gap-8">
+          <div>
+            <PhotoField
+              size="large"
+              removeName="removePhoto"
+              label="Photo"
+              name="photo"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              helpText="JPG, PNG, GIF or WEBP, up to 8MB."
+              existingUrl={currentPhotoUrl}
+            />
+          </div>
 
-        <PhotoField
-          label={currentPhotoUrl ? "Photo" : "Photo"}
-          name="photo"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          helpText="JPG, PNG, GIF, or WEBP — up to 8MB. Choosing a new one replaces what’s there."
-          existingUrl={currentPhotoUrl}
-        />
+          <div className="space-y-5">
+            {/* Where it's kept comes first: it's the thing most often changed. */}
+            <LocationField
+              nodes={placeRows}
+              defaultValue={typedItem.location_id ?? ""}
+              label="Kept in"
+            />
 
-        {currentPhotoUrl ? (
-          <label className="flex min-h-11 w-fit items-center gap-2 font-body text-sm text-muted md:min-h-0">
-            <input type="checkbox" name="removePhoto" />
-            Remove current photo
-          </label>
-        ) : null}
+            <TextField label="Name" name="name" defaultValue={typedItem.name} required />
 
-        <div className="grid grid-cols-2 gap-4">
-          <SelectField
-            label="Category"
-            name="category"
-            defaultValue={typedItem.category}
-          >
-            {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </SelectField>
+            <div className="grid grid-cols-2 gap-4">
+              <SelectField label="Category" name="category" defaultValue={typedItem.category}>
+                {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </SelectField>
 
-          <TextField
-            label="Quantity"
-            name="quantity"
-            type="number"
-            defaultValue={String(typedItem.quantity)}
-          />
-        </div>
+              <TextField
+                label="Quantity"
+                name="quantity"
+                type="number"
+                defaultValue={String(typedItem.quantity)}
+              />
+            </div>
 
-        <TextareaField
-          label="Description"
-          name="description"
-          rows={3}
-          defaultValue={typedItem.description ?? ""}
-        />
+            <SelectField label="Condition" name="condition" defaultValue={typedItem.condition ?? ""}>
+              <option value="">Not set</option>
+              {Object.entries(CONDITION_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </SelectField>
 
-        <div className="grid grid-cols-2 gap-4">
-          <SelectField
-            label="Condition"
-            name="condition"
-            defaultValue={typedItem.condition ?? ""}
-          >
-            <option value="">Not set</option>
-            {Object.entries(CONDITION_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </SelectField>
+            <TextareaField
+              label="Description"
+              name="description"
+              rows={3}
+              defaultValue={typedItem.description ?? ""}
+            />
 
-          <LocationField
-            nodes={(locations ?? []) as unknown as LocationNode[]}
-            defaultValue={typedItem.location_id ?? ""}
-          />
-        </div>
-
-        <div className="flex items-center gap-3">
-          <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
-          <SubmitShortcut />
+            {/* On a phone, Save stays in reach above the tab bar, to the
+                right of the thumb hexagon; from md up it sits under the form. */}
+            <div
+              data-save-bar
+              className="sticky bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-20 -mx-6 flex items-center justify-end gap-3 border-t border-rule bg-background/95 px-6 py-3 backdrop-blur md:static md:mx-0 md:justify-start md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none"
+            >
+              <SubmitShortcut />
+              <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
+            </div>
+          </div>
         </div>
       </form>
 
-      <div className="mt-8 max-w-lg border-t border-rule pt-6">
-        <h2 className="font-body text-sm font-medium text-foreground">
-          Search tags
-        </h2>
-        <p className="mt-1 font-body text-xs text-muted">
-          Generated from this item’s name, description and photo, and used
-          only to decide what a search matches — they’re never shown in the
-          items list or in search results. They’re what lets someone find
-          this by searching “wood” when nothing here says “wood”.
-        </p>
+      <div className="mt-10 grid max-w-4xl gap-4 md:grid-cols-2">
+        {twinPanel.available ? (
+          <TwinsPanel
+            itemId={typedItem.id}
+            itemName={typedItem.name}
+            twins={twinPanel.twins}
+            suggestions={twinPanel.suggestions}
+            locations={searchPlaces}
+            addAction={addTwin}
+            removeAction={removeFromTwins}
+          />
+        ) : null}
 
-        {(typedItem.auto_tags ?? []).length > 0 ? (
-          <p className="mt-3 font-body text-sm text-foreground">
-            {(typedItem.auto_tags ?? []).join(", ")}
+        {/* Folded away: useful to know, rarely needed. */}
+        <details data-search-tags className="group rounded-lg border border-rule bg-background px-4 py-3 md:self-start">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 md:min-h-0 [&::-webkit-details-marker]:hidden">
+            <span className="font-display text-lg text-foreground">Search tags</span>
+            <span className="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted">
+              <span className="truncate">{tags.length ? tags.slice(0, 4).join(", ") : "none yet"}</span>
+              <span
+                aria-hidden="true"
+                className="hex w-2.5 shrink-0 bg-honey transition-[rotate] duration-200 group-open:rotate-90 group-open:bg-foreground"
+              />
+            </span>
+          </summary>
+          <p className="mt-2 font-body text-xs text-muted">
+            Generated from this item’s name, description and photo, and used only to decide what
+            a search matches. They’re never shown in lists. They’re what lets someone find this by
+            searching “wood” when nothing here says “wood”.
           </p>
-        ) : (
-          <p className="mt-3 font-body text-sm text-muted">
-            None yet — save this item, or regenerate, to tag it.
-          </p>
-        )}
-
-        <form action={regenerateTags} className="mt-3">
-          <input type="hidden" name="itemId" value={typedItem.id} />
-          <SubmitButton pendingText="Regenerating…" variant="ghost">
-            Regenerate tags
-          </SubmitButton>
-        </form>
+          {tags.length ? (
+            <p className="mt-3 font-body text-sm text-foreground">{tags.join(", ")}</p>
+          ) : (
+            <p className="mt-3 font-body text-sm text-muted">
+              None yet — save this item, or regenerate, to tag it.
+            </p>
+          )}
+          <form action={regenerateTags} className="mt-3">
+            <input type="hidden" name="itemId" value={typedItem.id} />
+            <SubmitButton pendingText="Regenerating…" variant="ghost">
+              Regenerate tags
+            </SubmitButton>
+          </form>
+        </details>
       </div>
 
-      <ImportDataPanel data={typedItem.import_data} />
+      <div className="max-w-4xl">
+        <ImportDataPanel data={typedItem.import_data} />
+      </div>
 
-      {twinPanel.available ? (
-        <TwinsPanel
-          itemId={typedItem.id}
-          itemName={typedItem.name}
-          twins={twinPanel.twins}
-          suggestions={twinPanel.suggestions}
-          locations={searchPlaces}
-          addAction={addTwin}
-          removeAction={removeFromTwins}
-        />
-      ) : null}
-
-      <form action={deleteItem} className="mt-10 border-t border-rule pt-6">
+      <form action={deleteItem} className="mt-10 max-w-4xl border-t border-rule pt-6">
         <input type="hidden" name="itemId" value={typedItem.id} />
         {twinPanel.twins.length && twinPanel.photoCount ? (
           <p data-twin-handover className="mb-3 max-w-xl font-body text-sm text-muted">

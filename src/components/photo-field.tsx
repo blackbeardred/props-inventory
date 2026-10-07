@@ -30,6 +30,8 @@ export function PhotoField({
   helpText,
   existingUrl,
   acceptHandoff = false,
+  size = "compact",
+  removeName,
 }: {
   label: string;
   name: string;
@@ -42,6 +44,13 @@ export function PhotoField({
    * new prop", so the form opens with it already in place.
    */
   acceptHandoff?: boolean;
+  /**
+   * "large": the photo fills its column, with Replace and Remove as buttons
+   * under it (the item page). "compact" is the add-item form's thumbnail.
+   */
+  size?: "compact" | "large";
+  /** With an existing photo, a "Remove" toggle posting this checkbox name. */
+  removeName?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -57,6 +66,7 @@ export function PhotoField({
   const [cropping, setCropping] = useState(false);
   const [cropped, setCropped] = useState(false);
   const [cropRefused, setCropRefused] = useState(false);
+  const [removing, setRemoving] = useState(false);
   // Cropping rewrites the input's FileList, which needs DataTransfer. If a
   // browser won't allow that, the field still works — it just uploads the
   // photo as taken, rather than pretending to crop and silently not. Read
@@ -285,6 +295,92 @@ export function PhotoField({
       {/* Always mounted, only hidden: applyCrop writes the cropped file back
           into this input, which means it has to still exist while the cropper
           is open. Unmounting it here left the crop button doing nothing. */}
+      {size === "large" ? (
+        <div className={cropping ? "hidden" : "space-y-3"} data-photo-large>
+          {/* The picture itself opens the file picker, as on the compact one. */}
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            aria-label={shown ? "Choose a different photo" : "Choose a photo"}
+            className="block w-full rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            {shown ? (
+              // eslint-disable-next-line @next/next/no-img-element -- blob or signed URL
+              <img
+                src={shown}
+                alt=""
+                className={`aspect-square w-full rounded-lg border border-rule object-cover transition-opacity hover:opacity-90 ${
+                  removing && !previewUrl ? "opacity-30" : ""
+                }`}
+              />
+            ) : (
+              <span className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-rule transition-colors hover:border-accent/50 hover:bg-accent-soft/10">
+                <span className="px-3 text-center font-body text-sm text-muted">
+                  No photo yet
+                  <span className="mt-1 block text-accent-ink">Choose a file</span>
+                </span>
+              </span>
+            )}
+          </button>
+
+          <input
+            ref={inputRef}
+            type="file"
+            name={name}
+            accept={accept}
+            onChange={(event) => {
+              setRemoving(false);
+              onFile(event.target.files?.[0]);
+            }}
+            className="sr-only"
+            tabIndex={-1}
+          />
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-rule bg-background px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface md:min-h-0"
+            >
+              {shown ? "Replace photo" : "Choose a photo"}
+            </button>
+            {sourceUrl && canCrop ? (
+              <button
+                type="button"
+                onClick={() => setCropping(true)}
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-rule bg-background px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface md:min-h-0"
+              >
+                {cropped ? "Crop again" : "Crop"}
+              </button>
+            ) : null}
+            {existingUrl && removeName && !previewUrl ? (
+              // A checkbox underneath, so the form still posts it; the label
+              // is what looks and acts like the button.
+              <label
+                className={`inline-flex min-h-11 cursor-pointer items-center justify-center rounded-md border px-4 py-2 font-body text-sm font-medium transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent md:min-h-0 ${
+                  removing
+                    ? "border-danger/50 bg-danger/10 text-danger-ink"
+                    : "border-rule bg-background text-foreground hover:bg-surface"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  name={removeName}
+                  checked={removing}
+                  onChange={(event) => setRemoving(event.target.checked)}
+                  className="sr-only"
+                />
+                {removing ? "Removed when you save · keep it" : "Remove"}
+              </label>
+            ) : null}
+          </div>
+
+          {cropped ? (
+            <p className="font-body text-xs text-success-ink">Cropped — this is what will be saved.</p>
+          ) : null}
+          {helpText ? <p className="font-body text-xs text-muted">{helpText}</p> : null}
+        </div>
+      ) : (
       <div className={cropping ? "hidden" : "flex flex-wrap items-start gap-4"}>
           {/* The picture itself opens the file picker — the placeholder is the
               biggest, most obvious target on the field, and it would be odd
@@ -343,6 +439,7 @@ export function PhotoField({
             ) : null}
           </div>
       </div>
+      )}
     </div>
   );
 }

@@ -41,11 +41,11 @@ export function TwinsPanel({
   const twinIds = new Set(twins.map((twin) => twin.id));
 
   return (
-    <section id="twins" data-twins className="mt-10 max-w-xl border-t border-rule pt-6">
+    <section id="twins" data-twins className="scroll-mt-24 rounded-lg border border-rule bg-background px-4 py-3">
       <h2 className="font-display text-lg text-foreground">Twins</h2>
       <p className="mt-1 font-body text-sm text-muted">
-        Own more than one of this, all looking the same? Link them as twins. A photo of one
-        finds them all, and a photo of the prop table marks whichever one isn’t in use.
+        Own more than one of this, all looking the same? Link them as twins: a photo of one
+        finds them all, and a prop-table photo marks whichever isn’t in use.
       </p>
 
       {twins.length ? (
