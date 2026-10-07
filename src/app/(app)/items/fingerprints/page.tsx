@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { PageHeading } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { FingerprintRunner } from "./fingerprint-runner";
+import { RecognitionCheck } from "./recognition-check";
 
 export const metadata: Metadata = { title: "Photo fingerprints · Props & Costume Inventory" };
 
@@ -28,7 +29,10 @@ export default async function FingerprintsPage() {
         intro="So a photograph of the prop table can recognise the things you already own, rather than guessing from their names."
       />
       {orgId ? (
-        <FingerprintRunner orgId={orgId} />
+        <>
+          <FingerprintRunner orgId={orgId} />
+          <RecognitionCheck />
+        </>
       ) : (
         <p className="font-body text-sm text-foreground/70">
           You&rsquo;re not in an organization yet.

@@ -19,7 +19,8 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { Notice } from "@/components/ui";
 import type { LoadProgress } from "@/lib/embedding";
-import { embedImage, loadEmbedder } from "@/lib/embedding";
+import { loadEmbedder } from "@/lib/embedding";
+import { embedImageRobust } from "@/lib/robust-embedding";
 import { optIn } from "@/lib/fingerprint-device";
 import { describeSimilarity, matchEmbedding, type Lookalike } from "@/lib/fingerprints";
 import { keepReferencePhoto, whoAmI } from "@/lib/reference-photos";
@@ -65,7 +66,9 @@ export function LookalikeSearch() {
       // now on as well.
       optIn();
       await loadEmbedder(setLoad);
-      const embedding = await embedImage(file);
+      // Read three ways and averaged, so the framing doesn't decide the
+      // match. The recognition check measures this against a single reading.
+      const embedding = await embedImageRobust(file);
       searched.current = { file, embedding };
       setMatches(await matchEmbedding(embedding, 5));
     } catch (problem) {
