@@ -80,6 +80,9 @@ export const DB: Record<string, Row[]> = new Proxy({} as Record<string, Row[]>, 
  *                 10 days ago, one 40 days ago (past its 30, due a purge)
  *   pictures=1    the second brass candlestick (it6) has two extra pictures
  *   twins=1       the two brass candlesticks (it5, it6) are twins
+ *   copies=1      five more Silver Trays (it12 is in Props Room A): one
+ *                 more loose in Props Room A, two in the Loft (one out on
+ *                 Noises Off!), one in the Shakespeare Box, one on shelf B
  */
 export function resetFixtures(options?: URLSearchParams): void {
   const db = seed();
@@ -105,6 +108,25 @@ export function resetFixtures(options?: URLSearchParams): void {
     db.item_twins.push(
       { item_id: "it5", org_id: "org1", twin_set: "set-candles", created_at: now },
       { item_id: "it6", org_id: "org1", twin_set: "set-candles", created_at: now }
+    );
+  }
+  if (options?.get("copies") === "1") {
+    // Identical items: two in the Loft (a room with nothing inside, so they
+    // show as "Silver Tray (2)"); the rest apart, or loose in a room that
+    // has boxes, so they don't (src/lib/item-copies.ts).
+    const tray = (id: string, name: string, location_id: string, condition: string | null, day: string) => ({
+      id, org_id: "org1", name, category: "prop", description: id === "it-tray4" ? "Dented on one corner." : null,
+      photo_url: null, quantity: 1, condition, location_id, created_at: `2026-09-${day}T10:00:00Z`, auto_tags: [], import_data: {},
+    });
+    db.items.push(
+      tray("it-tray2", "Silver Tray", "roomA", "good", "20"),
+      tray("it-tray3", "Silver Tray", "loft", "good", "21"),
+      tray("it-tray4", "silver  tray", "loft", "fair", "22"),
+      tray("it-tray5", "Silver Tray", "shake", null, "23"),
+      tray("it-tray6", "Silver Tray", "shelfB", null, "24"),
+    );
+    db.pull_list_items.push(
+      { id: "pli-tray", pull_list_id: "pl1", item_id: "it-tray3", quantity_needed: 1, status: "pulled", check_state: "open", checked_at: null, checked_by: null, created_at: now },
     );
   }
   store.__fixtureDB = db;

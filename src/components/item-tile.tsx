@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { ItemDetails, type ItemCellData } from "@/components/item-cell";
+import { ItemDetails, actionTarget, displayName, inUseSummary, type ItemCellData } from "@/components/item-cell";
 import { SwipeReveal } from "@/components/swipe-reveal";
 import { addToProductionMenu, requestAddToProduction } from "@/components/add-to-production";
 import { moveToPlaceMenu } from "@/components/move-to-place";
@@ -61,12 +61,15 @@ export function ItemTile({ item }: { item: ItemCellData }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const ref = useRef<HTMLLIElement>(null);
+  const name = displayName(item);
+  const target = actionTarget(item);
+  const inUse = inUseSummary(item);
   // On a phone, a swipe to the left puts it on a production's pull list.
-  const swipe = useSwipeLeft(() => requestAddToProduction({ id: item.id, name: item.name }));
+  const swipe = useSwipeLeft(() => requestAddToProduction({ id: target.id, name: target.name }));
   // …and on a computer, a right-click offers the same.
-  const context = useContextMenu(item.name, () => [
-    ...addToProductionMenu({ id: item.id, name: item.name }),
-    ...moveToPlaceMenu(item),
+  const context = useContextMenu(name, () => [
+    ...addToProductionMenu({ id: target.id, name: target.name }),
+    ...moveToPlaceMenu(target),
   ]);
 
   const place = item.locationId ? (item.locationName ?? "Unknown location") : "Unassigned";
@@ -121,6 +124,7 @@ export function ItemTile({ item }: { item: ItemCellData }) {
     <li
       ref={ref}
       data-item-tile
+      data-copies={item.copies ? item.copies.length : undefined}
       data-open={open ? "" : undefined}
       // Named only while a morph runs (see globals.css): the name is what
       // lets the browser match this tile's old box to its new one. The tile
@@ -163,7 +167,7 @@ export function ItemTile({ item }: { item: ItemCellData }) {
               // eslint-disable-next-line @next/next/no-img-element -- signed URL from a private bucket
               <img
                 src={item.photoUrl}
-                alt={open ? item.name : ""}
+                alt={open ? name : ""}
                 className="absolute inset-0 h-full w-full object-cover"
                 loading="lazy"
               />
@@ -173,22 +177,23 @@ export function ItemTile({ item }: { item: ItemCellData }) {
               </span>
             )}
 
-            {item.quantity > 1 ? (
+            {/* A stack of copies says how many in its name instead. */}
+            {item.quantity > 1 && !item.copies ? (
               <span className="absolute right-1.5 top-1.5 rounded bg-surface/90 px-1.5 py-0.5 font-body text-xs text-foreground">
                 ×{item.quantity}
               </span>
             ) : null}
 
-            {item.inUse ? (
+            {inUse ? (
               <span
-                title={`In use in ${item.inUse.productionName}`}
+                title={`In use in ${inUse.production}`}
                 className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded bg-surface/90 px-1.5 py-0.5 font-body text-xs text-foreground"
               >
                 <span
                   aria-hidden="true"
                   className="inline-block h-[7px] w-[7px] rounded-full bg-in-use"
                 />
-                In use
+                {inUse.of > 1 && item.copies ? `${inUse.out}/${inUse.of} in use` : "In use"}
               </span>
             ) : null}
           </div>
@@ -212,13 +217,13 @@ export function ItemTile({ item }: { item: ItemCellData }) {
                 aria-expanded={open}
                 aria-controls={open ? panelId : undefined}
                 onClick={toggle}
-                title={open ? `Hide details for ${item.name}` : `Show details for ${item.name}`}
+                title={open ? `Hide details for ${name}` : `Show details for ${name}`}
                 className={`hex w-3.5 cursor-pointer border-0 p-0 outline-none transition-[rotate,background-color] duration-200 ${
                   open ? "rotate-90 bg-foreground" : "bg-honey"
                 }`}
               >
                 <span className="sr-only">
-                  {open ? `Hide details for ${item.name}` : `Show details for ${item.name}`}
+                  {open ? `Hide details for ${name}` : `Show details for ${name}`}
                 </span>
               </button>
             </span>
@@ -231,7 +236,7 @@ export function ItemTile({ item }: { item: ItemCellData }) {
                     : "line-clamp-2 font-body text-sm font-medium text-foreground"
                 }
               >
-                {item.name}
+                {name}
               </h3>
               {open ? (
                 <p className="mt-0.5 font-mono text-[11px] leading-snug tracking-[0.02em] text-muted">

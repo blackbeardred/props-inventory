@@ -8,6 +8,7 @@ import { addToProductionMenu, requestAddToProduction } from "@/components/add-to
 import { moveToPlaceMenu } from "@/components/move-to-place";
 import { useContextMenu } from "@/components/context-menu";
 import { useSwipeLeft } from "@/lib/use-swipe";
+import { copiesCount } from "@/lib/item-copies";
 import {
   CATEGORY_LABELS,
   CONDITION_LABELS,
@@ -35,7 +36,35 @@ export type ItemCellData = {
     endDate: string | null;
     quantityInUse: number;
   };
+  /** Identical items in the same box, this one first, when there are two or
+   *  more (src/lib/item-copies.ts). Shown as one row: "Silver Tray (2)". */
+  copies?: ItemCellData[];
 };
+
+/** "Silver Tray (2)" for a stack of copies, the plain name otherwise. */
+export function displayName(item: ItemCellData): string {
+  return item.copies
+    ? `${item.name.trim().replace(/\s+/g, " ")} (${copiesCount(item.copies)})`
+    : item.name;
+}
+
+/** What a swipe or a right-click acts on: for a stack of copies, one that
+ *  isn't already out on a show. */
+export function actionTarget(item: ItemCellData): ItemCellData {
+  return item.copies?.find((copy) => !copy.inUse) ?? item.copies?.[0] ?? item;
+}
+
+/** How many are out on a show, of how many: across every copy. */
+export function inUseSummary(item: ItemCellData): { out: number; of: number; production: string } | null {
+  const all = item.copies ?? [item];
+  const out = all.filter((copy) => copy.inUse);
+  if (!out.length) return null;
+  return {
+    out: out.reduce((total, copy) => total + (copy.inUse?.quantityInUse ?? 1), 0),
+    of: copiesCount(all),
+    production: out[0].inUse!.productionName,
+  };
+}
 
 /**
  * One label→value pair, kept tight.
@@ -78,18 +107,21 @@ function Pair({ label, children }: { label: string; children: React.ReactNode })
 export function ItemCell({ item }: { item: ItemCellData }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  const name = displayName(item);
+  const target = actionTarget(item);
+  const inUse = inUseSummary(item);
   // On a phone, a swipe to the left puts it on a production's pull list.
-  const swipe = useSwipeLeft(() => requestAddToProduction({ id: item.id, name: item.name }));
+  const swipe = useSwipeLeft(() => requestAddToProduction({ id: target.id, name: target.name }));
   // …and on a computer, a right-click offers the same.
-  const context = useContextMenu(item.name, () => [
-    ...addToProductionMenu({ id: item.id, name: item.name }),
-    ...moveToPlaceMenu(item),
+  const context = useContextMenu(name, () => [
+    ...addToProductionMenu({ id: target.id, name: target.name }),
+    ...moveToPlaceMenu(target),
   ]);
 
   const place = item.locationId ? (item.locationName ?? "Unknown location") : "Unassigned";
 
   return (
-    <li className="relative">
+    <li className="relative" data-copies={item.copies ? item.copies.length : undefined}>
       <SwipeReveal armed={swipe.armed} offset={swipe.offset} />
       {context.menu}
       <div
@@ -123,7 +155,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
             aria-expanded={open}
             aria-controls={panelId}
             onClick={() => setOpen((current) => !current)}
-            title={open ? `Hide details for ${item.name}` : `Show details for ${item.name}`}
+            title={open ? `Hide details for ${name}` : `Show details for ${name}`}
             // `scale`, not `transform`: Tailwind v4 compiles scale-110 to the
             // standalone scale property, so a transition on transform never
             // animated it.
@@ -132,7 +164,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
             }`}
           >
             <span className="sr-only">
-              {open ? `Hide details for ${item.name}` : `Show details for ${item.name}`}
+              {open ? `Hide details for ${name}` : `Show details for ${name}`}
             </span>
           </button>
         </span>
@@ -150,7 +182,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
             // eslint-disable-next-line @next/next/no-img-element -- signed URL from a private bucket
             <img
               src={item.photoUrl}
-              alt={open ? item.name : ""}
+              alt={open ? name : ""}
               loading="lazy"
               data-cell-photo
               className={`aspect-square shrink-0 rounded object-cover transition-[width,border-radius] duration-300 ease-out motion-reduce:transition-none ${
@@ -165,7 +197,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
                 should open the card rather than leave the list. Editing is
                 one line down, inside it. */}
             <h3 className="font-display text-[17px] font-semibold leading-tight text-foreground">
-              {item.name}
+              {name}
             </h3>
 
             {/* Quiet on purpose. This is a caption under the name, not a second
@@ -181,15 +213,13 @@ export function ItemCell({ item }: { item: ItemCellData }) {
             ) : null}
           </div>
 
-          {item.inUse ? (
+          {inUse ? (
             <span
-              title={`In use in ${item.inUse.productionName}`}
+              title={`In use in ${inUse.production}`}
               className="mt-0.5 flex shrink-0 items-center gap-1.5 font-mono text-[10px] text-in-use-ink"
             >
               <span aria-hidden="true" className="hex inline-block w-[9px] bg-in-use" />
-              {item.quantity > 1
-                ? `${item.inUse.quantityInUse}/${item.quantity} in use`
-                : "in use"}
+              {inUse.of > 1 ? `${inUse.out}/${inUse.of} in use` : "in use"}
             </span>
           ) : null}
         </div>
@@ -217,6 +247,7 @@ export function ItemCell({ item }: { item: ItemCellData }) {
  * views can't drift apart.
  */
 export function ItemDetails({ item }: { item: ItemCellData }) {
+  if (item.copies) return <CopiesDetails item={item} copies={item.copies} />;
   const condition = item.condition;
   return (
     <>
@@ -302,6 +333,90 @@ export function ItemDetails({ item }: { item: ItemCellData }) {
           className="inline-flex min-h-11 cursor-pointer items-center font-mono text-[11px] text-accent underline-offset-2 hover:underline"
         >
           Add to a production →
+        </button>
+      </p>
+    </>
+  );
+}
+
+/**
+ * Under an opened "Silver Tray (2)": where they are, then each one on its own
+ * line, because each is still its own item with its own condition, show and
+ * page.
+ */
+function CopiesDetails({ item, copies }: { item: ItemCellData; copies: ItemCellData[] }) {
+  const target = actionTarget(item);
+  return (
+    <>
+      <dl className="mt-2.5 grid grid-cols-1 gap-x-10 gap-y-1 border-t border-dashed border-rule pt-2.5 sm:grid-cols-[auto_auto] sm:justify-start">
+        <Pair label="Kept in">
+          {item.locationId ? (
+            <Link
+              href={`/inventory?place=${item.locationId}`}
+              className="-my-3.5 inline-block py-3.5 text-accent-ink underline-offset-2 hover:underline"
+            >
+              {item.locationName ?? "Unknown location"}
+            </Link>
+          ) : (
+            <span className="font-normal text-muted">Unassigned</span>
+          )}
+        </Pair>
+        <Pair label="Category">
+          <Badge tone={item.category === "costume" ? "accent" : "neutral"}>
+            {CATEGORY_LABELS[item.category] ?? item.category}
+          </Badge>
+        </Pair>
+      </dl>
+
+      <ol data-copy-list className="mt-2.5 divide-y divide-dashed divide-rule border-t border-dashed border-rule">
+        {copies.map((copy, index) => (
+          <li key={copy.id} data-copy className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2">
+            <span className="font-mono text-[11px] text-muted">{index + 1}</span>
+            <span className="min-w-0 flex-1 font-body text-[13px] text-foreground">
+              {copy.condition ? (
+                <Badge tone={CONDITION_TONE[copy.condition] ?? "muted"}>
+                  {CONDITION_LABELS[copy.condition] ?? copy.condition}
+                </Badge>
+              ) : (
+                <span className="text-muted">Condition not recorded</span>
+              )}
+              {copy.quantity > 1 ? <span className="ml-2 font-semibold">×{copy.quantity}</span> : null}
+              {copy.inUse ? (
+                <>
+                  {" "}
+                  <span className="ml-1 text-in-use-ink">
+                    in use in{" "}
+                    <Link
+                      href={`/productions/${copy.inUse.productionId}`}
+                      className="underline-offset-2 hover:underline"
+                    >
+                      {copy.inUse.productionName}
+                    </Link>
+                  </span>
+                </>
+              ) : null}
+              <span className="ml-2 font-mono text-[11px] text-muted">added {formatDate(copy.createdAt)}</span>
+              {copy.description ? (
+                <span className="mt-0.5 block text-[12px] text-muted">{copy.description}</span>
+              ) : null}
+            </span>
+            <Link
+              href={`/items/${copy.id}/edit`}
+              className="inline-flex min-h-11 items-center font-mono text-[11px] text-accent underline-offset-2 hover:underline md:min-h-0"
+            >
+              Edit →
+            </Link>
+          </li>
+        ))}
+      </ol>
+
+      <p className="mt-1 flex flex-wrap gap-x-5">
+        <button
+          type="button"
+          onClick={() => requestAddToProduction({ id: target.id, name: target.name })}
+          className="inline-flex min-h-11 cursor-pointer items-center font-mono text-[11px] text-accent underline-offset-2 hover:underline"
+        >
+          Add one to a production →
         </button>
       </p>
     </>

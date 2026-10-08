@@ -10,6 +10,7 @@ import { pluralize, type ItemRow } from "@/lib/inventory";
 import { PHOTOS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
 import { ItemTile, ViewTab } from "@/components/item-tile";
 import { ItemCell, type ItemCellData } from "@/components/item-cell";
+import { groupCopies } from "@/lib/item-copies";
 import { locationPaths, type LocationNode } from "@/lib/locations";
 import { SearchBar } from "../search/search-bar";
 import { AddToProduction } from "@/components/add-to-production";
@@ -318,6 +319,19 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     }
   }
 
+  // Identical items in the same box are one row, "Silver Tray (2)"
+  // (src/lib/item-copies.ts). Display only: each keeps its own record.
+  const rows: ItemCellData[] = groupCopies(items, locations).map((group) => {
+    const cells = group.map((item) =>
+      toCellData(item, inUseByItem.get(item.id), photoUrlByPath, pathById)
+    );
+    if (cells.length === 1) return cells[0];
+    // Oldest first, so the numbering stays put as more are added, and the
+    // row takes the oldest one's spelling of the name.
+    cells.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+    return { ...cells[0], copies: cells };
+  });
+
   const here = place?.id ?? null;
 
   // The last tile in the row: add a place right where you're standing.
@@ -430,11 +444,8 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
            an opened tile taking a whole row doesn't leave a hole in the row
            it came from: the tiles after it close the gap. */
         <ul className="grid grid-flow-row-dense grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-          {items.map((item) => (
-            <ItemTile
-              key={item.id}
-              item={toCellData(item, inUseByItem.get(item.id), photoUrlByPath, pathById)}
-            />
+          {rows.map((row) => (
+            <ItemTile key={row.id} item={row} />
           ))}
         </ul>
       ) : (
@@ -443,11 +454,8 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
            so is the 12px pulled back on the left, which lets the list clip
            sideways — a card swiped off the side would otherwise widen the page. */
         <ul className="-ml-3 grid items-start gap-x-6 gap-y-2.5 overflow-x-clip pl-3 lg:grid-cols-2 2xl:grid-cols-3">
-          {items.map((item) => (
-            <ItemCell
-              key={item.id}
-              item={toCellData(item, inUseByItem.get(item.id), photoUrlByPath, pathById)}
-            />
+          {rows.map((row) => (
+            <ItemCell key={row.id} item={row} />
           ))}
         </ul>
       )}
