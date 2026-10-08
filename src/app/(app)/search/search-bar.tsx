@@ -18,7 +18,7 @@ import { describeMatch } from "@/lib/search-reason";
 import { useSwipeLeft } from "@/lib/use-swipe";
 import { SwipeReveal } from "@/components/swipe-reveal";
 import { addToProductionMenu, requestAddToProduction } from "@/components/add-to-production";
-import { moveToPlaceMenu } from "@/components/move-to-place";
+import { moveToPlaceMenu, requestMoveToPlace } from "@/components/move-to-place";
 import { useContextMenu } from "@/components/context-menu";
 import { searchItemsLive, type SearchResultItem } from "./actions";
 
@@ -119,7 +119,13 @@ function ResultRow({
 }) {
   const swipe = useSwipeLeft(
     () => requestAddToProduction({ id: item.id, name: item.name }),
-    { enabled: swipeable, startOnControls: true }
+    {
+      enabled: swipeable,
+      startOnControls: true,
+      // …and to the right, "Add to room…", as on the Inventory list.
+      onCommitRight: () =>
+        requestMoveToPlace({ id: item.id, name: item.name, locationId: item.location_id }),
+    }
   );
   const context = useContextMenu(item.name, () =>
     swipeable
@@ -136,7 +142,13 @@ function ResultRow({
   );
   return (
     <li className="relative overflow-hidden border-b border-rule last:border-b-0">
-      <SwipeReveal armed={swipe.armed} offset={swipe.offset} rounded={false} />
+      <SwipeReveal
+        armed={swipe.armed}
+        armedRight={swipe.armedRight}
+        offset={swipe.offset}
+        place={item.location_id ? (item.locationName ?? "a place") : null}
+        rounded={false}
+      />
       {context.menu}
       <button
         type="button"

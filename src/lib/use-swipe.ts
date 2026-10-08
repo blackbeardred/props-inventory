@@ -5,6 +5,10 @@ import type { TouchEvent } from "react";
 export const SWIPE_THRESHOLD = 110;
 /** Movement under this is a tap or a wobble, not a swipe. */
 const SLOP = 12;
+/** A rightward swipe begun this close to the left edge of the screen is the
+ *  phone's own "back" gesture (Safari on iPhone, Android's edge swipe), so
+ *  the row leaves it alone rather than moving under it. */
+export const BACK_GESTURE_EDGE = 24;
 
 function startedOnAControl(target: EventTarget | null): boolean {
   return Boolean(
@@ -25,14 +29,21 @@ function startedOnAControl(target: EventTarget | null): boolean {
  *
  * Put `touch-action: pan-y` on the element that takes the handlers: the browser
  * keeps vertical scrolling and hands horizontal movement to the row.
+ *
+ * Inventory items also take a rightward swipe (`onCommitRight`): "Add to
+ * room…". Only those rows opt in; everywhere else a swipe right does nothing.
  */
 export function useSwipeLeft(
   onCommit: () => void,
   {
     enabled = true,
     startOnControls = false,
+    onCommitRight,
   }: {
     enabled?: boolean;
+    /** What a swipe to the right does, for a row that has a second action.
+     *  Left out, the row only moves left. */
+    onCommitRight?: () => void;
     /** For a row that is itself a button: let the swipe start on it, and use
      *  justSwiped() in its onClick. */
     startOnControls?: boolean;
@@ -40,7 +51,7 @@ export function useSwipeLeft(
 ) {
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const gesture = useRef<{ x: number; y: number; swiping: boolean } | null>(null);
+  const gesture = useRef<{ x: number; y: number; swiping: boolean; right: boolean } | null>(null);
   const travelled = useRef(0);
   const swipedAt = useRef(0);
 
@@ -51,7 +62,7 @@ export function useSwipeLeft(
     // user asked for a swipe begun at the side to count. (Leftward also stays
     // clear of the iPhone's own back gesture, which starts at the left edge.)
     const touch = event.touches[0];
-    gesture.current = { x: touch.clientX, y: touch.clientY, swiping: false };
+    gesture.current = { x: touch.clientX, y: touch.clientY, swiping: false, right: false };
   }
 
   function onTouchMove(event: TouchEvent) {
@@ -67,17 +78,26 @@ export function useSwipeLeft(
         return;
       }
       if (Math.abs(dx) < SLOP || Math.abs(dx) <= Math.abs(dy)) return;
+      if (dx > 0 && (!onCommitRight || start.x < BACK_GESTURE_EDGE)) {
+        // Rightward: either this row has nothing to do that way, or it's
+        // the phone's back gesture. Either way it isn't the row's.
+        gesture.current = null;
+        return;
+      }
       start.swiping = true;
+      start.right = dx > 0;
       setDragging(true);
     }
 
-    const distance = Math.max(0, -dx);
+    // The direction is settled once the swipe starts: dragging back past
+    // where it began springs to rest rather than flipping to the other side.
+    const distance = Math.max(0, start.right ? dx : -dx);
     const eased =
       distance > SWIPE_THRESHOLD
         ? SWIPE_THRESHOLD + (distance - SWIPE_THRESHOLD) * 0.35
         : distance;
     travelled.current = eased;
-    setOffset(-eased);
+    setOffset(start.right ? eased : -eased);
   }
 
   function finish(allowCommit: boolean) {
@@ -89,7 +109,7 @@ export function useSwipeLeft(
     travelled.current = 0;
     setDragging(false);
     setOffset(0);
-    if (commit) onCommit();
+    if (commit) (start.right ? onCommitRight : onCommit)?.();
   }
 
   return {
@@ -97,6 +117,8 @@ export function useSwipeLeft(
     dragging,
     /** Far enough that letting go now will do it. */
     armed: -offset >= SWIPE_THRESHOLD,
+    /** The same, for a swipe to the right. */
+    armedRight: offset >= SWIPE_THRESHOLD,
     /** True just after a swipe, so the click some browsers still send at the
      *  end of one doesn't also open or close the card. */
     justSwiped: () => Date.now() - swipedAt.current < 400,

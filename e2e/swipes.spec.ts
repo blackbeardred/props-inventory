@@ -2,11 +2,12 @@ import { test, expect, PHONE, DESKTOP, open, swipe, LIST_CELLS } from "./helpers
 import path from "node:path";
 import type { Page } from "@playwright/test";
 
-// Every swipe goes left and does the row's "yes": an inventory item onto a
-// production's pull list (ask once, then remember), a pull-list line to
-// "Pulled", a checklist line to "Checked", a photo-review row to "Add to
-// inventory". Nothing is removed or cleared by a swipe, and a rightward drag
-// does nothing anywhere.
+// A swipe left does the row's "yes": an inventory item onto a production's
+// pull list (ask once, then remember), a pull-list line to "Pulled", a
+// checklist line to "Checked", a photo-review row to "Add to inventory".
+// Inventory items (list, grid and search results) also swipe right, to "Add
+// to room…"; everywhere else a rightward drag does nothing. Nothing is
+// removed or cleared by a swipe.
 
 const cell = (page: Page, name: string) =>
   page.locator(LIST_CELLS, { has: page.locator("h3", { hasText: new RegExp(`^${name.replace(/[()]/g, "\\$&")}$`) }) });
@@ -65,11 +66,11 @@ test.describe("inventory (phone)", () => {
     await expect(bar(page)).toBeHidden({ timeout: 9_000 });
   });
 
-  test("short, vertical and rightward drags do nothing; taps still open the card", async ({ page }) => {
+  test("short and vertical drags do nothing; taps still open the card", async ({ page }) => {
     await open(page, "/inventory?view=list");
     await swipe(page, cell(page, "Tea Set"), -60);
     await swipe(page, cell(page, "Silver Tray"), -30, { dy: -200 });
-    await swipe(page, cell(page, "Pewter tankard"), 160);
+    await swipe(page, cell(page, "Pewter tankard"), 60, { fromX: 120 });
     await page.waitForTimeout(500);
     await expect(bar(page)).toBeHidden();
     await expect(sheet(page)).toBeHidden();
@@ -108,6 +109,74 @@ test.describe("inventory (phone)", () => {
     await open(page, "/productions/prod1");
     await expect(page.locator("[data-pull-row]", { hasText: "Oil Lantern" })).toHaveCount(1);
     await expect(page.locator("[data-pull-row]", { hasText: "Map (Aged)" })).toHaveCount(1);
+  });
+});
+
+test.describe("Add to room, by swiping right (phone)", () => {
+  test.use(PHONE);
+  const moveSheet = (page: Page) => page.locator("[data-move-to-place]");
+  const moveBar = (page: Page) => page.locator("[data-move-bar]");
+  const roomStrip = (page: Page) => page.locator("[data-swipe-reveal-room]");
+
+  test("a right swipe on a card opens Add to room…, and the strip says where it is now", async ({ page }) => {
+    await open(page, "/inventory?view=list");
+    // Pewter tankard is in Costume Storage.
+    await swipe(page, cell(page, "Pewter tankard"), 160, {
+      fromX: 60,
+      during: async () => {
+        await expect(roomStrip(page)).toContainText("Add to room…");
+        await expect(roomStrip(page)).toContainText("Now in Costume Storage");
+      },
+    });
+    await expect(moveSheet(page)).toContainText("Add Pewter tankard to…");
+    // It didn't also go on a production, or open the card.
+    await expect(bar(page)).toBeHidden();
+    await expect(cell(page, "Pewter tankard").locator("[data-cell-button]")).toHaveAttribute("aria-expanded", "false");
+
+    await moveSheet(page).locator('button[aria-haspopup="listbox"]').click();
+    await moveSheet(page).getByRole("combobox").fill("Loft");
+    await moveSheet(page).getByRole("option", { name: /Loft/ }).first().click();
+    await moveSheet(page).getByRole("button", { name: "Move it here" }).click();
+    await expect(moveBar(page)).toContainText(/Moved\s+Pewter tankard\s+to Loft/);
+    await open(page, "/inventory?view=list&place=loft");
+    await expect(cell(page, "Pewter tankard")).toHaveCount(1);
+  });
+
+  test("an item not filed anywhere says so on the strip", async ({ page }) => {
+    await open(page, "/inventory?view=list");
+    // Yorick's skull is unassigned.
+    await swipe(page, cell(page, "Yorick's skull"), 160, {
+      fromX: 60,
+      during: async () => {
+        await expect(roomStrip(page)).toContainText("Not filed yet");
+      },
+    });
+    await expect(moveSheet(page)).toContainText("Add Yorick's skull to…");
+  });
+
+  test("a short right drag springs back; one begun at the screen's edge is left to the phone", async ({ page }) => {
+    await open(page, "/inventory?view=list");
+    await swipe(page, cell(page, "Tea Set"), 60, { fromX: 80 });
+    // The left edge is the phone's own back gesture.
+    await swipe(page, cell(page, "Tea Set"), 170, { fromX: 8 });
+    await page.waitForTimeout(400);
+    await expect(moveSheet(page)).toHaveCount(0);
+    await expect(bar(page)).toBeHidden();
+  });
+
+  test("grid tiles and search results swipe right too", async ({ page }) => {
+    await open(page, "/inventory?view=grid");
+    await swipe(page, page.locator("[data-item-tile]", { hasText: "Oil Lantern" }), 150, { fromX: 40 });
+    await expect(moveSheet(page)).toContainText("Add Oil Lantern to…");
+    await moveSheet(page).getByRole("button", { name: "Cancel" }).click();
+    await expect(moveSheet(page)).toHaveCount(0);
+    await expect(page.locator("[data-item-tile][data-open]")).toHaveCount(0);
+
+    await page.locator("main input[type=text]").fill("map");
+    await page.locator("main input[type=text]").press("Enter");
+    await expect(page.locator("main li", { hasText: "Map (Aged)" }).first()).toBeVisible();
+    await swipe(page, page.locator("main li", { hasText: "Map (Aged)" }).first(), 150, { fromX: 60 });
+    await expect(moveSheet(page)).toContainText("Add Map (Aged) to…");
   });
 });
 

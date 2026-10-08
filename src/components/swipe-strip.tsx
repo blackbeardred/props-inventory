@@ -1,11 +1,11 @@
 /**
  * The strip a row uncovers as it's swiped left: what letting go will do.
  *
- * Every swipe in the app goes the same way and means the same kind of thing:
- * left, to do the row's "yes" (add it to a production, mark it pulled, mark
- * it checked, add it to the inventory). Nothing is removed or cleared by a
- * swipe; those stay on buttons and the right-click menu, where a slip of the
- * thumb can't do them. So every strip looks alike too: a green tint that
+ * Every swipe left means the same kind of thing: the row's "yes" (add it to
+ * a production, mark it pulled, mark it checked, add it to the inventory).
+ * Inventory items also swipe right, to "Add to room…". Nothing is removed or
+ * cleared by a swipe; those stay on buttons and the right-click menu, where a
+ * slip of the thumb can't do them. So every strip looks alike too: a green tint that
  * fills in once letting go will act, and grey with "Already …" when there's
  * nothing left to do. (Inventory cards draw their own, SwipeReveal, because
  * theirs names the production the item will go to.)

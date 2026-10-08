@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { SwipeReveal } from "@/components/swipe-reveal";
 import { addToProductionMenu, requestAddToProduction } from "@/components/add-to-production";
-import { moveToPlaceMenu } from "@/components/move-to-place";
+import { moveToPlaceMenu, requestMoveToPlace } from "@/components/move-to-place";
 import { useContextMenu } from "@/components/context-menu";
 import { useSwipeLeft } from "@/lib/use-swipe";
 import { copiesCount } from "@/lib/item-copies";
@@ -111,7 +111,10 @@ export function ItemCell({ item }: { item: ItemCellData }) {
   const target = actionTarget(item);
   const inUse = inUseSummary(item);
   // On a phone, a swipe to the left puts it on a production's pull list.
-  const swipe = useSwipeLeft(() => requestAddToProduction({ id: target.id, name: target.name }));
+  const swipe = useSwipeLeft(() => requestAddToProduction({ id: target.id, name: target.name }), {
+    // …and a swipe to the right files it somewhere.
+    onCommitRight: () => requestMoveToPlace(target),
+  });
   // …and on a computer, a right-click offers the same.
   const context = useContextMenu(name, () => [
     ...addToProductionMenu({ id: target.id, name: target.name }),
@@ -122,7 +125,12 @@ export function ItemCell({ item }: { item: ItemCellData }) {
 
   return (
     <li className="relative" data-copies={item.copies ? item.copies.length : undefined}>
-      <SwipeReveal armed={swipe.armed} offset={swipe.offset} />
+      <SwipeReveal
+        armed={swipe.armed}
+        armedRight={swipe.armedRight}
+        offset={swipe.offset}
+        place={target.locationId ? (target.locationName ?? "a place") : null}
+      />
       {context.menu}
       <div
         {...swipe.handlers}
