@@ -193,32 +193,37 @@ test.describe("grid", () => {
   }
 });
 
-test.describe("grid tiles open like list cells", () => {
-  async function geometry(page: import("@playwright/test").Page) {
+test.describe("grid tiles open beneath their row", () => {
+  // Every tile's place on screen, by id.
+  async function places(page: import("@playwright/test").Page) {
+    return page.$$eval("[data-item-tile]", (els) =>
+      Object.fromEntries(
+        els.map((li) => {
+          const r = li.getBoundingClientRect();
+          return [li.getAttribute("data-id")!, { x: Math.round(r.left), y: Math.round(r.top + scrollY), w: Math.round(r.width) }];
+        })
+      )
+    );
+  }
+  async function panel(page: import("@playwright/test").Page) {
     return page.evaluate(() => {
-      const ul = document.querySelector("[data-item-tile]")!.parentElement!.getBoundingClientRect();
-      const opened = document.querySelector("[data-item-tile][data-open]");
-      if (!opened) return null;
-      const r = opened.getBoundingClientRect();
-      const ph = opened.querySelector("[data-tile-photo]")?.getBoundingClientRect();
-      const h3 = opened.querySelector("h3")!.getBoundingClientRect();
-      const dl = opened.querySelector("dl")?.getBoundingClientRect();
-      // Rows of the closed tiles, by top, within 2px.
-      const rows: { top: number; n: number }[] = [];
-      for (const t of document.querySelectorAll("[data-item-tile]:not([data-open])")) {
-        const top = t.getBoundingClientRect().top + scrollY;
-        const row = rows.find((x) => Math.abs(x.top - top) <= 2);
-        if (row) row.n++;
-        else rows.push({ top, n: 1 });
-      }
-      rows.sort((a, b) => a.top - b.top);
+      const ul = document.querySelector("[data-item-grid]")!.getBoundingClientRect();
+      const p = document.querySelector("[data-tile-panel]");
+      if (!p) return null;
+      const r = p.getBoundingClientRect();
+      const ph = p.querySelector("[data-tile-photo]")?.getBoundingClientRect();
+      const h3 = p.querySelector("h3")!.getBoundingClientRect();
+      const dl = p.querySelector("dl")?.getBoundingClientRect();
+      const notch = p.querySelector("[data-tile-notch]")!.getBoundingClientRect();
       return {
         gridWidth: ul.width,
+        left: r.left - ul.left,
         width: r.width,
+        top: r.top + scrollY,
         photo: ph ? { w: Math.round(ph.width), h: Math.round(ph.height), right: ph.right, bottom: ph.bottom } : null,
         nameTop: h3.top,
         dlLeft: dl?.left ?? 0,
-        rows: rows.map((x) => x.n),
+        notchX: notch.left + notch.width / 2,
       };
     });
   }
@@ -226,74 +231,110 @@ test.describe("grid tiles open like list cells", () => {
   test.describe("phone", () => {
     test.use(PHONE);
 
-    test("a tile opens across the grid, photo full width, details beneath, no holes", async ({ page }) => {
+    test("opening a right-hand tile moves nothing sideways and pulls nothing up", async ({ page }) => {
       await open(page, "/inventory?view=grid");
+      const before = await places(page);
+      const ids = await page.$$eval("[data-item-tile]", (els) => els.map((li) => li.getAttribute("data-id")!));
+      // Tile 3 is on the right of the second row; tile 4 starts the third.
       const tile = page.locator("[data-item-tile]").nth(3);
       await tile.locator("h3").tap();
       await page.waitForTimeout(600);
-      const g = (await geometry(page))!;
+      const after = await places(page);
+      // The opened tile, its row-mate and everything above stay put.
+      for (const id of ids.slice(0, 4)) expect(after[id], id).toEqual(before[id]);
+      // Everything after keeps its column and moves straight down, by the
+      // same distance: nothing jumps up into the opened tile's place.
+      const drop = after[ids[4]].y - before[ids[4]].y;
+      expect(drop).toBeGreaterThan(200);
+      for (const id of ids.slice(4)) {
+        expect(after[id].x, id).toBe(before[id].x);
+        expect(after[id].y - before[id].y, id).toBe(drop);
+      }
+      // The details sit across the grid, between the rows, photo full width.
+      const g = (await panel(page))!;
       expect(Math.abs(g.width - g.gridWidth)).toBeLessThan(1);
+      expect(g.top).toBeGreaterThan(before[ids[3]].y);
+      expect(g.top).toBeLessThan(after[ids[4]].y);
       expect(Math.abs(g.photo!.w - g.width)).toBeLessThan(3);
       expect(g.photo!.w).toBe(g.photo!.h);
       expect(g.nameTop).toBeGreaterThanOrEqual(g.photo!.bottom);
-      expect(g.rows.slice(0, -1).every((n) => n === 2), `rows ${g.rows}`).toBe(true);
-      await expect(tile.getByRole("link", { name: /Edit this item/ })).toHaveCount(1);
+      // The notch points at the right-hand column.
+      const tileBox = (await tile.boundingBox())!;
+      expect(Math.abs(g.notchX - (tileBox.x + tileBox.width / 2))).toBeLessThan(4);
+      await expect(page.locator("[data-tile-panel]").getByRole("link", { name: /Edit this item/ })).toHaveCount(1);
       await expect(tile.locator("[data-tile-button]")).toHaveAttribute("aria-expanded", "true");
-      const top = await tile.evaluate((t) => t.getBoundingClientRect().top);
-      expect(top, "scrolled into view").toBeGreaterThanOrEqual(0);
-      expect(top).toBeLessThan(844 - 300);
+      await expect(tile).toHaveAttribute("data-open", "");
       await noSidewaysScroll(page);
+
       await tile.locator("h3").tap();
+      await page.waitForTimeout(400);
+      expect(await panel(page)).toBeNull();
+      expect(await places(page)).toEqual(before);
+    });
+
+    test("a left-hand tile too: its row-mate stays beside it", async ({ page }) => {
+      await open(page, "/inventory?view=grid");
+      const before = await places(page);
+      const ids = await page.$$eval("[data-item-tile]", (els) => els.map((li) => li.getAttribute("data-id")!));
+      await page.locator("[data-item-tile]").nth(2).locator("h3").tap();
       await page.waitForTimeout(600);
-      expect(await geometry(page)).toBeNull();
+      const after = await places(page);
+      expect(after[ids[2]]).toEqual(before[ids[2]]);
+      expect(after[ids[3]]).toEqual(before[ids[3]]);
+      for (const id of ids.slice(4)) expect(after[id].x, id).toBe(before[id].x);
+    });
+
+    test("opening another closes the first; Close and Escape close it", async ({ page }) => {
+      await open(page, "/inventory?view=grid");
+      await page.locator("[data-item-tile]").nth(0).locator("h3").tap();
+      await page.locator("[data-item-tile]").nth(5).locator("h3").tap();
+      await expect(page.locator("[data-item-tile][data-open]")).toHaveCount(1);
+      await expect(page.locator("[data-item-tile]").nth(5)).toHaveAttribute("data-open", "");
+      await expect(page.locator("[data-tile-panel]")).toHaveCount(1);
+      await page.locator("[data-tile-panel]").getByRole("button", { name: "Close" }).tap();
+      await expect(page.locator("[data-tile-panel]")).toHaveCount(0);
     });
   });
 
   test.describe("desktop", () => {
     test.use({ viewport: { width: 1440, height: 900 } });
 
-    test("a 320px photo beside the details; two can be open; keyboard works", async ({ page }) => {
+    test("a 320px photo beside the details, under the row; keyboard works", async ({ page }) => {
       await open(page, "/inventory?view=grid");
       const tile = (i: number) => page.locator("[data-item-tile]").nth(i);
+      const before = await places(page);
       await tile(2).locator("h3").click();
       await page.waitForTimeout(600);
-      const g = (await geometry(page))!;
+      const g = (await panel(page))!;
       expect(Math.abs(g.width - g.gridWidth)).toBeLessThan(1);
       expect([g.photo!.w, g.photo!.h]).toEqual([320, 320]);
       expect(g.dlLeft).toBeGreaterThan(g.photo!.right);
-      expect(g.rows.slice(0, -1).every((n) => n === 5), `rows ${g.rows}`).toBe(true);
-      await tile(0).locator("h3").click();
-      await page.waitForTimeout(600);
-      await expect(page.locator("[data-item-tile][data-open]")).toHaveCount(2);
-      await tile(0).locator("[data-tile-button]").focus();
+      // The whole first row (five across) is untouched.
+      const after = await places(page);
+      const ids = Object.keys(before);
+      for (const id of ids.slice(0, 5)) expect(after[id], id).toEqual(before[id]);
+
+      await tile(2).locator("[data-tile-button]").focus();
       await page.keyboard.press("Enter");
-      await page.waitForTimeout(600);
-      await expect(tile(0)).not.toHaveAttribute("data-open", "");
+      await expect(tile(2)).not.toHaveAttribute("data-open", "");
       await page.keyboard.press(" ");
-      await page.waitForTimeout(600);
-      await expect(tile(0)).toHaveAttribute("data-open", "");
+      await expect(tile(2)).toHaveAttribute("data-open", "");
+      await page.keyboard.press("Escape");
+      await expect(page.locator("[data-tile-panel]")).toHaveCount(0);
       expect(await page.evaluate(() => document.activeElement?.hasAttribute("data-tile-button"))).toBe(true);
-      expect(await page.evaluate(() => !document.querySelector("[data-morphing], [data-morph-self]"))).toBe(true);
-      const kept = page.locator("[data-item-tile][data-open]").last().locator('dl a[href^="/inventory?place="]');
+      await page.keyboard.press("Enter");
+      const kept = page.locator('[data-tile-panel] dl a[href^="/inventory?place="]');
       await kept.click();
       await page.waitForURL(/place=/);
     });
 
-    test("no morph with reduced motion, but it still opens", async ({ browser }) => {
+    test("with reduced motion it still opens", async ({ browser }) => {
       const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
       const page = await context.newPage();
       await open(page, "/inventory?view=grid");
-      const morphs = await page.evaluate(
-        () =>
-          new Promise<number>((done) => {
-            document.querySelectorAll("[data-item-tile]")[1].querySelector("h3")!.click();
-            requestAnimationFrame(() =>
-              done(document.getAnimations().filter((a) => (a.effect as KeyframeEffect | null)?.pseudoElement?.startsWith("::view-transition")).length)
-            );
-          })
-      );
-      expect(morphs).toBe(0);
+      await page.locator("[data-item-tile]").nth(1).locator("h3").click();
       await expect(page.locator("[data-item-tile]").nth(1)).toHaveAttribute("data-open", "");
+      await expect(page.locator("[data-tile-panel] h3")).toBeVisible();
       await context.close();
     });
   });

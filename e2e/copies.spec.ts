@@ -72,7 +72,7 @@ test.describe("the grid", () => {
     await expect(tile.locator("h3")).toHaveText("Silver Tray (2)");
     await expect(tile).toContainText("1/2 in use");
     await tile.locator("h3").click();
-    await expect(tile.locator("[data-copy]")).toHaveCount(2);
+    await expect(page.locator("[data-tile-panel] [data-copy]")).toHaveCount(2);
   });
 });
 

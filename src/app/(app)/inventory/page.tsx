@@ -8,7 +8,7 @@ import { supabaseConfigured } from "@/lib/supabase/config";
 import { EmptyState, Notice, PageHeading } from "@/components/ui";
 import { pluralize, type ItemRow } from "@/lib/inventory";
 import { PHOTOS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
-import { ItemTile, ViewTab } from "@/components/item-tile";
+import { ItemGrid, ViewTab } from "@/components/item-tile";
 import { ItemCell, type ItemCellData } from "@/components/item-cell";
 import { groupCopies } from "@/lib/item-copies";
 import { locationPaths, type LocationNode } from "@/lib/locations";
@@ -440,14 +440,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
       ) : view === "grid" ? (
         /* Pictures first. Names in a props store are approximate — "the small
            urn", "the good candlestick" — so a wall of photographs is often
-           the faster way to find a thing than a column of text. Dense, so
-           an opened tile taking a whole row doesn't leave a hole in the row
-           it came from: the tiles after it close the gap. */
-        <ul className="grid grid-flow-row-dense grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-          {rows.map((row) => (
-            <ItemTile key={row.id} item={row} />
-          ))}
-        </ul>
+           the faster way to find a thing than a column of text. A tile opens
+           its details in a row beneath it, and no other tile moves. */
+        <ItemGrid items={rows} />
       ) : (
         /* One cell per item; columns from lg up (see Day 22). The column gap
            is wide enough for the hexagon, which sits half outside its card;

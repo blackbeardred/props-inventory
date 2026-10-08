@@ -168,32 +168,6 @@ body {
   background-color: color-mix(in srgb, var(--accent) 7%, var(--surface)) !important;
 }
 
-/* A grid tile opening (ItemTile). Each tile is named only while the morph
- * runs, so the browser can match its old box to its new one; the rest of the
- * page stays as it is. Names come from a custom property set on the
- * tile, because view-transition-name has to be unique per element.
- *
- * The tile being opened or shut lends its name to its photo instead. Its
- * outline changes shape (a square-ish tile, a whole-row card), and the
- * browser would stretch a snapshot of one into the other; the photo stays
- * square, so it can simply grow or shrink into place while the card's
- * text is drawn where it ends up. */
-[data-morphing] > li:not([data-morph-self]),
-[data-morph-self] [data-tile-photo] {
-  view-transition-name: var(--vt);
-}
-
-/* Only the tiles move. The rest of the page isn't snapshotted at all, so it
- * stays live instead of cross-fading a picture of itself. */
-:root[data-morphing] {
-  view-transition-name: none;
-}
-
-::view-transition-group(*) {
-  animation-duration: 260ms;
-  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
-}
-
 /* A cell opening, or a hexagon turning under the pointer, is a nicety rather
  * than information. Somebody who has asked for less movement still gets the
  * contents, and still gets the colour change that carries the state. */
