@@ -8,6 +8,7 @@ import type { Category, Condition } from "@/lib/inventory";
 import { MAX_EXTRA_COLUMNS, MAX_IMPORT_ROWS } from "@/lib/csv";
 import { buildLocationChoices, type LocationNode } from "@/lib/locations";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
+import { findAlreadyHere, type ExistingItemKey } from "@/lib/import-duplicates";
 
 const CATEGORIES: Category[] = ["prop", "costume"];
 const CONDITIONS: Condition[] = ["new", "good", "fair", "needs_repair"];
@@ -130,6 +131,96 @@ function cleanExtra(raw: unknown): Record<string, string> {
   return extra;
 }
 
+/**
+ * Location names and full paths, lower-cased, to ids: how a sheet's
+ * "Location" column is matched, by importItems and the duplicate check
+ * alike.
+ */
+function locationLookup(locationRows: LocationNode[]): Map<string, string> {
+  const locationIdByName = new Map<string, string>();
+  for (const location of locationRows) {
+    locationIdByName.set(location.name.trim().toLowerCase(), location.id);
+  }
+  // A sheet exported from here writes locations as full paths ("Props Room A /
+  // Shakespeare box"), both to say which room a box is in and because two
+  // boxes can share a name. Matching those as well is what lets an export go
+  // back in without creating a location literally called "A / B".
+  for (const choice of buildLocationChoices(locationRows)) {
+    const key = choice.path.trim().toLowerCase();
+    if (!locationIdByName.has(key)) locationIdByName.set(key, choice.id);
+  }
+  return locationIdByName;
+}
+
+export type AlreadyHereRow = { line: number; name: string; place: string | null };
+
+export type DuplicateCheck =
+  | { ok: true; alreadyHere: AlreadyHereRow[] }
+  | { ok: false; error: string };
+
+const PAGE = 1000;
+
+/**
+ * Before an import: which of these rows are already in the inventory (the
+ * same name in the same place, src/lib/import-duplicates.ts), so the wizard
+ * can ask before adding them again. Reads only; nothing is written.
+ */
+export async function checkAlreadyImported(rowsJson: string): Promise<DuplicateCheck> {
+  let incoming: unknown;
+  try {
+    incoming = JSON.parse(rowsJson);
+  } catch {
+    return { ok: false, error: "Couldn’t read the rows from that file. Try uploading it again." };
+  }
+  if (!Array.isArray(incoming) || incoming.length > MAX_IMPORT_ROWS) {
+    return { ok: false, error: "Couldn’t read the rows from that file. Try uploading it again." };
+  }
+  const rows = (incoming as IncomingRow[]).map(clean).filter((row): row is CleanRow => row !== null);
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login?next=/items/import");
+
+  const { data: locationData } = await supabase.from("locations").select("id, name, parent_location_id");
+  const locationRows = (locationData ?? []) as unknown as LocationNode[];
+  const locationIdByName = locationLookup(locationRows);
+  const pathById = new Map(buildLocationChoices(locationRows).map((choice) => [choice.id, choice.path]));
+
+  // Every item, a page at a time: a request returns at most 1,000 rows.
+  const existing: ExistingItemKey[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("items")
+      .select("id, name, location_id")
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) return { ok: false, error: `Couldn’t check your inventory: ${error.message}` };
+    const page = (data ?? []) as unknown as ExistingItemKey[];
+    existing.push(...page);
+    if (page.length < PAGE) break;
+  }
+
+  const found = findAlreadyHere(
+    rows.map((row) => ({ line: row.line, name: row.name, locationName: row.locationName })),
+    existing,
+    (name) => (name === null ? null : locationIdByName.get(name.toLowerCase()))
+  );
+  const byId = new Map(existing.map((item) => [item.id, item]));
+  return {
+    ok: true,
+    alreadyHere: found.map(({ line, itemId }) => {
+      const item = byId.get(itemId)!;
+      return {
+        line,
+        name: item.name,
+        place: item.location_id ? (pathById.get(item.location_id) ?? null) : null,
+      };
+    }),
+  };
+}
+
 export type ImportOutcome =
   | {
       ok: true;
@@ -226,20 +317,7 @@ export async function importItems(
     .select("id, name, parent_location_id");
 
   const locationRows = (existingLocations ?? []) as unknown as LocationNode[];
-
-  const locationIdByName = new Map<string, string>();
-  for (const location of locationRows) {
-    locationIdByName.set(location.name.trim().toLowerCase(), location.id);
-  }
-
-  // A sheet exported from here writes locations as full paths ("Props Room A /
-  // Shakespeare box"), both to say which room a box is in and because two
-  // boxes can share a name. Matching those as well is what lets an export go
-  // back in without creating a location literally called "A / B".
-  for (const choice of buildLocationChoices(locationRows)) {
-    const key = choice.path.trim().toLowerCase();
-    if (!locationIdByName.has(key)) locationIdByName.set(key, choice.id);
-  }
+  const locationIdByName = locationLookup(locationRows);
 
   const wanted = new Set<string>();
   for (const row of rows) {

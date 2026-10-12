@@ -194,6 +194,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   // Set by the spreadsheet import on its way back here.
   const importedCount = Number.parseInt(first(params.imported) ?? "", 10);
   const skippedCount = Number.parseInt(first(params.skipped) ?? "", 10);
+  const alreadyHereCount = Number.parseInt(first(params.alreadyHere) ?? "", 10);
   const locationsCreated = Number.parseInt(first(params.newPlaces) ?? "", 10);
   const unmatchedLocations = Number.parseInt(first(params.unmatched) ?? "", 10);
   const photosFetched = Number.parseInt(first(params.photos) ?? "", 10);
@@ -527,6 +528,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                 : null,
               Number.isFinite(skippedCount) && skippedCount > 0
                 ? `Skipped ${skippedCount} row${skippedCount === 1 ? "" : "s"} that couldn’t be read.`
+                : null,
+              Number.isFinite(alreadyHereCount) && alreadyHereCount > 0
+                ? `Left out ${alreadyHereCount} row${alreadyHereCount === 1 ? "" : "s"} already in your inventory.`
                 : null,
               Number.isFinite(photosFetched) && photosFetched > 0
                 ? `Fetched ${photosFetched} photo${photosFetched === 1 ? "" : "s"}.`

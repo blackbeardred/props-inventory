@@ -22,7 +22,7 @@ import {
 import { uploadImportedPhotos, type PhotoUpload } from "@/lib/photo-upload";
 import { markFingerprintsDue } from "@/lib/fingerprint-device";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@/lib/inventory";
-import { attachPhotos, importItems } from "./actions";
+import { attachPhotos, checkAlreadyImported, importItems, type AlreadyHereRow } from "./actions";
 
 const PREVIEW_LIMIT = 15;
 
@@ -43,7 +43,10 @@ export function ImportWizard({
   const router = useRouter();
   const [fileName, setFileName] = useState<string | null>(null);
   const [createLocations, setCreateLocations] = useState(true);
-  const [phase, setPhase] = useState<"idle" | "importing" | "photos">("idle");
+  const [phase, setPhase] = useState<"idle" | "checking" | "importing" | "photos">("idle");
+  // Rows already in the inventory, and which set of rows that was worked out
+  // for: change the file or the mapping and the question no longer applies.
+  const [duplicates, setDuplicates] = useState<{ forRows: unknown; rows: AlreadyHereRow[] } | null>(null);
   const [photoProgress, setPhotoProgress] = useState({ done: 0, total: 0, failed: 0 });
   const [importError, setImportError] = useState<string | null>(null);
   const [table, setTable] = useState<string[][] | null>(null);
@@ -136,13 +139,45 @@ export function ImportWizard({
    * any serverless time limit — so the browser drives them, which also gives
    * an honest progress count instead of a page that looks hung.
    */
-  async function runImport() {
+  const toPayload = (rows: typeof valid) =>
+    JSON.stringify(rows.map(({ errors: _errors, warnings: _warnings, ...row }) => row));
+
+  const asking = duplicates && duplicates.forRows === valid ? duplicates.rows : null;
+  const duplicateLines = useMemo(() => new Set(asking?.map((row) => row.line) ?? []), [asking]);
+  const newRows = useMemo(() => valid.filter((row) => !duplicateLines.has(row.line)), [valid, duplicateLines]);
+
+  /**
+   * First, whether any of these rows are already in the inventory. If none
+   * are, the import goes straight ahead; if some are, the wizard asks.
+   */
+  async function startImport() {
     setImportError(null);
+    setPhase("checking");
+    let check: Awaited<ReturnType<typeof checkAlreadyImported>>;
+    try {
+      check = await checkAlreadyImported(toPayload(valid));
+    } catch {
+      check = { ok: false, error: "Couldn’t reach the server. Check the connection and try again." };
+    }
+    if (!check.ok) {
+      setImportError(check.error);
+      setPhase("idle");
+      return;
+    }
+    if (check.alreadyHere.length === 0) {
+      await runImport(valid);
+      return;
+    }
+    setDuplicates({ forRows: valid, rows: check.alreadyHere });
+    setPhase("idle");
+  }
+
+  async function runImport(rows: typeof valid) {
+    setImportError(null);
+    setDuplicates(null);
     setPhase("importing");
 
-    const payload = JSON.stringify(
-      valid.map(({ errors: _errors, warnings: _warnings, ...row }) => row)
-    );
+    const payload = toPayload(rows);
 
     const outcome = await importItems(payload, createLocations);
 
@@ -202,6 +237,8 @@ export function ImportWizard({
     }
 
     const params = new URLSearchParams({ imported: String(outcome.imported) });
+    const leftOut = valid.length - rows.length;
+    if (leftOut > 0) params.set("alreadyHere", String(leftOut));
     if (outcome.skipped > 0) params.set("skipped", String(outcome.skipped));
     if (outcome.locationsCreated > 0) {
       params.set("newPlaces", String(outcome.locationsCreated));
@@ -449,25 +486,87 @@ export function ImportWizard({
               <p className="font-body text-sm text-danger-ink">{importError}</p>
             ) : null}
 
-            <button
-              type="button"
-              onClick={runImport}
-              disabled={valid.length === 0 || phase !== "idle"}
-              className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {phase === "importing"
-                ? "Importing…"
-                : phase === "photos"
-                  ? `Attaching pictures… ${photoProgress.done} of ${photoProgress.total}`
-                  : valid.length === 0
-                    ? "Nothing to import"
-                    : `Import ${valid.length.toLocaleString()} item${valid.length === 1 ? "" : "s"}`}
-            </button>
+            {asking ? (
+              <div
+                data-import-duplicates
+                role="alertdialog"
+                aria-labelledby="duplicates-title"
+                className="rounded-lg border border-warning bg-surface px-4 py-4"
+              >
+                <h3 id="duplicates-title" className="font-display text-lg leading-tight text-foreground">
+                  {asking.length === valid.length
+                    ? "You’ve already imported this"
+                    : `${asking.length.toLocaleString()} of these ${valid.length.toLocaleString()} rows are already in your inventory`}
+                </h3>
+                <p className="mt-1 font-body text-sm text-muted">
+                  {asking.length === valid.length
+                    ? `Every row matches an item you already have: the same name, in the same place. Importing again would give you two of each.`
+                    : `Each matches an item you already have: the same name, in the same place. Importing them again would give you two of each.`}
+                </p>
+                <ul className="mt-3 space-y-1">
+                  {asking.slice(0, 8).map((row) => (
+                    <li key={row.line} className="font-body text-sm text-foreground">
+                      <span className="font-mono text-xs text-muted">Line {row.line}</span>{" "}
+                      {row.name}
+                      <span className="text-muted"> · {row.place ?? "not filed anywhere"}</span>
+                    </li>
+                  ))}
+                  {asking.length > 8 ? (
+                    <li className="font-body text-sm text-muted">…and {(asking.length - 8).toLocaleString()} more.</li>
+                  ) : null}
+                </ul>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {newRows.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => void runImport(newRows)}
+                      className="inline-flex min-h-11 items-center justify-center rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90 md:min-h-0"
+                    >
+                      {`Import only the ${newRows.length.toLocaleString()} new ${newRows.length === 1 ? "one" : "ones"}`}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void runImport(valid)}
+                    className="inline-flex min-h-11 items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-background md:min-h-0"
+                  >
+                    {newRows.length > 0
+                      ? `Import all ${valid.length.toLocaleString()}, duplicates too`
+                      : `Import all ${valid.length.toLocaleString()} again anyway`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDuplicates(null)}
+                    className="inline-flex min-h-11 items-center px-3 font-body text-sm text-muted hover:text-foreground md:min-h-0"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void startImport()}
+                disabled={valid.length === 0 || phase !== "idle"}
+                className="inline-flex min-h-11 items-center justify-center rounded-md md:min-h-0 bg-accent px-4 py-2 font-body text-sm font-medium text-background transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {phase === "checking"
+                  ? "Checking what you already have…"
+                  : phase === "importing"
+                    ? "Importing…"
+                    : phase === "photos"
+                      ? `Attaching pictures… ${photoProgress.done} of ${photoProgress.total}`
+                      : valid.length === 0
+                        ? "Nothing to import"
+                        : `Import ${valid.length.toLocaleString()} item${valid.length === 1 ? "" : "s"}`}
+              </button>
+            )}
 
             <p className="font-body text-xs text-muted">
               {fileName ? `From ${fileName}. ` : ""}
-              Items are added, never merged — importing the same file twice
-              gives you two copies of everything.
+              Items are added, never merged. Before anything is added, the rows
+              are checked against what you already have, and you’re asked about
+              any that are already here.
             </p>
           </div>
         </>
