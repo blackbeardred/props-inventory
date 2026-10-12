@@ -28,7 +28,7 @@ import {
   updatePassword,
   updateProfile,
 } from "../account/actions";
-import { regenerateInviteCode, removeMember, setMemberRole } from "../organization/actions";
+import { regenerateInviteCode, removeMember, renameTheatre, setMemberRole } from "../organization/actions";
 import { formatDate, pluralize } from "@/lib/inventory";
 
 export const metadata: Metadata = {
@@ -53,6 +53,10 @@ function first(value: string | string[] | undefined) {
 }
 
 const NOTICES: Record<string, { title: string; body: string }> = {
+  "theatre-renamed": {
+    title: "Renamed",
+    body: "Everyone in the theatre sees the new name from their next page.",
+  },
   "profile-saved": {
     title: "Saved",
     body: "Your name and picture are up to date.",
@@ -179,6 +183,35 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
               : "Owners can invite people and manage who's here."
           }`}
         >
+          {isOwner ? (
+            <form
+              action={renameTheatre}
+              data-rename-theatre
+              className="mb-5 rounded-lg border border-rule bg-surface px-4 py-3"
+            >
+              <label htmlFor="theatre-name" className="block font-body text-sm font-medium text-foreground">
+                Theatre name
+              </label>
+              <p className="mt-1 font-body text-sm text-muted">
+                The name everyone in this theatre sees. Only owners can change it.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <input
+                  id="theatre-name"
+                  name="name"
+                  required
+                  maxLength={100}
+                  defaultValue={profile.organizations?.name ?? ""}
+                  autoComplete="organization"
+                  className="min-h-11 min-w-0 flex-1 basis-56 rounded-md border border-rule bg-background px-3 py-2 font-body text-sm text-foreground outline-none transition-colors focus:border-accent md:min-h-0"
+                />
+                <SubmitButton variant="ghost" pendingText="Saving…">
+                  Rename
+                </SubmitButton>
+              </div>
+            </form>
+          ) : null}
+
           {isOwner ? (
             <div className="mb-5 rounded-lg border border-rule bg-surface px-4 py-3">
               <p className="font-body text-sm font-medium text-foreground">Invite code</p>

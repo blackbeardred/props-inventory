@@ -80,12 +80,16 @@ export const DB: Record<string, Row[]> = new Proxy({} as Record<string, Row[]>, 
  *                 10 days ago, one 40 days ago (past its 30, due a purge)
  *   pictures=1    the second brass candlestick (it6) has two extra pictures
  *   twins=1       the two brass candlesticks (it5, it6) are twins
+ *   pre012=1      migration 012 hasn't been run: renaming the theatre fails
  *   copies=1      five more Silver Trays (it12 is in Props Room A): one
  *                 more loose in Props Room A, two in the Loft (one out on
  *                 Noises Off!), one in the Shakespeare Box, one on shelf B
  */
 export function resetFixtures(options?: URLSearchParams): void {
   const db = seed();
+  const flags = new Set<string>();
+  if (options?.get("pre012") === "1") flags.add("pre012");
+  (globalThis as unknown as { __fixtureFlags?: Set<string> }).__fixtureFlags = flags;
   if (options?.get("role") === "member") db.memberships[0].role = "member";
   if (options?.get("deleted") === "old") {
     const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
@@ -275,6 +279,19 @@ export function query(table: string) {
 }
 
 export function rpc(name: string, args: Record<string, unknown>) {
+  if (name === "rename_organization") {
+    // Migration 012's checks, in miniature. pre012=1 answers the way
+    // PostgREST does when the function doesn't exist yet.
+    if ((globalThis as unknown as { __fixtureFlags?: Set<string> }).__fixtureFlags?.has("pre012")) {
+      return Promise.resolve({ data: null, error: { code: "PGRST202", message: "Could not find the function public.rename_organization(new_name) in the schema cache" } });
+    }
+    if (DB.memberships[0].role !== "owner") return Promise.resolve({ data: null, error: { code: "P0001", message: "Only an owner can rename the theatre" } });
+    const cleaned = String(args.new_name ?? "").replace(/\s+/g, " ").trim();
+    if (!cleaned) return Promise.resolve({ data: null, error: { code: "P0001", message: "A theatre needs a name" } });
+    if (cleaned.length > 100) return Promise.resolve({ data: null, error: { code: "P0001", message: "That name is too long: 100 characters at most" } });
+    DB.organizations[0].name = cleaned;
+    return Promise.resolve({ data: cleaned, error: null });
+  }
   if (name === "location_descendants") {
     const out = new Set<string>(args.p_ids as string[]);
     let grew = true;

@@ -726,6 +726,40 @@ begin
 end;
 $$;
 
+-- Renaming the theatre (migration 012). Same pattern as the invite code:
+-- owners only, the open theatre only, the checks inside.
+create or replace function rename_organization(new_name text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  caller_org_id uuid := auth_org_id();
+  cleaned text := btrim(regexp_replace(coalesce(new_name, ''), '\s+', ' ', 'g'));
+begin
+  if caller_org_id is null then
+    raise exception 'You have no active organization';
+  end if;
+
+  if auth_org_role() is distinct from 'owner' then
+    raise exception 'Only an owner can rename the theatre';
+  end if;
+
+  if cleaned = '' then
+    raise exception 'A theatre needs a name';
+  end if;
+
+  if char_length(cleaned) > 100 then
+    raise exception 'That name is too long: 100 characters at most';
+  end if;
+
+  update organizations set name = cleaned where id = caller_org_id;
+
+  return cleaned;
+end;
+$$;
+
 create or replace function set_member_role(target_profile_id uuid, new_role text)
 returns void
 language plpgsql
