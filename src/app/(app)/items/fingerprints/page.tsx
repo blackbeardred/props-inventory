@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { FingerprintRunner } from "./fingerprint-runner";
 import { RecognitionCheck } from "./recognition-check";
 
-export const metadata: Metadata = { title: "Photo fingerprints · Props & Costume Inventory" };
+export const metadata: Metadata = { title: "Photo fingerprints · Propolis" };
 
 export default async function FingerprintsPage() {
   const supabase = await createClient();

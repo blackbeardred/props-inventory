@@ -15,7 +15,7 @@ import { PRODUCTION_STATUS_LABELS, type ProductionRow } from "@/lib/inventory";
 import { deleteProduction, updateProduction } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Edit production · Props & Costume Inventory",
+  title: "Edit production · Propolis",
 };
 
 type EditProductionPageProps = {

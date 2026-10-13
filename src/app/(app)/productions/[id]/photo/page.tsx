@@ -7,7 +7,7 @@ import { supabaseConfigured } from "@/lib/supabase/config";
 import { StagePhoto } from "./stage-photo";
 
 export const metadata: Metadata = {
-  title: "Mark from a photo · Props & Costume Inventory",
+  title: "Mark from a photo · Propolis",
 };
 
 // Looking at a photo and searching the inventory for every thing in it takes

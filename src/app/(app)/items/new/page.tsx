@@ -20,7 +20,7 @@ import { LocationField } from "@/components/location-field";
 import { createItem } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Add item · Props & Costume Inventory",
+  title: "Add item · Propolis",
 };
 
 type NewItemPageProps = {

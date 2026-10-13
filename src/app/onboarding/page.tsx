@@ -6,7 +6,7 @@ import { getUserAndProfile } from "@/lib/auth";
 import { createOrganization, joinOrganization } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Create your organization · Props & Costume Inventory",
+  title: "Create your organization · Propolis",
 };
 
 type OnboardingPageProps = {

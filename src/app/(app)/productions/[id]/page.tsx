@@ -38,7 +38,7 @@ import {
 import { PullRow, StatusSwitch } from "./pull-row";
 
 export const metadata: Metadata = {
-  title: "Production · Props & Costume Inventory",
+  title: "Production · Propolis",
 };
 
 const STATUS_TONE: Record<ProductionStatus, "neutral" | "muted" | "accent"> = {

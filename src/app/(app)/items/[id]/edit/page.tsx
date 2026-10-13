@@ -29,7 +29,7 @@ import { addTwin, deleteItem, regenerateTags, removeFromTwins, updateItem } from
 import { TwinsPanel } from "./twins-panel";
 
 export const metadata: Metadata = {
-  title: "Edit item · Props & Costume Inventory",
+  title: "Edit item · Propolis",
 };
 
 type EditItemPageProps = {

@@ -185,7 +185,7 @@ export function trainingReadme(
   const ready = plan.labels.filter((label) => label.files.length >= PICTURES_PER_LABEL).length;
   const lines = [
     `Training set for ${theatre}`,
-    `Made ${made.toISOString().slice(0, 10)} from the Props & Costume Inventory.`,
+    `Made ${made.toISOString().slice(0, 10)} from Propolis.`,
     "",
     `${plan.labels.length} label${plan.labels.length === 1 ? "" : "s"}, ${plan.files.length - missing.length} picture${plan.files.length - missing.length === 1 ? "" : "s"}.`,
     `${ready} label${ready === 1 ? " has" : "s have"} ${PICTURES_PER_LABEL} or more pictures, which is about the least either service will train on.`,

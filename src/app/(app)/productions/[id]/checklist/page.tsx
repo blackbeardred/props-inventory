@@ -11,7 +11,7 @@ import { loadChecklistRows } from "@/lib/checklist-data";
 import { ChecklistView } from "./checklist-view";
 
 export const metadata: Metadata = {
-  title: "Checklist · Props & Costume Inventory",
+  title: "Checklist · Propolis",
 };
 
 type ChecklistPageProps = {

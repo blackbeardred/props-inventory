@@ -33,7 +33,7 @@
  * model lives in "transformers-cache" and must survive.
  */
 
-const VERSION = "v1";
+const VERSION = "v2";
 const STATIC_CACHE = `props-static-${VERSION}`;
 const PAGES_CACHE = `props-pages-${VERSION}`;
 const OFFLINE_URL = "/offline.html";

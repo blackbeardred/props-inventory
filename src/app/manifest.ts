@@ -9,18 +9,27 @@ import type { MetadataRoute } from "next";
  * who haven't signed up; someone opening the app from their home screen has.
  * A signed-out person is sent to log in from there as usual.
  *
+ * Saved to a home screen or a computer as "Propolis", with the brand board's
+ * home-screen icon: the P-and-hexagon mark in cream on green
+ * (public/icons/, src/app/apple-icon.png, src/app/icon.svg).
+ *
  * Colours are the Propolis tokens: cream behind the splash screen, ink for
- * the status bar on Android.
+ * the status bar on Android and the title strip on a computer.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Props & Costume Inventory",
-    short_name: "Props",
+    name: "Propolis",
+    short_name: "Propolis",
     description: "Props, costumes, where they live, and what each production has pulled.",
     id: "/",
     start_url: "/inventory",
     scope: "/",
     display: "standalone",
+    // On a computer, the installed app draws its own top strip (TitleStrip)
+    // instead of the browser's title bar, which carried the browser's app
+    // menu ("Uninstall…" among it). Browsers that don't do this fall back
+    // to standalone.
+    display_override: ["window-controls-overlay"],
     background_color: "#FBF7EC",
     theme_color: "#2A2219",
     categories: ["productivity", "business"],

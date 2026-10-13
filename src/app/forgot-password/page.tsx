@@ -6,7 +6,7 @@ import { supabaseConfigured } from "@/lib/supabase/config";
 import { requestPasswordReset } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Forgot password · Props & Costume Inventory",
+  title: "Forgot password · Propolis",
 };
 
 type ForgotPasswordPageProps = {

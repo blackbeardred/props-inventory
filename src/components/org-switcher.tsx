@@ -15,7 +15,7 @@ export function OrgSwitcher({
   activeOrgId: string | null;
 }) {
   const active = memberships.find((m) => m.org_id === activeOrgId);
-  const activeName = active?.organizations?.name ?? "Props & Costume Inventory";
+  const activeName = active?.organizations?.name ?? "Propolis";
 
   if (memberships.length <= 1) {
     return (

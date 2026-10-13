@@ -12,7 +12,7 @@ import { PRODUCTION_STATUS_LABELS } from "@/lib/inventory";
 import { createProduction } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Add production · Props & Costume Inventory",
+  title: "Add production · Propolis",
 };
 
 type NewProductionPageProps = {

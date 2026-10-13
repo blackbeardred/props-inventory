@@ -9,7 +9,7 @@ import { loadChecklistRows } from "@/lib/checklist-data";
 import { IssueList } from "./issue-list";
 
 export const metadata: Metadata = {
-  title: "Pull issues · Props & Costume Inventory",
+  title: "Pull issues · Propolis",
 };
 
 type IssuesPageProps = {

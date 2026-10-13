@@ -18,7 +18,7 @@ import {
 } from "@/lib/inventory";
 
 export const metadata: Metadata = {
-  title: "Productions · Props & Costume Inventory",
+  title: "Productions · Propolis",
 };
 
 const STATUS_TONE: Record<ProductionStatus, "neutral" | "muted" | "accent"> = {

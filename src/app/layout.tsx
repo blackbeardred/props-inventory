@@ -1,3 +1,4 @@
+import { TitleStrip } from "@/components/title-strip";
 import type { Metadata, Viewport } from "next";
 import { Courier_Prime, Fraunces, Inter } from "next/font/google";
 import "./globals.css";
@@ -36,13 +37,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Props & Costume Inventory",
+  title: "Propolis",
+  applicationName: "Propolis",
   description: "Track props, costumes, storage locations, and pull lists.",
   // Opened from an iPhone home screen, run full screen rather than as a
   // Safari tab. The manifest (app/manifest.ts) does the same for Android.
   appleWebApp: {
     capable: true,
-    title: "Props",
+    title: "Propolis",
     statusBarStyle: "default",
   },
 };
@@ -56,6 +58,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       {/* The honeycomb texture lives on the body so every page carries the
           same ground, rather than each panel drawing its own. */}
       <body className="honeycomb min-h-full flex flex-col">
+        <TitleStrip />
         {children}
         <ServiceWorkerRegistration />
       </body>

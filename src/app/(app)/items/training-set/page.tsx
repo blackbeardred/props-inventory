@@ -13,7 +13,7 @@ import {
 } from "@/lib/training-set";
 import { TrainingSetExport } from "./training-set-export";
 
-export const metadata: Metadata = { title: "Training set · Props & Costume Inventory" };
+export const metadata: Metadata = { title: "Training set · Propolis" };
 
 // Always read fresh: it's a snapshot of what's been confirmed so far.
 export const dynamic = "force-dynamic";

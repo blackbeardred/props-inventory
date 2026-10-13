@@ -66,7 +66,7 @@ test("installable, and the checklist works with no connection", async ({ page, c
 
   await test.step("manifest and icons", async () => {
     const manifest = await (await context.request.get(`${BASE}/manifest.webmanifest`)).json();
-    expect([manifest.display, manifest.short_name, manifest.start_url]).toEqual(["standalone", "Props", "/inventory"]);
+    expect([manifest.display, manifest.short_name, manifest.start_url]).toEqual(["standalone", "Propolis", "/inventory"]);
     for (const icon of manifest.icons) {
       const response = await context.request.get(BASE + icon.src);
       expect(response.status(), icon.src).toBe(200);
@@ -104,7 +104,7 @@ test("installable, and the checklist works with no connection", async ({ page, c
     await page.goto(`${BASE}/productions/prod1/checklist`, { waitUntil: "networkidle" });
     await page.goto(`${BASE}/productions/prod1`, { waitUntil: "networkidle" });
     const kept = await page.evaluate(async () =>
-      (await (await caches.open("props-pages-v1")).keys()).map((r) => new URL(r.url).pathname)
+      (await (await caches.open("props-pages-v2")).keys()).map((r) => new URL(r.url).pathname)
     );
     for (const path of ["/inventory", "/productions/prod1/checklist", "/productions/prod1"]) {
       expect(kept, path).toContain(path);
@@ -168,10 +168,10 @@ test("installable, and the checklist works with no connection", async ({ page, c
     await page.waitForTimeout(800);
     const keys = await page.evaluate(async () => await caches.keys());
     expect(keys.filter((k) => k.startsWith("props-pages-"))).toEqual([]);
-    expect(keys).toContain("props-static-v1");
+    expect(keys).toContain("props-static-v2");
     await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
     expect(
-      await page.evaluate(async () => (await (await caches.open("props-pages-v1")).keys()).length),
+      await page.evaluate(async () => (await (await caches.open("props-pages-v2")).keys()).length),
       "the login page itself is never kept"
     ).toBe(0);
   });

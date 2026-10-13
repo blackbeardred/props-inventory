@@ -32,7 +32,7 @@ import { regenerateInviteCode, removeMember, renameTheatre, setMemberRole } from
 import { formatDate, pluralize } from "@/lib/inventory";
 
 export const metadata: Metadata = {
-  title: "Theatre · Props & Costume Inventory",
+  title: "Theatre · Propolis",
 };
 
 // A member of the current theatre. The person lives in profiles; their role

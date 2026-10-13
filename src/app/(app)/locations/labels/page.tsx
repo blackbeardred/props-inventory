@@ -10,7 +10,7 @@ import { qrSymbol } from "@/lib/qr-svg";
 import { LabelSheet, type LabelData } from "./label-sheet";
 
 export const metadata: Metadata = {
-  title: "Box labels · Props & Costume Inventory",
+  title: "Box labels · Propolis",
 };
 
 /**

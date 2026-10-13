@@ -6,7 +6,7 @@ import { getUserAndProfile } from "@/lib/auth";
 import { updatePassword } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Set a new password · Props & Costume Inventory",
+  title: "Set a new password · Propolis",
 };
 
 type ResetPasswordPageProps = {

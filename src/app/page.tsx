@@ -37,7 +37,7 @@ export default async function Home() {
       <div className="flex flex-1 items-center">
         <div className="w-full max-w-3xl mx-auto px-6 py-20">
           <p className="font-body text-sm text-muted mb-6">
-            Props &amp; Costume Inventory
+            Propolis
             {/* The wordmark's full stop. The only decorative hexagon in the
                 app — everywhere else the shape is a control. */}
             <span

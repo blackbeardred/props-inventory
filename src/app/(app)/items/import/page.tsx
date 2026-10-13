@@ -7,7 +7,7 @@ import { supabaseConfigured } from "@/lib/supabase/config";
 import { ImportWizard } from "./import-wizard";
 
 export const metadata: Metadata = {
-  title: "Import items · Props & Costume Inventory",
+  title: "Import items · Propolis",
 };
 
 type ImportPageProps = {

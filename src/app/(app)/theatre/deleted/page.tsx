@@ -13,7 +13,7 @@ import { KEEP_DAYS, KIND_LABELS, daysLeft, deletedAgo, expiresAt } from "@/lib/d
 import { deleteDeletedForever, restoreDeleted } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Recently deleted · Props & Costume Inventory",
+  title: "Recently deleted · Propolis",
 };
 
 type PageProps = {

@@ -7,7 +7,7 @@ import { supabaseConfigured } from "@/lib/supabase/config";
 import { login } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Log in · Props & Costume Inventory",
+  title: "Log in · Propolis",
 };
 
 type LoginPageProps = {

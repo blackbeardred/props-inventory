@@ -4,7 +4,7 @@ import { PageHeading } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { LookalikeSearch } from "./lookalike-search";
 
-export const metadata: Metadata = { title: "Find by photo · Props & Costume Inventory" };
+export const metadata: Metadata = { title: "Find by photo · Propolis" };
 
 export default async function LookalikePage() {
   const supabase = await createClient();

@@ -194,3 +194,39 @@ body {
     scale: none !important;
   }
 }
+
+/* The installed app's own top strip on a computer (TitleStrip), shown only
+ * when the browser has handed the title bar to the page: the
+ * window-controls-overlay display mode (manifest.ts). env(titlebar-area-*)
+ * is the room left beside the window buttons; the strip spans the whole
+ * width in ink, the same as the buttons' own background (theme_color), so it
+ * reads as one bar. Dragging it moves the window. */
+.title-strip {
+  display: none;
+}
+
+@media (display-mode: window-controls-overlay) {
+  .title-strip {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 70;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: env(titlebar-area-height, 33px);
+    padding-left: calc(env(titlebar-area-x, 0px) + 12px);
+    background: var(--foreground);
+    color: var(--background);
+    font-family: var(--font-display), Georgia, serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    user-select: none;
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  body {
+    padding-top: env(titlebar-area-height, 33px);
+  }
+}

@@ -62,7 +62,7 @@ function withDescendants(rootId: string, nodes: LocationNode[]): string[] {
 }
 
 export const metadata: Metadata = {
-  title: "Inventory · Props & Costume Inventory",
+  title: "Inventory · Propolis",
 };
 
 // `location_id` is a to-one foreign key, so the embed comes back as a single

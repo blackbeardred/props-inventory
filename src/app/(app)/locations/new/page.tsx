@@ -15,7 +15,7 @@ import { LocationInput } from "@/components/location-input";
 import { createLocation } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Add location · Props & Costume Inventory",
+  title: "Add location · Propolis",
 };
 
 type NewLocationPageProps = {

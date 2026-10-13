@@ -15,7 +15,7 @@ import type { LocationRow } from "@/lib/inventory";
 import { deleteLocation, updateLocation } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Edit location · Props & Costume Inventory",
+  title: "Edit location · Propolis",
 };
 
 type EditLocationPageProps = {
