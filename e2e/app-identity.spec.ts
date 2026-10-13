@@ -30,6 +30,12 @@ test("the home-screen icons are the green tile with the cream mark", async ({ re
   const apple = await request.get("/apple-icon.png");
   expect(apple.ok()).toBe(true);
   expect(pngSize(await apple.body())).toEqual([180, 180]);
+  // The company mark's master files, public and outside the sign-in.
+  for (const path of ["/brand/propolis-mark.svg", "/brand/propolis-icon.svg"]) {
+    const response = await request.get(path, { maxRedirects: 0 });
+    expect(response.status(), path).toBe(200);
+    expect(await response.text(), path).toContain("M28 68 Q50 104 72 68 Z");
+  }
   const svg = await (await request.get("/icon.svg")).text();
   expect(svg).toContain("#3F6B52");
   expect(svg).toContain("#FBF7EC");

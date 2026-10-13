@@ -104,7 +104,7 @@ test("installable, and the checklist works with no connection", async ({ page, c
     await page.goto(`${BASE}/productions/prod1/checklist`, { waitUntil: "networkidle" });
     await page.goto(`${BASE}/productions/prod1`, { waitUntil: "networkidle" });
     const kept = await page.evaluate(async () =>
-      (await (await caches.open("props-pages-v3")).keys()).map((r) => new URL(r.url).pathname)
+      (await (await caches.open("props-pages-v4")).keys()).map((r) => new URL(r.url).pathname)
     );
     for (const path of ["/inventory", "/productions/prod1/checklist", "/productions/prod1"]) {
       expect(kept, path).toContain(path);
@@ -168,10 +168,10 @@ test("installable, and the checklist works with no connection", async ({ page, c
     await page.waitForTimeout(800);
     const keys = await page.evaluate(async () => await caches.keys());
     expect(keys.filter((k) => k.startsWith("props-pages-"))).toEqual([]);
-    expect(keys).toContain("props-static-v3");
+    expect(keys).toContain("props-static-v4");
     await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
     expect(
-      await page.evaluate(async () => (await (await caches.open("props-pages-v3")).keys()).length),
+      await page.evaluate(async () => (await (await caches.open("props-pages-v4")).keys()).length),
       "the login page itself is never kept"
     ).toBe(0);
   });
