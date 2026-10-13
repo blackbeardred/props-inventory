@@ -9,9 +9,9 @@ import type { MetadataRoute } from "next";
  * who haven't signed up; someone opening the app from their home screen has.
  * A signed-out person is sent to log in from there as usual.
  *
- * Saved to a home screen or a computer as "Propolis", with the brand board's
- * home-screen icon: the P-and-hexagon mark in cream on green
- * (public/icons/, src/app/apple-icon.png, src/app/icon.svg).
+ * Saved to a home screen or a computer as "Propolis". The icon is the brand
+ * board's honey hexagon with a white comedy mask, on green (public/icons/,
+ * src/app/apple-icon.png, src/app/icon.svg).
  *
  * Colours are the Propolis tokens: cream behind the splash screen, ink for
  * the status bar on Android and the title strip on a computer.

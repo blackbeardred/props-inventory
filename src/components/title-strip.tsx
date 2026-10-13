@@ -14,16 +14,26 @@
 export function TitleStrip() {
   return (
     <div className="title-strip" data-title-strip data-print-hide aria-hidden="true">
-      <svg viewBox="0 0 120 116" width="15" style={{ display: "block" }}>
-        <rect x="16" y="0.6" width="16" height="111.4" fill="currentColor" />
-        <polygon
-          points="28,44 49,7.6 91,7.6 112,44 91,80.4 49,80.4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="14"
-          strokeLinejoin="miter"
-        />
-        <polygon points="47,44 58.5,24.1 81.5,24.1 93,44 81.5,63.9 58.5,63.9" fill="#C98A2C" />
+      {/* The app icon's honey hexagon and mask, as drawn for a dark ground
+          on the brand board. */}
+      <svg viewBox="0 0 150 130" width="20" style={{ display: "block" }}>
+        <polygon points="26,8 82,8 108,57 82,106 26,106 0,57" fill="#C98A2C" />
+        <g transform="translate(62 14) scale(0.95)">
+          <path
+            d="M10 8 Q50 0 90 8 L88 60 Q86 105 50 115 Q14 105 12 60 Z"
+            fill="#FBF7EC"
+            stroke="#2A2219"
+            strokeWidth="4"
+          />
+          <path
+            d="M26 40 Q35 29 44 40 M56 40 Q65 29 74 40"
+            fill="none"
+            stroke="#2A2219"
+            strokeWidth="5"
+            strokeLinecap="round"
+          />
+          <path d="M28 68 Q50 104 72 68 Z" fill="#2A2219" />
+        </g>
       </svg>
       <span>Propolis</span>
     </div>
