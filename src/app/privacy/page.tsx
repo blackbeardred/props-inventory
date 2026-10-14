@@ -8,13 +8,25 @@ export const metadata: Metadata = {
 };
 
 /*
- * DRAFT, written Oct 14 2026 from what the app actually does. Not legal
- * advice: have it reviewed before Propolis is offered widely, and keep it in
- * step with the app. Fill these in before publishing:
+ * Written Oct 14 2026 from what the app actually does. Not legal advice:
+ * have it reviewed before Propolis is offered widely, and keep it in step
+ * with the app (a new provider, a new kind of data, a new AI feature).
  */
-const OPERATOR = "[Your name or company]";
-const CONTACT_EMAIL = "[contact email]";
+const OPERATOR = "Arjun Bhatkhande";
+const CONTACT_EMAIL = "arjunallenbhatkhande@gmail.com";
 const EFFECTIVE = "October 14, 2026";
+
+/** The contact address, as a link that opens an email. */
+function Contact() {
+  return (
+    <a
+      href={`mailto:${CONTACT_EMAIL}`}
+      className="-my-3 inline-block break-all py-3 text-accent-ink underline underline-offset-2"
+    >
+      {CONTACT_EMAIL}
+    </a>
+  );
+}
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -45,7 +57,7 @@ export default function PrivacyPage() {
           own, where it&rsquo;s stored, and what each production has pulled. It is run by{" "}
           {OPERATOR} (&ldquo;we&rdquo;). This policy explains what information Propolis collects,
           how it&rsquo;s used, who it&rsquo;s shared with, and the choices you have. If anything
-          here is unclear, write to us at {CONTACT_EMAIL}.
+          here is unclear, write to us at <Contact />.
         </p>
 
         <Section title="What we collect">
@@ -167,7 +179,7 @@ export default function PrivacyPage() {
             backups for a limited time after that.
           </p>
           <p>
-            To close your account or remove a theatre entirely, write to {CONTACT_EMAIL} and
+            To close your account or remove a theatre entirely, write to <Contact /> and
             we&rsquo;ll delete it, along with its photos.
           </p>
         </Section>
@@ -178,7 +190,7 @@ export default function PrivacyPage() {
             <li>Export your theatre&rsquo;s inventory as a spreadsheet whenever you like.</li>
             <li>Leave a theatre from Theatre › Your theatres.</li>
             <li>Don&rsquo;t turn on photo recognition, or don&rsquo;t use the AI features, if you&rsquo;d rather not.</li>
-            <li>Ask us for a copy of your information, or to delete it, at {CONTACT_EMAIL}.</li>
+            <li>Ask us for a copy of your information, or to delete it, at <Contact />.</li>
           </ul>
           <p>
             Depending on where you live, you may have further rights over your information; write
@@ -211,7 +223,7 @@ export default function PrivacyPage() {
 
         <Section title="Contact">
           <p>
-            Questions about privacy, or a request about your information: {CONTACT_EMAIL}.
+            Questions about privacy, or a request about your information: <Contact />.
           </p>
         </Section>
       </div>

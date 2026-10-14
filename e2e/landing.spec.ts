@@ -16,6 +16,9 @@ test.describe("signed out", () => {
     await page.waitForURL(/\/privacy$/);
     await expect(page.locator("h1")).toHaveText("Privacy policy");
     await expect(page.locator("main")).toContainText("Anthropic");
+    await expect(page.locator("main")).toContainText("Arjun Bhatkhande");
+    await expect(page.locator("main")).not.toContainText("[contact email]");
+    await expect(page.getByRole("link", { name: "arjunallenbhatkhande@gmail.com" }).first()).toHaveAttribute("href", "mailto:arjunallenbhatkhande@gmail.com");
   });
 
   test("sign-up links to the privacy policy", async ({ page }) => {
