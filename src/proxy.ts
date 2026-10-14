@@ -8,6 +8,7 @@ const PUBLIC_PATHS = new Set([
   "/login",
   "/signup",
   "/forgot-password",
+  "/privacy",
   "/auth/callback",
 ]);
 // Routes a signed-in user shouldn't see again (bounce to the app instead).

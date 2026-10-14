@@ -76,6 +76,13 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
               />
               <SubmitButton pendingText="Creating account…">Create account</SubmitButton>
             </form>
+            <p className="mt-4 font-body text-xs text-muted">
+              See how we handle your information in our{" "}
+              <Link href="/privacy" className="-my-3 inline-block py-3 text-accent-ink underline underline-offset-2">
+                privacy policy
+              </Link>
+              .
+            </p>
             <p className="mt-6 font-body text-sm text-muted">
               Already have an account?{" "}
               <Link href="/login" className="text-accent hover:underline">
