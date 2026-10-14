@@ -17,6 +17,7 @@ test.describe("on a phone", () => {
       ["/productions", 1],
       ["/productions/prod1", 1],
       ["/theatre", 2],
+      ["/account", -1],
     ] as const) {
       await open(page, path);
       const current = await tabs.evaluateAll((as) => as.map((a) => a.getAttribute("aria-current")));
@@ -29,7 +30,7 @@ test.describe("on a phone", () => {
     const tabs = await tappable(page, 'nav[aria-label="Main"] a');
     expect(tabs.filter((t) => t.onScreen)).toHaveLength(3);
     expect(tabs.every((t) => t.hit), JSON.stringify(tabs)).toBe(true);
-    expect((await tappable(page, 'header a[href="/theatre"]')).every((t) => t.hit)).toBe(true);
+    expect((await tappable(page, 'header a[href="/account"]')).every((t) => t.hit)).toBe(true);
     const heights = await page.$$eval('nav[aria-label="Main"] a', (as) =>
       as.filter((a) => a.getClientRects().length).map((a) => a.getBoundingClientRect().height)
     );
@@ -65,6 +66,7 @@ test.describe("on a phone", () => {
       "/productions/prod1/checklist",
       "/productions/prod1/photo",
       "/theatre",
+      "/account",
       "/items/new",
       "/items/it0/edit",
       "/locations/new",
@@ -82,6 +84,7 @@ test.describe("on a phone", () => {
       "/productions/prod1/checklist",
       "/productions/prod1/photo",
       "/theatre",
+      "/account",
       "/items/new",
     ]) {
       await open(page, path);
@@ -93,7 +96,7 @@ test.describe("on a phone", () => {
     for (const width of [375, 430]) {
       const context = await browser.newContext({ ...PHONE, viewport: { width, height: 860 } });
       const page = await context.newPage();
-      for (const path of ["/inventory", "/productions/prod1", "/theatre"]) {
+      for (const path of ["/inventory", "/productions/prod1", "/theatre", "/account"]) {
         await open(page, path);
         await noSidewaysScroll(page);
       }
@@ -150,10 +153,11 @@ test.describe("old addresses", () => {
       const url = new URL(page.url());
       expect(url.pathname + url.search, from).toMatch(new RegExp(`^${to.replace(/[?]/g, "\\?")}`));
     }
-    for (const from of ["/account", "/organization"]) {
-      await open(page, from);
-      expect(new URL(page.url()).pathname, from).toBe("/theatre");
-    }
+    await open(page, "/organization");
+    expect(new URL(page.url()).pathname).toBe("/theatre");
+    // Account was folded into Theatre for a while; it's its own page again.
+    await open(page, "/account");
+    expect(new URL(page.url()).pathname).toBe("/account");
   });
 
   test("signed in, the login page bounces to Inventory; signed out, the app sends you to log in", async ({ page, context }) => {

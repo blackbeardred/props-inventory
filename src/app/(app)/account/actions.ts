@@ -14,11 +14,11 @@ const ALLOWED_AVATAR_TYPES: Record<string, string> = {
 };
 
 function fail(message: string): never {
-  redirect(`/theatre?error=${encodeURIComponent(message)}`);
+  redirect(`/account?error=${encodeURIComponent(message)}`);
 }
 
 function done(notice: string): never {
-  redirect(`/theatre?notice=${notice}`);
+  redirect(`/account?notice=${notice}`);
 }
 
 async function requireUser() {
@@ -28,7 +28,7 @@ async function requireUser() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?next=/theatre");
+    redirect("/login?next=/account");
   }
 
   return { supabase, user };

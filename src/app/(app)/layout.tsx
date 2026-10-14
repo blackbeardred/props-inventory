@@ -27,7 +27,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // Belongs somewhere, but the active organization no longer resolves —
   // they need to pick one before any org-scoped page can show anything.
   if (!profile.organizations) {
-    redirect("/theatre?notice=pick-organization#theatres");
+    redirect("/account?notice=pick-organization#theatres");
   }
 
   let avatarUrl: string | null = null;
@@ -61,7 +61,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-5">
             <AppNav />
             <Link
-              href="/theatre"
+              href="/account"
               aria-label={`Your account (${displayName})`}
               className="flex min-h-11 min-w-11 items-center justify-center gap-2 font-body text-sm text-muted transition-colors hover:text-foreground"
             >

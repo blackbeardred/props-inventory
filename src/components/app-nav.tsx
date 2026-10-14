@@ -5,15 +5,15 @@ import { usePathname } from "next/navigation";
 
 /**
  * Three places, not five. Items, Locations and Search were three ways into
- * the same list, and Account and Organization both held the invite code and
- * the theatre switcher; they're one Inventory and one Theatre page now. Each
- * tab also lights up for the pages that live under it — adding an item is
- * still "in" Inventory.
+ * the same list, so they're one Inventory page. Theatre is the theatre's own
+ * settings; your account (reached from your picture in the header) is about
+ * you, so no tab lights up for it. Each tab also lights up for the pages that
+ * live under it — adding an item is still "in" Inventory.
  */
 const LINKS = [
   { href: "/inventory", label: "Inventory", also: ["/items", "/locations", "/search"] },
   { href: "/productions", label: "Productions", also: [] },
-  { href: "/theatre", label: "Theatre", also: ["/account", "/organization"] },
+  { href: "/theatre", label: "Theatre", also: ["/organization"] },
 ] as const;
 
 function isActive(pathname: string, link: (typeof LINKS)[number]): boolean {
