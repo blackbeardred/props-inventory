@@ -10,7 +10,7 @@ import { type NextRequest, NextResponse } from "next/server";
  */
 export async function refreshSession(
   request: NextRequest
-): Promise<{ user: { id: string } | null; response: NextResponse }> {
+): Promise<{ user: { id: string; is_anonymous?: boolean } | null; response: NextResponse }> {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

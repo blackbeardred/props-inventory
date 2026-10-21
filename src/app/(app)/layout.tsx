@@ -7,6 +7,7 @@ import { DeletedBar } from "@/components/deleted-bar";
 import { FingerprintCatchUp } from "@/components/fingerprint-catch-up";
 import { OfflineBanner } from "@/components/service-worker";
 import { OrgSwitcher } from "@/components/org-switcher";
+import { TryoutBanner } from "@/components/tryout-banner";
 import { getUserAndProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AVATARS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
@@ -45,6 +46,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-1 flex-col">
       <OfflineBanner />
+      {/* On a tryout link (migration 013): whose test copy, and feedback. */}
+      {user.is_anonymous ? <TryoutBanner name={profile.full_name?.trim() || "you"} /> : null}
       <header className="border-b border-rule">
         {/* The shell widens only from xl up. Below that nothing changes: a
             phone is already edge to edge, and a tablet reads better narrow.

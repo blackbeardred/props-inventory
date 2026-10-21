@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Badge, FileField, Notice, PageHeading, TextField } from "@/components/ui";
+import {
+  Badge,
+  FileField,
+  Notice,
+  PageHeading,
+  TextField,
+} from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { DeleteButton } from "@/components/delete-button";
 import { SettingsSection as Section } from "@/components/settings-section";
@@ -92,6 +98,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   }
 
   const activeNotice = notice ? NOTICES[notice] : undefined;
+  // Opened from a tryout link (migration 013): no email or password to manage,
+  // and the link is how they get back in.
+  const tryout = Boolean(user.is_anonymous);
 
   return (
     <>
@@ -108,6 +117,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       {error ? (
         <div className="mb-6">
           <Notice title="That didn’t go through">{error}</Notice>
+        </div>
+      ) : null}
+
+      {tryout ? (
+        <div className="mb-6" data-tryout-account>
+          <Notice title="You’re using a test link">
+            There’s no email or password to manage. To come back to your test
+            copy, open the same link again, on this device or another.
+          </Notice>
         </div>
       ) : null}
 
@@ -172,15 +190,20 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-body text-sm text-foreground">
-                        {membership.organizations?.name ?? "Unnamed organization"}
+                        {membership.organizations?.name ??
+                          "Unnamed organization"}
                       </p>
                       <div className="mt-1.5 flex flex-wrap items-center gap-2">
                         <Badge
-                          tone={membership.role === "owner" ? "accent" : "muted"}
+                          tone={
+                            membership.role === "owner" ? "accent" : "muted"
+                          }
                         >
                           {membership.role === "owner" ? "Owner" : "Member"}
                         </Badge>
-                        {isActive ? <Badge tone="success">Current</Badge> : null}
+                        {isActive ? (
+                          <Badge tone="success">Current</Badge>
+                        ) : null}
                       </div>
                     </div>
 
@@ -192,23 +215,28 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                             name="orgId"
                             value={membership.org_id}
                           />
-                          <SubmitButton variant="ghost" pendingText="Switching…">
+                          <SubmitButton
+                            variant="ghost"
+                            pendingText="Switching…"
+                          >
                             Switch to this
                           </SubmitButton>
                         </form>
                       )}
-                      <form action={leaveOrganization}>
-                        <input
-                          type="hidden"
-                          name="orgId"
-                          value={membership.org_id}
-                        />
-                        <DeleteButton
-                          confirmMessage={`Leave ${membership.organizations?.name ?? "this organization"}? You'll lose access to its inventory until someone invites you back.`}
-                        >
-                          Leave
-                        </DeleteButton>
-                      </form>
+                      {tryout ? null : (
+                        <form action={leaveOrganization}>
+                          <input
+                            type="hidden"
+                            name="orgId"
+                            value={membership.org_id}
+                          />
+                          <DeleteButton
+                            confirmMessage={`Leave ${membership.organizations?.name ?? "this organization"}? You'll lose access to its inventory until someone invites you back.`}
+                          >
+                            Leave
+                          </DeleteButton>
+                        </form>
+                      )}
                     </div>
                   </div>
                 </li>
@@ -221,63 +249,71 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             ) : null}
           </ul>
 
-          <form action={joinOrganization} className="mt-6 space-y-5">
-            <TextField
-              label="Join another theatre with its invite code"
-              name="inviteCode"
-              autoComplete="off"
-              required
-            />
-            <SubmitButton pendingText="Joining…" variant="ghost">
-              Join a theatre
-            </SubmitButton>
-          </form>
+          {tryout ? null : (
+            <form action={joinOrganization} className="mt-6 space-y-5">
+              <TextField
+                label="Join another theatre with its invite code"
+                name="inviteCode"
+                autoComplete="off"
+                required
+              />
+              <SubmitButton pendingText="Joining…" variant="ghost">
+                Join a theatre
+              </SubmitButton>
+            </form>
+          )}
         </Section>
 
-        <Section
-          id="email"
-          title="Email address"
-          intro="You sign in with this, and password resets go here."
-        >
-          <p className="mb-4 font-body text-sm">
-            Currently{" "}
-            <span className="text-foreground">{user.email ?? "unknown"}</span>
-          </p>
-          <form action={updateEmail} className="space-y-5">
-            <TextField
-              label="New email address"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-            />
-            <SubmitButton pendingText="Sending…" variant="ghost">
-              Send confirmation link
-            </SubmitButton>
-          </form>
-        </Section>
+        {tryout ? null : (
+          <>
+            <Section
+              id="email"
+              title="Email address"
+              intro="You sign in with this, and password resets go here."
+            >
+              <p className="mb-4 font-body text-sm">
+                Currently{" "}
+                <span className="text-foreground">
+                  {user.email ?? "unknown"}
+                </span>
+              </p>
+              <form action={updateEmail} className="space-y-5">
+                <TextField
+                  label="New email address"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                />
+                <SubmitButton pendingText="Sending…" variant="ghost">
+                  Send confirmation link
+                </SubmitButton>
+              </form>
+            </Section>
 
-        <Section id="password" title="Password">
-          <form action={updatePassword} className="space-y-5">
-            <TextField
-              label="New password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-            />
-            <TextField
-              label="Confirm new password"
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              required
-            />
-            <SubmitButton pendingText="Changing…" variant="ghost">
-              Change password
-            </SubmitButton>
-          </form>
-        </Section>
+            <Section id="password" title="Password">
+              <form action={updatePassword} className="space-y-5">
+                <TextField
+                  label="New password"
+                  name="password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                />
+                <TextField
+                  label="Confirm new password"
+                  name="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                />
+                <SubmitButton pendingText="Changing…" variant="ghost">
+                  Change password
+                </SubmitButton>
+              </form>
+            </Section>
+          </>
+        )}
 
         <Section id="device" title="This device">
           <InstallApp />
@@ -285,7 +321,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
         <Section title="Signing out">
           <p className="mb-3 font-body text-sm text-muted">
-            Logging out also forgets the pages this device kept for offline use.
+            {tryout
+              ? "Your test copy stays as it is. Open your link again to get back to it."
+              : "Logging out also forgets the pages this device kept for offline use."}
           </p>
           <form action={logout}>
             <SubmitButton pendingText="Signing out…" variant="ghost">

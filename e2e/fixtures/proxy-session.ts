@@ -8,7 +8,7 @@ import { type NextRequest, NextResponse } from "next/server";
 export async function refreshSession(request: NextRequest) {
   const signedOut = request.cookies.has("e2e-signed-out");
   return {
-    user: signedOut ? null : { id: "u1" },
+    user: signedOut ? null : { id: "u1", is_anonymous: request.cookies.has("e2e-anonymous") },
     response: NextResponse.next({ request }),
   };
 }

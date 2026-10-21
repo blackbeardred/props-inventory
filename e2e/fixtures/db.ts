@@ -278,7 +278,23 @@ export function query(table: string) {
   return b;
 }
 
+/** The one tryout link the sample theatre has (migration 013). */
+export const TRYOUT_TOKEN = "0123456789abcdef0123456789abcdef";
+
 export function rpc(name: string, args: Record<string, unknown>) {
+  if (name === "tryout_label") {
+    return Promise.resolve({ data: args.p_token === TRYOUT_TOKEN ? "Tester 1" : null, error: null });
+  }
+  if (name === "join_tryout") {
+    if (args.p_token !== TRYOUT_TOKEN) {
+      return Promise.resolve({ data: null, error: { code: "P0001", message: "That test link isn't working any more" } });
+    }
+    // In miniature: the sample theatre stands in for the link's own.
+    DB.organizations[0].name = "Tester 1's test theatre";
+    DB.profiles[0].full_name = "Tester 1";
+    DB.memberships[0].role = "owner";
+    return Promise.resolve({ data: "org1", error: null });
+  }
   if (name === "rename_organization") {
     // Migration 012's checks, in miniature. pre012=1 answers the way
     // PostgREST does when the function doesn't exist yet.

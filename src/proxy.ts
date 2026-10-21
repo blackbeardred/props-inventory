@@ -11,6 +11,9 @@ const PUBLIC_PATHS = new Set([
   "/privacy",
   "/auth/callback",
 ]);
+// Tryout links (/try/<token>, migration 013): opened by people with no
+// account yet.
+const PUBLIC_PREFIXES = ["/try/"];
 // Routes a signed-in user shouldn't see again (bounce to the app instead).
 const AUTH_PATHS = new Set(["/login", "/signup"]);
 
@@ -28,14 +31,18 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  if (!user && !PUBLIC_PATHS.has(pathname)) {
+  const isPublic = PUBLIC_PATHS.has(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
+  if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = `?next=${encodeURIComponent(pathname)}`;
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && AUTH_PATHS.has(pathname)) {
+  // Someone on a tryout link is signed in without an account; they may still
+  // want to log in or sign up for real.
+  if (user && !user.is_anonymous && AUTH_PATHS.has(pathname)) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/inventory";
     redirectUrl.search = "";
