@@ -35,15 +35,26 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#FBF7EC",
     theme_color: "#2A2219",
     categories: ["productivity", "business"],
+    // Versioned file names (propolis-v2-…), not the old icon-192.png: an
+    // app already installed on a computer keeps whatever it fetched at those
+    // old addresses, and the service worker served them cache-first, so a
+    // new drawing at the same URL never reached it. A new URL makes the
+    // browser fetch the icon again on its next manifest check. Next time the
+    // drawing changes, bump the version in these names (and in sw.js).
     icons: [
-      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icons/propolis-v2-48.png", sizes: "48x48", type: "image/png", purpose: "any" },
+      { src: "/icons/propolis-v2-96.png", sizes: "96x96", type: "image/png", purpose: "any" },
+      { src: "/icons/propolis-v2-144.png", sizes: "144x144", type: "image/png", purpose: "any" },
+      { src: "/icons/propolis-v2-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/propolis-v2-256.png", sizes: "256x256", type: "image/png", purpose: "any" },
+      { src: "/icons/propolis-v2-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icons/propolis-v2-maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+      { src: "/icons/propolis-v2-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     shortcuts: [
-      { name: "Inventory", url: "/inventory", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
-      { name: "Productions", url: "/productions", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
-      { name: "Add an item", url: "/items/new", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+      { name: "Inventory", url: "/inventory", icons: [{ src: "/icons/propolis-v2-96.png", sizes: "96x96" }] },
+      { name: "Productions", url: "/productions", icons: [{ src: "/icons/propolis-v2-96.png", sizes: "96x96" }] },
+      { name: "Add an item", url: "/items/new", icons: [{ src: "/icons/propolis-v2-96.png", sizes: "96x96" }] },
     ],
   };
 }

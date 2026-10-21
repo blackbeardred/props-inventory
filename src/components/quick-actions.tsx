@@ -24,6 +24,10 @@ import {
  * "Take picture" asks one question after the photo: is this one new prop, or
  * a whole prop table to mark off for a production? The photo is handed to the
  * page that answers it (see photo-handoff), so nobody takes it twice.
+ *
+ * On a computer the same hexagon sits in the header instead (placement
+ * "header"), beside the nav, and the shortcuts drop down beneath it. Nothing
+ * floats there, so it doesn't duck out of the way while the page scrolls.
  */
 
 type Step = "menu" | "photo" | "production";
@@ -34,7 +38,11 @@ type ProductionOption = { id: string; name: string };
  *  it's back by the time a thumb comes looking for it. */
 const SETTLE_MS = 300;
 
-export function QuickActions() {
+type Placement = "thumb" | "header";
+
+export function QuickActions({ placement = "thumb" }: { placement?: Placement }) {
+  const header = placement === "header";
+  const menuId = header ? "quick-actions-menu-header" : "quick-actions-menu";
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("menu");
@@ -67,6 +75,7 @@ export function QuickActions() {
   // menu closes instead: it was opened to be used, and a scroll means it
   // isn't being.
   useEffect(() => {
+    if (header) return;
     function onScroll() {
       if (openRef.current) close(false);
       setScrolling(true);
@@ -78,11 +87,12 @@ export function QuickActions() {
       window.removeEventListener("scroll", onScroll);
       if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
     };
-  }, [close]);
+  }, [close, header]);
 
   // Out of the way while the keyboard is up for a text field — on a phone
   // it would otherwise float over whatever is being typed.
   useEffect(() => {
+    if (header) return;
     const isTextField = (target: EventTarget | null) =>
       target instanceof HTMLElement &&
       (target.matches("textarea, select, [contenteditable=''], [contenteditable='true']") ||
@@ -96,7 +106,7 @@ export function QuickActions() {
       document.removeEventListener("focusin", onIn);
       document.removeEventListener("focusout", onOut);
     };
-  }, []);
+  }, [header]);
 
   useEffect(() => {
     if (!open) return;
@@ -163,7 +173,140 @@ export function QuickActions() {
     go(href);
   }
 
-  const away = scrolling || typing;
+  const away = !header && (scrolling || typing);
+
+  const choices =
+    step === "menu" ? (
+      <>
+        <Choice onClick={() => go("/items/new")}>Add item</Choice>
+        <label
+          role="menuitem"
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              (event.currentTarget.querySelector("input") as HTMLInputElement)?.click();
+            }
+          }}
+          className={CHOICE}
+        >
+          <Bullet />
+          {header ? "Add a photo" : "Take picture"}
+          {/* No `capture`: the phone offers camera and library both. */}
+          <input
+            type="file"
+            accept="image/*"
+            tabIndex={-1}
+            onChange={(event) => {
+              onPicture(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+            className="sr-only"
+          />
+        </label>
+        <Choice onClick={() => go("/items/lookalike")}>Image search</Choice>
+        {checklist ? (
+          <Choice onClick={() => go(checklistHref(checklist))} detail={checklist.name}>
+            Back to my checklist
+          </Choice>
+        ) : null}
+      </>
+    ) : step === "photo" && photo ? (
+      <>
+        <Choice onClick={() => sendPhotoTo("/items/new")} detail="A single item, with this as its picture">
+          Add as a new prop
+        </Choice>
+        <Choice onClick={() => void chooseProduction()} detail="Mark what’s on it for a production">
+          Add as a prop table
+        </Choice>
+        <PhotoPreview url={photo.url} caption="What is this?" onBack={() => setStep("menu")} />
+      </>
+    ) : step === "production" && photo ? (
+      <>
+        {productionError ? (
+          <p className={`${CHOICE} cursor-default text-danger-ink`}>{productionError}</p>
+        ) : productions === null ? (
+          <p className={`${CHOICE} cursor-default text-muted`}>Loading productions…</p>
+        ) : productions.length === 0 ? (
+          <Choice onClick={() => go("/productions/new")} detail="There aren’t any yet">
+            Add a production first
+          </Choice>
+        ) : (
+          productions.slice(0, 6).map((production) => (
+            <Choice key={production.id} onClick={() => sendPhotoTo(`/productions/${production.id}/photo`)}>
+              {production.name}
+            </Choice>
+          ))
+        )}
+        <PhotoPreview url={photo.url} caption="Which production?" onBack={() => setStep("photo")} />
+      </>
+    ) : null;
+
+  const hexButton = (
+    // The focus ring sits on this unclipped wrapper: a clip-path clips the
+    // element's own outline. The drop shadow is a filter for the same reason —
+    // box-shadow is clipped away with the corners.
+    <span
+      className={`inline-flex rounded-[4px] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-accent ${
+        header ? "" : "[filter:drop-shadow(0_3px_6px_rgb(42_34_25/0.35))]"
+      }`}
+    >
+      <button
+        ref={hexRef}
+        type="button"
+        data-hex-toggle
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        aria-label={open ? "Close shortcuts" : "Shortcuts"}
+        title={header ? "Shortcuts" : undefined}
+        className={`hex flex items-center justify-center border-0 p-0 font-body leading-none outline-none transition-[rotate,background-color,color] duration-200 ease-out ${
+          header ? "w-10 text-lg" : "w-16 text-2xl"
+        } ${open ? "rotate-90 bg-foreground text-background" : "bg-honey text-foreground"}`}
+      >
+        {/* Counter-rotated, so the mark reads upright once the hexagon has
+            turned. */}
+        <span
+          aria-hidden="true"
+          className={`transition-[rotate] duration-200 ease-out motion-reduce:transition-none ${open ? "-rotate-45" : ""}`}
+        >
+          +
+        </span>
+      </button>
+    </span>
+  );
+
+  if (header) {
+    return (
+      <div data-quick-actions-header data-print-hide className="relative hidden md:flex">
+        {open ? (
+          // Clicking anywhere else closes it. Clear rather than dimmed: on a
+          // computer the menu is a dropdown, not a sheet over the page.
+          <button
+            type="button"
+            aria-label="Close the shortcuts"
+            tabIndex={-1}
+            onClick={() => close()}
+            className="fixed inset-0 z-40 cursor-default bg-transparent"
+          />
+        ) : null}
+        <div className="relative z-50 flex">
+          {hexButton}
+          {open ? (
+            <div
+              ref={panelRef}
+              id={menuId}
+              role="menu"
+              aria-label="Shortcuts"
+              className="absolute right-0 top-full mt-3 flex w-72 flex-col gap-2"
+            >
+              {choices}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -189,114 +332,16 @@ export function QuickActions() {
         {open ? (
           <div
             ref={panelRef}
-            id="quick-actions-menu"
+            id={menuId}
             role="menu"
             aria-label="Shortcuts"
+            // flex-col-reverse: the first in the list sits nearest the thumb.
             className="absolute bottom-full left-0 mb-3 flex w-[min(18rem,calc(100vw-2rem))] flex-col-reverse gap-2"
           >
-            {step === "menu" ? (
-              <>
-                {/* flex-col-reverse: the first in the list sits nearest the
-                    thumb. */}
-                <Choice onClick={() => go("/items/new")}>Add item</Choice>
-                <label
-                  role="menuitem"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      (event.currentTarget.querySelector("input") as HTMLInputElement)?.click();
-                    }
-                  }}
-                  className={CHOICE}
-                >
-                  <Bullet />
-                  Take picture
-                  {/* No `capture`: the phone offers camera and library both. */}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    tabIndex={-1}
-                    onChange={(event) => {
-                      onPicture(event.target.files?.[0]);
-                      event.target.value = "";
-                    }}
-                    className="sr-only"
-                  />
-                </label>
-                <Choice onClick={() => go("/items/lookalike")}>Image search</Choice>
-                {checklist ? (
-                  <Choice onClick={() => go(checklistHref(checklist))} detail={checklist.name}>
-                    Back to my checklist
-                  </Choice>
-                ) : null}
-              </>
-            ) : step === "photo" && photo ? (
-              <>
-                <Choice onClick={() => sendPhotoTo("/items/new")} detail="A single item, with this as its picture">
-                  Add as a new prop
-                </Choice>
-                <Choice onClick={() => void chooseProduction()} detail="Mark what’s on it for a production">
-                  Add as a prop table
-                </Choice>
-                <PhotoPreview url={photo.url} caption="What is this?" onBack={() => setStep("menu")} />
-              </>
-            ) : step === "production" && photo ? (
-              <>
-                {productionError ? (
-                  <p className={`${CHOICE} cursor-default text-danger-ink`}>{productionError}</p>
-                ) : productions === null ? (
-                  <p className={`${CHOICE} cursor-default text-muted`}>Loading productions…</p>
-                ) : productions.length === 0 ? (
-                  <Choice onClick={() => go("/productions/new")} detail="There aren’t any yet">
-                    Add a production first
-                  </Choice>
-                ) : (
-                  productions.slice(0, 6).map((production) => (
-                    <Choice
-                      key={production.id}
-                      onClick={() => sendPhotoTo(`/productions/${production.id}/photo`)}
-                    >
-                      {production.name}
-                    </Choice>
-                  ))
-                )}
-                <PhotoPreview
-                  url={photo.url}
-                  caption="Which production?"
-                  onBack={() => setStep("photo")}
-                />
-              </>
-            ) : null}
+            {choices}
           </div>
         ) : null}
-
-        {/* The focus ring sits on this unclipped wrapper: a clip-path clips
-            the element's own outline. The drop shadow is a filter for the
-            same reason — box-shadow is clipped away with the corners. */}
-        <span className="inline-flex rounded-[4px] [filter:drop-shadow(0_3px_6px_rgb(42_34_25/0.35))] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-accent">
-          <button
-            ref={hexRef}
-            type="button"
-            data-hex-toggle
-            onClick={toggle}
-            aria-expanded={open}
-            aria-controls={open ? "quick-actions-menu" : undefined}
-            aria-label={open ? "Close shortcuts" : "Shortcuts"}
-            className={`hex flex w-16 items-center justify-center border-0 p-0 font-body text-2xl leading-none outline-none transition-[rotate,background-color,color] duration-200 ease-out ${
-              open ? "rotate-90 bg-foreground text-background" : "bg-honey text-foreground"
-            }`}
-          >
-            {/* Counter-rotated, so the mark reads upright once the hexagon
-                has turned. */}
-            <span
-              aria-hidden="true"
-              className={`transition-[rotate] duration-200 ease-out motion-reduce:transition-none ${open ? "-rotate-45" : ""}`}
-            >
-              +
-            </span>
-          </button>
-        </span>
+        {hexButton}
       </div>
     </>
   );

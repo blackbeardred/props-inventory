@@ -33,7 +33,7 @@
  * model lives in "transformers-cache" and must survive.
  */
 
-const VERSION = "v4";
+const VERSION = "v5";
 const STATIC_CACHE = `props-static-${VERSION}`;
 const PAGES_CACHE = `props-pages-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
@@ -47,8 +47,8 @@ const MAX_STATIC = 400;
 
 const PRECACHE = [
   OFFLINE_URL,
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
+  "/icons/propolis-v2-192.png",
+  "/icons/propolis-v2-512.png",
 ];
 
 /** Pages with nothing worth showing offline, and that mustn't be kept. */

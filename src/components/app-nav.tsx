@@ -24,7 +24,8 @@ function isActive(pathname: string, link: (typeof LINKS)[number]): boolean {
 
 /**
  * The nav in the header, from tablet width up. Below that it is the tab bar
- * at the bottom of the screen instead.
+ * at the bottom of the screen instead. Each link carries the tab bar's
+ * hexagon, so a computer and a phone mark the page you're on the same way.
  *
  * It used to be one row that wrapped. On every phone — 430 wide included —
  * the second line spilled out of a fixed-height header and the page painted
@@ -44,7 +45,7 @@ export function AppNav() {
             key={link.href}
             href={link.href}
             aria-current={active ? "page" : undefined}
-            className={`rounded-md px-3 py-1.5 font-body text-sm transition-colors ${
+            className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 font-body text-sm transition-colors ${
               active
                 // --accent-ink, not --accent: on its own 15% tint the plain
                 // accent falls to 4.02:1. Same fix as the accent badge.
@@ -52,6 +53,15 @@ export function AppNav() {
                 : "text-muted hover:text-foreground"
             }`}
           >
+            {/* The same hexagon as the phone's tab bar: honey when shut, ink
+                and turned 90° on the page you're on. */}
+            <span
+              aria-hidden="true"
+              data-hex-toggle
+              className={`hex w-2.5 transition-[background-color,rotate] duration-200 ${
+                active ? "rotate-90 bg-foreground" : "bg-honey"
+              }`}
+            />
             {link.label}
           </Link>
         );

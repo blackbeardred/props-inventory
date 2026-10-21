@@ -26,6 +26,18 @@ test("the manifest names it Propolis and asks for the title bar", async ({ reque
   }
 });
 
+test("icons live at versioned addresses, so an installed app fetches the new drawing", async ({ request }) => {
+  const manifest = await (await request.get("/manifest.webmanifest")).json();
+  const srcs = (manifest.icons as { src: string; purpose: string }[]).map((icon) => icon.src);
+  expect(srcs.every((src) => src.startsWith("/icons/propolis-v2-")), srcs.join()).toBe(true);
+  expect(manifest.icons.filter((icon: { purpose: string }) => icon.purpose === "maskable").length).toBeGreaterThan(0);
+  // A computer's taskbar and Start menu want a large plain icon as well.
+  expect(srcs).toContain("/icons/propolis-v2-256.png");
+  const sw = await (await request.get("/sw.js")).text();
+  expect(sw).toContain('"/icons/propolis-v2-192.png"');
+  expect(sw).not.toContain('"/icons/icon-192.png"');
+});
+
 test("the home-screen icons are the green tile with the cream mark", async ({ request }) => {
   const apple = await request.get("/apple-icon.png");
   expect(apple.ok()).toBe(true);

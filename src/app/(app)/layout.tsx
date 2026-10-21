@@ -60,6 +60,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           />
           <div className="flex items-center gap-5">
             <AppNav />
+            {/* The phone's thumb hexagon, at home in the header on a
+                computer: the same shortcuts, dropping down. */}
+            <QuickActions placement="header" />
             <Link
               href="/account"
               aria-label={`Your account (${displayName})`}

@@ -1,7 +1,8 @@
 import { test, expect, PHONE, DESKTOP, open } from "./helpers";
 import path from "node:path";
 
-// The thumb hexagon: a floating shortcut menu, phones only.
+// The thumb hexagon: a floating shortcut menu on phones. A computer has the
+// same shortcuts in the header instead (desktop-hexagons.spec.ts).
 
 const PROP_TABLE = path.join(__dirname, "fixtures", "prop-table.jpg");
 
