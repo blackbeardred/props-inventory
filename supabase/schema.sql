@@ -1078,33 +1078,35 @@ begin
   insert into locations (org_id, parent_location_id, name)
     values (p_org, costumes, 'Rack 1') returning id into rack;
 
+  -- Photos aren't set here: a function can't upload files. They're added
+  -- afterwards by scripts/add-sample-photos.mjs, from supabase/sample-photos/.
   insert into items (org_id, location_id, name, category, description, quantity, condition, import_data)
   select p_org, place, name, category, description, quantity, condition, coalesce(extra, '{}'::jsonb)
   from (values
     (shakespeare, 'Yorick''s skull', 'prop', 'Resin, lightly aged. Lower jaw is loose.', 1, 'good', null::jsonb),
-    (shakespeare, 'Rapier, steel-hilt', 'prop', 'Blunted stage rapier with a swept hilt.', 2, 'good', '{"Inventory No.": "W-031"}'::jsonb),
-    (shakespeare, 'Quill and inkwell', 'prop', 'Goose feather quill, pewter inkwell.', 1, 'fair', null),
-    (shakespeare, 'Pewter tankard', 'prop', null, 4, 'good', null),
-    (shakespeare, 'Crown (Prop)', 'prop', 'Gold-painted brass, paste stones.', 1, 'needs_repair', '{"Notes": "Two stones missing"}'::jsonb),
-    (shelf_a, 'Brass candlestick', 'prop', 'Tall, with a drip tray.', 1, 'good', null),
-    (shelf_a, 'Brass candlestick', 'prop', 'Short, slightly dented base.', 1, 'fair', null),
-    (shelf_a, 'Oil lantern', 'prop', 'Battery LED inside; glass chimney is real.', 1, 'good', null),
+    (shakespeare, 'Stage dagger', 'prop', 'Black double-edged dagger with a ribbed grip. Blunted, for stage use only.', 2, 'good', '{"Inventory No.": "W-031"}'::jsonb),
+    (shakespeare, 'Royal crown, blue velvet', 'prop', 'Gold filigree with paste sapphires and pearls, a blue velvet cap and white fur trim.', 1, 'good', null::jsonb),
+    (shakespeare, 'Crown, gold', 'prop', 'Aged gold metal crown with fleur-de-lis points, lined in black felt.', 1, 'needs_repair', '{"Notes": "One stud loose"}'::jsonb),
+    (shelf_a, 'Violin ornament, brass', 'prop', 'Solid brass violin on a round base, about 30 cm tall.', 1, 'good', null::jsonb),
+    (shelf_a, 'Birdcage, gold', 'prop', 'Gold wire birdcage with a hanging hook and a latched door.', 1, 'good', null::jsonb),
+    (shelf_a, 'Lantern, black metal', 'prop', 'Square black lantern with glass panes and a ring handle. Battery candle inside.', 1, 'good', null::jsonb),
     (shelf_a, 'Map (Aged)', 'prop', 'Tea-stained parchment of a made-up coastline.', 1, 'good', '{"Inventory No.": "P-014", "Donor": "The Hartley family"}'::jsonb),
-    (shelf_b, 'Silver Tray', 'prop', 'Oval, with handles.', 1, 'good', null),
-    (shelf_b, 'Silver Tray', 'prop', 'Oval, with handles. Scratched underneath.', 1, 'fair', null),
-    (shelf_b, 'Tea set', 'prop', 'Brass-handled teapot and four cups.', 1, 'good', null),
-    (shelf_b, 'Rotary telephone', 'prop', 'Black, 1950s. Bell rings from a battery box.', 1, 'good', null),
-    (room_b, 'Wooden chair', 'prop', 'Plain kitchen chair, pine.', 4, 'good', null),
-    (room_b, 'Ladderback chair, carved oak', 'prop', null, 2, 'fair', null),
-    (room_b, 'Travel trunk', 'prop', 'Leather straps, brass corners. Holds a body.', 1, 'good', null),
-    (room_b, 'Rug (Persian style)', 'prop', 'Red and blue, about 2 by 3 metres. Orange/rust border.', 1, 'fair', null),
-    (rack, 'Velvet cloak', 'costume', 'Deep green, full length, with a hood.', 1, 'good', null),
-    (rack, 'Doublet, black', 'costume', 'Slashed sleeves, men''s 40R.', 1, 'good', null),
-    (rack, 'Ruff collar', 'costume', 'Starched linen.', 3, 'new', null),
-    (rack, 'Bowler hat', 'costume', null, 2, 'good', null),
-    (loft, 'Fishing net', 'prop', 'About 3 metres square, hemp.', 1, 'fair', null),
-    (loft, 'Bicycle, 1920s', 'prop', 'Rides, but the brakes don''t. Walk it on.', 1, 'needs_repair', null),
-    (null, 'Umbrella, black', 'prop', 'Opens fully.', 3, 'good', null)
+    (shelf_b, 'Serving platter, black', 'prop', 'Oval glazed platter.', 1, 'good', null::jsonb),
+    (shelf_b, 'Serving platter, black', 'prop', 'Oval glazed platter. Small chip on the underside.', 1, 'fair', null::jsonb),
+    (shelf_b, 'Mug, monogram A', 'prop', 'White ceramic with a black rim and a gold-edged letter A.', 1, 'good', null::jsonb),
+    (shelf_b, 'Dinner plate, white', 'prop', 'Plain white china with a wide rim.', 4, 'good', null::jsonb),
+    (shelf_b, 'Rotary telephone', 'prop', 'Black, 1950s. Bell rings from a battery box.', 1, 'good', null::jsonb),
+    (room_b, 'Wooden urn', 'prop', 'Turned wooden vessel, dark and worn smooth.', 1, 'good', null::jsonb),
+    (room_b, 'Walking cane, mahogany', 'prop', 'Glossy carved handle with a brass collar.', 1, 'good', null::jsonb),
+    (room_b, 'Travel trunk', 'prop', 'Leather straps, brass corners. Holds a body.', 1, 'good', null::jsonb),
+    (room_b, 'Curtains, paisley (pair)', 'prop', 'Sheer tab-top curtains, yellow and purple paisley with an orange/rust edge.', 1, 'fair', null::jsonb),
+    (rack, 'Fan, lace', 'costume', 'Folding fan of cream lace on pale bamboo sticks, with a silk tassel.', 1, 'good', null::jsonb),
+    (rack, 'Doublet, black', 'costume', 'Slashed sleeves, men''s 40R.', 1, 'good', null::jsonb),
+    (rack, 'Ruff collar', 'costume', 'Starched linen.', 3, 'new', null::jsonb),
+    (rack, 'Spectacles, black frames', 'costume', 'Thick black frames with clear lenses, no prescription.', 2, 'good', null::jsonb),
+    (loft, 'Anvil', 'prop', 'Cast iron, black, with a bright working face. Heavy: lift with two people.', 1, 'good', null::jsonb),
+    (loft, 'Wheelbarrow, wooden', 'prop', 'Old-style wooden barrow with a spoked wheel. The wheel wobbles: carry it on, don''t push it.', 1, 'needs_repair', null::jsonb),
+    (null, 'Umbrella, blue', 'prop', 'Blue canopy with a wooden crook handle. Opens fully.', 1, 'good', null::jsonb)
   ) as seed(place, name, category, description, quantity, condition, extra);
 
   insert into productions (org_id, name, start_date, end_date, status)
@@ -1116,12 +1118,12 @@ begin
 
   insert into pull_list_items (pull_list_id, item_id, quantity_needed, status, check_state)
   select list_noises, i.id, n, s, 'open'
-  from (values ('Rotary telephone', 1, 'pending'), ('Silver Tray', 1, 'pending'), ('Travel trunk', 1, 'pulled')) as want(name, n, s)
+  from (values ('Rotary telephone', 1, 'pending'), ('Serving platter, black', 1, 'pending'), ('Travel trunk', 1, 'pulled')) as want(name, n, s)
   cross join lateral (select id from items where org_id = p_org and items.name = want.name order by created_at limit 1) i;
 
   insert into pull_list_items (pull_list_id, item_id, quantity_needed, status, check_state, checked_at)
   select list_twelfth, i.id, n, 'pulled', c, case when c = 'checked' then now() end
-  from (values ('Rapier, steel-hilt', 2, 'checked'), ('Ruff collar', 3, 'checked'), ('Doublet, black', 1, 'open'), ('Pewter tankard', 2, 'open')) as want(name, n, c)
+  from (values ('Stage dagger', 2, 'checked'), ('Ruff collar', 3, 'checked'), ('Doublet, black', 1, 'open'), ('Dinner plate, white', 2, 'open')) as want(name, n, c)
   cross join lateral (select id from items where org_id = p_org and items.name = want.name order by created_at limit 1) i;
 end;
 $$;

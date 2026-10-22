@@ -60,14 +60,14 @@ SQL
 
 echo "── A fresh install from schema.sql"
 check "schema.sql applies cleanly" "" "$(run "$HERE/../schema.sql")"
-FRESH_SRC="$(q "select string_agg(md5(prosrc), ',' order by proname) from pg_proc where proname in ('create_tryout','join_tryout','rename_tryout','seed_sample_theatre','tryout_label')")"
+FRESH_SRC="$(q "select string_agg(md5(prosrc), ',' order by proname) from pg_proc where proname in ('create_tryout','join_tryout','rename_tryout','tryout_label')")"
 
 echo ""
 echo "── Migration 013"
 check "applies cleanly" "" "$(run "$HERE/../migrations/013_tryout_links.sql")"
 check "applies a second time (re-runnable)" "" "$(run "$HERE/../migrations/013_tryout_links.sql")"
 check "leaves the same functions a fresh install has" "$FRESH_SRC" \
-  "$(q "select string_agg(md5(prosrc), ',' order by proname) from pg_proc where proname in ('create_tryout','join_tryout','rename_tryout','seed_sample_theatre','tryout_label')")"
+  "$(q "select string_agg(md5(prosrc), ',' order by proname) from pg_proc where proname in ('create_tryout','join_tryout','rename_tryout','tryout_label')")"
 
 psql -h /tmp -p "$PORT" -U postgres -d $DB -q >/dev/null 2>&1 <<'SQL'
 grant usage on schema public, auth, storage to authenticated, anon;
@@ -78,6 +78,8 @@ grant execute on all functions in schema public, auth, storage to authenticated,
 SQL
 run "$HERE/../migrations/013_tryout_links.sql" >/dev/null
 q "revoke all on tryout_links from anon, authenticated" >/dev/null
+# 014 replaces the sample theatre 013 seeds (sample_photos_test.sh covers it).
+run "$HERE/../migrations/014_sample_photos.sql" >/dev/null
 
 psql -h /tmp -p "$PORT" -U postgres -d $DB -q >/dev/null 2>&1 <<'SQL'
 insert into auth.users (id, is_anonymous) values
@@ -125,7 +127,7 @@ check "  two productions, each with a pull list" "2|2" \
   "$(q "select (select count(*) from productions where org_id = '$ORG1') || '|' || (select count(*) from pull_lists pl join productions p on p.id = pl.production_id where p.org_id = '$ORG1')")"
 check "  seven pull-list lines" "7" \
   "$(q "select count(*) from pull_list_items pli join pull_lists pl on pl.id = pli.pull_list_id join productions p on p.id = pl.production_id where p.org_id = '$ORG1'")"
-check "  a search for rust finds the rug" "Rug (Persian style)" \
+check "  a search for rust finds the curtains" "Curtains, paisley (pair)" \
   "$(q "select name from items where org_id = '$ORG1' and to_tsvector('english', items_search_document(name, description, auto_tags, import_data)) @@ plainto_tsquery('english', 'rust')")"
 check "a blank name is refused" "A tryout link needs a name" "$(q "select create_tryout('  ')" | grep -v '^CONTEXT:' | sed 's/^ERROR:  //')"
 check "a signed-in user can't make links" "permission denied for function create_tryout" \
@@ -159,7 +161,7 @@ as_user $T2 "select join_tryout('$TOK2')" >/dev/null
 check "a second tester's copy is separate" "24|0" \
   "$(as_user $T2 "select count(*) from items")|$(as_user $T2 "select count(*) from items where org_id = '$ORG1'")"
 check "  changes in one don't reach the other" "24" \
-  "$(as_user $T2 "delete from items where name = 'Silver Tray'" >/dev/null; as_user $T1 "select count(*) from items")"
+  "$(as_user $T2 "delete from items where name = 'Serving platter, black'" >/dev/null; as_user $T1 "select count(*) from items")"
 check "a real account can open a link too, and keeps its name" "Alice|owner" \
   "$(as_user $ALICE "select join_tryout('$TOK3')" >/dev/null; q "select p.full_name || '|' || m.role from profiles p join memberships m on m.user_id = p.id join tryout_links l on l.org_id = m.org_id where p.id = '$ALICE' and l.label = 'Tester 3'")"
 check "  and still belongs to Alpha" "1" "$(q "select count(*) from memberships where user_id = '$ALICE' and org_id = 'aaaaaaaa-0000-0000-0000-000000000001'")"
