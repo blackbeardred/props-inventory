@@ -74,6 +74,21 @@ test.describe("pull list (phone)", () => {
     await expect(page.locator("main ul.md\\:hidden > li")).toHaveCount(1);
     await expect(page.locator("main table")).toBeHidden();
   });
+
+  test("a production's name stands out as the way in, on a phone", async ({ page }) => {
+    await open(page, "/productions");
+    const name = page.locator("main ul.md\\:hidden [data-production-link] span.font-display");
+    await expect(name).toContainText("Noises Off!");
+    await expect(name).toContainText("→");
+    const style = await name.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { weight: Number(cs.fontWeight), underline: cs.textDecorationLine };
+    });
+    expect(style.weight).toBeGreaterThanOrEqual(600);
+    expect(style.underline).toContain("underline");
+    await page.locator("main ul.md\\:hidden [data-production-link]").click();
+    await page.waitForURL("**/productions/prod1");
+  });
 });
 
 test.describe("checklist (phone)", () => {
@@ -140,5 +155,27 @@ test.describe("desktop", () => {
   test("pull issues page opens", async ({ page }) => {
     await open(page, "/productions/prod1/issues");
     await expect(page.locator("main h1")).toBeVisible();
+  });
+});
+
+test.describe("productions list (computer)", () => {
+  test.use(DESKTOP);
+
+  test("a production's name is bold, green, underlined and opens it", async ({ page }) => {
+    await open(page, "/productions");
+    const link = page.locator("main table [data-production-link]");
+    await expect(link).toHaveText(/Noises Off!\s*→/);
+    const style = await link.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      const name = getComputedStyle(el.firstElementChild!);
+      return { weight: Number(cs.fontWeight), underline: name.textDecorationLine, color: cs.color };
+    });
+    expect(style.weight).toBeGreaterThanOrEqual(600);
+    expect(style.underline).toContain("underline");
+    // Not the plain ink the other columns use.
+    const ink = await page.locator("main table td").nth(2).evaluate((el) => getComputedStyle(el).color);
+    expect(style.color).not.toBe(ink);
+    await link.click();
+    await page.waitForURL("**/productions/prod1");
   });
 });

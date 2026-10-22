@@ -108,11 +108,17 @@ export default async function ProductionsPage() {
               <li key={production.id} className="rounded-lg border border-rule bg-surface">
                 <Link
                   href={`/productions/${production.id}`}
-                  className="block px-4 pb-2 pt-3"
+                  data-production-link
+                  className="group block px-4 pb-2 pt-3"
                 >
                   <span className="flex items-start justify-between gap-3">
-                    <span className="font-display text-[17px] font-semibold leading-tight text-foreground">
+                    {/* Green, underlined and with an arrow, so it reads as
+                        something to open rather than a label. */}
+                    <span className="font-display text-[17px] font-semibold leading-tight text-accent-ink underline decoration-accent/35 decoration-2 underline-offset-4 group-hover:decoration-accent">
                       {production.name}
+                      <span aria-hidden="true" className="ml-1.5 inline-block no-underline transition-transform group-hover:translate-x-0.5">
+                        →
+                      </span>
                     </span>
                     <Badge tone={STATUS_TONE[production.status] ?? "neutral"}>
                       {PRODUCTION_STATUS_LABELS[production.status] ?? production.status}
@@ -139,12 +145,20 @@ export default async function ProductionsPage() {
         <DataTable columns={["Production", "Status", "Dates", "Pull lists", ""]}>
           {productions.map((production) => (
             <tr key={production.id} className="border-b border-rule align-top">
-              <td className="px-3 py-3 font-body text-sm text-foreground">
+              <td className="px-3 py-3">
+                {/* The name is the way in: bold, green, underlined and with
+                    an arrow, so it reads as a link and not just a label. */}
                 <Link
                   href={`/productions/${production.id}`}
-                  className="hover:text-accent hover:underline"
+                  data-production-link
+                  className="group inline-flex min-h-11 items-center gap-1.5 font-display text-base font-semibold text-accent-ink md:min-h-0"
                 >
-                  {production.name}
+                  <span className="underline decoration-accent/35 decoration-2 underline-offset-4 transition-colors group-hover:decoration-accent">
+                    {production.name}
+                  </span>
+                  <span aria-hidden="true" className="inline-block no-underline transition-transform group-hover:translate-x-0.5">
+                    →
+                  </span>
                 </Link>
               </td>
               <td className="px-3 py-3">
