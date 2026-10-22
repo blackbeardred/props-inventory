@@ -132,14 +132,14 @@ function ResultRow({
   const context = useContextMenu(item.name, () =>
     swipeable
       ? [
-          ...addToProductionMenu({ id: item.id, name: item.name }),
+          { label: "Edit item", onSelect: () => router.push(`/items/${item.id}/edit`) },
           ...moveToPlaceMenu({
             id: item.id,
             name: item.name,
             locationId: item.location_id,
             locationName: item.locationName,
           }),
-          { label: "Edit item", onSelect: () => router.push(`/items/${item.id}/edit`) },
+          ...addToProductionMenu({ id: item.id, name: item.name }),
         ]
       : []
   );

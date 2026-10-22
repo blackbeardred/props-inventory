@@ -26,20 +26,25 @@ test("an inventory item: ask, then remember, then offer another", async ({ page 
   await cell(page, "Bells").locator("h3").click({ button: "right" });
   await expect(menu(page)).toBeVisible();
   await expect(menu(page)).toContainText("Bells");
-  expect(await items(page)).toEqual(["Add to a production…", "Add to room…", "Edit item"]);
+  // Edit first, then where it's kept, then a production.
+  expect(await items(page)).toEqual(["Edit item", "Add to room…", "Add to a production…"]);
   expect(await page.evaluate(() => document.activeElement?.getAttribute("role"))).toBe("menuitem");
+  await expect(page.locator(":focus")).toHaveText("Edit item");
   await expect(cell(page, "Bells").locator("[data-cell-button]")).toHaveAttribute("aria-expanded", "false");
-  await menu(page).getByRole("menuitem").first().click();
+  await menu(page).getByRole("menuitem", { name: /production/ }).click();
   await page.getByRole("dialog").locator("[data-pull-target]", { hasText: "Noises Off!" }).click();
   await expect(bar(page)).toContainText(/Added\s+Bells\s+to Noises Off!/);
 
   await cell(page, "Crown (Prop)").locator("h3").click({ button: "right" });
-  expect(await items(page)).toEqual(["Add to Noises Off!", "Add to another production…", "Add to room…", "Edit item"]);
+  expect(await items(page)).toEqual(["Edit item", "Add to room…", "Add to Noises Off!", "Add to another production…"]);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator(":focus")).toContainText("Add to Noises Off!");
   await page.keyboard.press("Enter");
   await expect(bar(page)).toContainText(/Added\s+Crown \(Prop\)\s+to Noises Off!/);
 
   await cell(page, "Tea Set").locator("h3").click({ button: "right" });
-  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("End");
   await expect(page.locator(":focus")).toContainText("another production");
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog")).toContainText("Tea Set");

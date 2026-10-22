@@ -219,13 +219,13 @@ export function ItemTile({
     onCommitRight: () => requestMoveToPlace(target),
   });
   const router = useRouter();
-  // …and on a computer, a right-click offers the same, and editing it.
+  // …and on a computer, a right-click offers editing it, and the same.
   const context = useContextMenu(name, () => [
-    ...addToProductionMenu({ id: target.id, name: target.name }),
-    ...moveToPlaceMenu(target),
     ...editItemMenu(item, (href) => router.push(href), () => {
       if (!open) onToggle();
     }),
+    ...moveToPlaceMenu(target),
+    ...addToProductionMenu({ id: target.id, name: target.name }),
   ]);
 
   return (

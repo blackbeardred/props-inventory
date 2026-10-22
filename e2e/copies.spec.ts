@@ -50,7 +50,7 @@ test.describe("the list (desktop)", () => {
     const menu = page.locator("[data-context-menu]");
     await expect(menu).toContainText("Silver Tray (2)");
     await expect(menu.getByRole("menuitem", { name: /Add to room…/ })).toContainText("Now in Loft");
-    await menu.getByRole("menuitem").first().click();
+    await menu.getByRole("menuitem", { name: /production/ }).click();
     await page.getByRole("dialog").locator("[data-pull-target]", { hasText: "Noises Off!" }).click();
     // it-tray3 is already out on the show, so it's it-tray4 ("silver  tray").
     await expect(page.locator("[data-pull-bar]")).toContainText(/Added\s+silver\s+tray\s+to Noises Off!/);
