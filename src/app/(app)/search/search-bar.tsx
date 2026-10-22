@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent, ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Badge,
   EmptyState,
@@ -127,6 +128,7 @@ function ResultRow({
         requestMoveToPlace({ id: item.id, name: item.name, locationId: item.location_id }),
     }
   );
+  const router = useRouter();
   const context = useContextMenu(item.name, () =>
     swipeable
       ? [
@@ -137,6 +139,7 @@ function ResultRow({
             locationId: item.location_id,
             locationName: item.locationName,
           }),
+          { label: "Edit item", onSelect: () => router.push(`/items/${item.id}/edit`) },
         ]
       : []
   );

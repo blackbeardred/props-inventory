@@ -26,7 +26,7 @@ test("an inventory item: ask, then remember, then offer another", async ({ page 
   await cell(page, "Bells").locator("h3").click({ button: "right" });
   await expect(menu(page)).toBeVisible();
   await expect(menu(page)).toContainText("Bells");
-  expect(await items(page)).toEqual(["Add to a production…", "Add to room…"]);
+  expect(await items(page)).toEqual(["Add to a production…", "Add to room…", "Edit item"]);
   expect(await page.evaluate(() => document.activeElement?.getAttribute("role"))).toBe("menuitem");
   await expect(cell(page, "Bells").locator("[data-cell-button]")).toHaveAttribute("aria-expanded", "false");
   await menu(page).getByRole("menuitem").first().click();
@@ -34,7 +34,7 @@ test("an inventory item: ask, then remember, then offer another", async ({ page 
   await expect(bar(page)).toContainText(/Added\s+Bells\s+to Noises Off!/);
 
   await cell(page, "Crown (Prop)").locator("h3").click({ button: "right" });
-  expect(await items(page)).toEqual(["Add to Noises Off!", "Add to another production…", "Add to room…"]);
+  expect(await items(page)).toEqual(["Add to Noises Off!", "Add to another production…", "Add to room…", "Edit item"]);
   await page.keyboard.press("Enter");
   await expect(bar(page)).toContainText(/Added\s+Crown \(Prop\)\s+to Noises Off!/);
 
@@ -105,6 +105,40 @@ test("grid tiles and search results have it too", async ({ page }) => {
   await page.locator("main li", { hasText: "Map (Aged)" }).first().click({ button: "right" });
   await expect(menu(page)).toContainText("Map (Aged)");
   await expect(menu(page).getByRole("menuitem", { name: /Add to room…/ })).toBeVisible();
+});
+
+test("Edit item: from a list row, a grid tile and a search result", async ({ page }) => {
+  await open(page, "/inventory?view=list");
+  await cell(page, "Bells").locator("h3").click({ button: "right" });
+  await menu(page).getByRole("menuitem", { name: "Edit item" }).click();
+  await page.waitForURL(/\/items\/it4\/edit$/);
+
+  await open(page, "/inventory?view=grid");
+  await page.locator("[data-item-tile]", { hasText: "Oil Lantern" }).locator("h3").click({ button: "right" });
+  await menu(page).getByRole("menuitem", { name: "Edit item" }).click();
+  await page.waitForURL(/\/items\/it10\/edit$/);
+
+  await open(page, "/inventory?view=list");
+  await page.locator("main input[type=text]").fill("map");
+  await page.locator("main li", { hasText: "Map (Aged)" }).first().click({ button: "right" });
+  await menu(page).getByRole("menuitem", { name: "Edit item" }).click();
+  await page.waitForURL(/\/items\/it18\/edit$/);
+});
+
+test.describe("with identical copies", () => {
+  test.use({ fixtureOptions: "copies=1" });
+
+  test("Edit item on a row of identical copies opens it, so you pick which", async ({ page }) => {
+  await open(page, "/inventory?view=list");
+  const loft = page.locator(LIST_CELLS, { has: page.locator("h3", { hasText: /^Silver Tray \(2\)$/ }) }).first();
+  await loft.locator("h3").click({ button: "right" });
+  const edit = menu(page).getByRole("menuitem", { name: /Edit item…/ });
+  await expect(edit).toContainText("2 copies: pick one");
+  await edit.click();
+  await expect(loft.locator("[data-cell-button]")).toHaveAttribute("aria-expanded", "true");
+  await expect(loft.locator("[data-copy] a", { hasText: "Edit" })).toHaveCount(2);
+  expect(new URL(page.url()).pathname).toBe("/inventory");
+  });
 });
 
 test("Add to room…: any place, walked into if need be, with Undo", async ({ page }) => {

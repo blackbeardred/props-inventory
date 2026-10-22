@@ -2,11 +2,12 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui";
 import { SwipeReveal } from "@/components/swipe-reveal";
 import { addToProductionMenu, requestAddToProduction } from "@/components/add-to-production";
 import { moveToPlaceMenu, requestMoveToPlace } from "@/components/move-to-place";
-import { useContextMenu } from "@/components/context-menu";
+import { useContextMenu, type MenuItem } from "@/components/context-menu";
 import { useSwipeLeft } from "@/lib/use-swipe";
 import { copiesCount } from "@/lib/item-copies";
 import {
@@ -104,6 +105,22 @@ function Pair({ label, children }: { label: string; children: React.ReactNode })
  * description can't be silently guillotined by a magic pixel value that was
  * chosen against six short rows of placeholder text.
  */
+/**
+ * "Edit item" for a right-click menu. A row standing for several identical
+ * copies ("Silver Tray (2)") opens instead, to the list where each copy has
+ * its own Edit link: which one to change is the person's call, not ours.
+ */
+export function editItemMenu(
+  item: ItemCellData,
+  go: (href: string) => void,
+  openDetails: () => void
+): MenuItem[] {
+  if (item.copies && item.copies.length > 1) {
+    return [{ label: "Edit item…", detail: `${item.copies.length} copies: pick one`, onSelect: openDetails }];
+  }
+  return [{ label: "Edit item", onSelect: () => go(`/items/${item.id}/edit`) }];
+}
+
 export function ItemCell({ item }: { item: ItemCellData }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
@@ -115,10 +132,12 @@ export function ItemCell({ item }: { item: ItemCellData }) {
     // …and a swipe to the right files it somewhere.
     onCommitRight: () => requestMoveToPlace(target),
   });
-  // …and on a computer, a right-click offers the same.
+  const router = useRouter();
+  // …and on a computer, a right-click offers the same, and editing it.
   const context = useContextMenu(name, () => [
     ...addToProductionMenu({ id: target.id, name: target.name }),
     ...moveToPlaceMenu(target),
+    ...editItemMenu(item, (href) => router.push(href), () => setOpen(true)),
   ]);
 
   const place = item.locationId ? (item.locationName ?? "Unknown location") : "Unassigned";

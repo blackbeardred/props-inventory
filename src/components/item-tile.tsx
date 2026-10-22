@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   ItemDetails,
   actionTarget,
   displayName,
+  editItemMenu,
   inUseSummary,
   type ItemCellData,
 } from "@/components/item-cell";
@@ -216,10 +218,14 @@ export function ItemTile({
     // …and a swipe to the right files it somewhere.
     onCommitRight: () => requestMoveToPlace(target),
   });
-  // …and on a computer, a right-click offers the same.
+  const router = useRouter();
+  // …and on a computer, a right-click offers the same, and editing it.
   const context = useContextMenu(name, () => [
     ...addToProductionMenu({ id: target.id, name: target.name }),
     ...moveToPlaceMenu(target),
+    ...editItemMenu(item, (href) => router.push(href), () => {
+      if (!open) onToggle();
+    }),
   ]);
 
   return (
