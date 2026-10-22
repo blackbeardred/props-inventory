@@ -72,7 +72,6 @@ echo ""
 echo "── Migration 014"
 check "applies cleanly" "" "$(run "$HERE/../migrations/014_sample_photos.sql")"
 check "applies a second time (re-runnable)" "" "$(run "$HERE/../migrations/014_sample_photos.sql")"
-check "leaves the seed function a fresh install has" "$NEW_SEED" "$(q "select md5(prosrc) from pg_proc where proname = 'seed_sample_theatre'")"
 check "still not callable from the app" "f" "$(q "select has_function_privilege('authenticated', 'seed_sample_theatre(uuid)', 'execute')")"
 
 echo ""

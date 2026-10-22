@@ -80,6 +80,7 @@ run "$HERE/../migrations/013_tryout_links.sql" >/dev/null
 q "revoke all on tryout_links from anon, authenticated" >/dev/null
 # 014 replaces the sample theatre 013 seeds (sample_photos_test.sh covers it).
 run "$HERE/../migrations/014_sample_photos.sql" >/dev/null
+run "$HERE/../migrations/015_sample_places.sql" >/dev/null
 
 psql -h /tmp -p "$PORT" -U postgres -d $DB -q >/dev/null 2>&1 <<'SQL'
 insert into auth.users (id, is_anonymous) values

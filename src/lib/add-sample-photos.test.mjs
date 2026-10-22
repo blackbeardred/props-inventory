@@ -51,14 +51,14 @@ function fakeSupabase({ links, items, failUploadFor = null }) {
 }
 
 const photos = JSON.parse(fs.readFileSync(`${PHOTO_DIR}/photos.json`, "utf8"));
-is("17 pictures, every one on disk", [Object.keys(photos).length, Object.values(photos).every((f) => fs.existsSync(`${PHOTO_DIR}/${f}`))], [17, true]);
+is("23 pictures, every one on disk", [Object.keys(photos).length, Object.values(photos).every((f) => fs.existsSync(`${PHOTO_DIR}/${f}`))], [23, true]);
 
 const links = [{ label: "Gregg", org_id: "orgA" }, { label: "Tester 2", org_id: "orgB" }];
 const items = [
   { id: "a1", org_id: "orgA", name: "Anvil", photo_url: null },
   { id: "a2", org_id: "orgA", name: "Serving platter, black", photo_url: null },
   { id: "a3", org_id: "orgA", name: "Serving platter, black", photo_url: null },
-  { id: "a4", org_id: "orgA", name: "Yorick's skull", photo_url: null },          // no picture for it
+  { id: "a4", org_id: "orgA", name: "Pewter tankard", photo_url: null },          // no picture for it
   { id: "a5", org_id: "orgA", name: "Mug, monogram A", photo_url: "orgA/a5/mine.jpg" }, // tester's own
   { id: "b1", org_id: "orgB", name: "Anvil", photo_url: null },
   { id: "c1", org_id: "realTheatre", name: "Anvil", photo_url: null },             // not a test copy
