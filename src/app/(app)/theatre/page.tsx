@@ -5,6 +5,7 @@ import { KEEP_DAYS } from "@/lib/deleted-records";
 import { purgeExpired } from "@/lib/recently-deleted";
 import { Badge, Notice, PageHeading } from "@/components/ui";
 import { CopyButton } from "@/components/copy-button";
+import { RetagAll } from "@/components/retag-all";
 import { SubmitButton } from "@/components/submit-button";
 import { DeleteButton } from "@/components/delete-button";
 import { createClient } from "@/lib/supabase/server";
@@ -245,6 +246,23 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
               Training set
             </Link>
           </div>
+        </Section>
+
+        <Section
+          id="tags"
+          title="Search tags"
+          intro="Every item gets hidden tags for what it is, what it’s made of and its colours, from its photo and its words, so a search for “wood” or “red” finds it even when nobody wrote that down. New and edited items are tagged as they’re saved, and anything untagged is filled in on its own."
+        >
+          {isOwner ? (
+            <>
+              <p className="mb-3 font-body text-sm text-muted">
+                Refreshing re-tags every item with the latest tagging: about 30 cents per 100 items.
+              </p>
+              <RetagAll />
+            </>
+          ) : (
+            <p className="font-body text-sm text-muted">An owner can refresh every item’s tags here.</p>
+          )}
         </Section>
 
         <Section

@@ -39,3 +39,35 @@ test("with no tagger (no key, spend limit), it gives up quietly for the visit", 
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith("tags-caught-up:")).length)).toBe(1);
   expect(await matches(page, "tagged")).toBe(0);
 });
+
+test.describe("Refresh all search tags (Theatre)", () => {
+  test.use({ fixtureOptions: "tagging=1" });
+
+  test("an owner re-tags every item, with progress", async ({ page }) => {
+    await open(page, "/theatre");
+    const section = page.locator("#tags");
+    await expect(section).toContainText("what it’s made of and its colours");
+    await section.getByRole("button", { name: "Refresh all search tags" }).click();
+    await expect(section.getByRole("status")).toContainText("Done: all 22 items have fresh tags.", { timeout: 30_000 });
+    await open(page, "/inventory?view=list");
+    // Every item now carries the fixture tagger's mark, the Silver Tray included.
+    expect(await matches(page, "tagged")).toBe(22);
+  });
+});
+
+test.describe("Refresh all search tags, as a member", () => {
+  test.use({ fixtureOptions: "role=member" });
+
+  test("is for owners", async ({ page }) => {
+    await open(page, "/theatre");
+    await expect(page.locator("#tags")).toContainText("An owner can refresh every item’s tags here.");
+    await expect(page.locator("#tags button")).toHaveCount(0);
+  });
+});
+
+test("with no tagger, refreshing stops and says why", async ({ page }) => {
+  await open(page, "/theatre");
+  await page.locator("#tags").getByRole("button", { name: "Refresh all search tags" }).click();
+  await expect(page.locator("#tags").getByRole("status")).toContainText("Stopped after 0 of 22", { timeout: 20_000 });
+  await expect(page.locator("#tags").getByRole("status")).toContainText("API key");
+});

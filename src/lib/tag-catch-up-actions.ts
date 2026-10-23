@@ -23,6 +23,23 @@ import { generateTags } from "@/lib/ai/tag-item";
 
 const BATCH = 4;
 
+type TaggableItem = { id: string; name: string; category: string; description: string | null; photo_url: string | null };
+type Client = Awaited<ReturnType<typeof createClient>>;
+
+/** Tags for one item, from its words and its photo when it has one. */
+async function tagsFor(supabase: Client, item: TaggableItem): Promise<string[]> {
+  let photo: { bytes: Uint8Array; mediaType: string } | null = null;
+  if (item.photo_url) {
+    try {
+      const { data: blob } = await supabase.storage.from(PHOTOS_BUCKET).download(item.photo_url);
+      if (blob) photo = { bytes: new Uint8Array(await blob.arrayBuffer()), mediaType: blob.type || "image/jpeg" };
+    } catch {
+      // Tag from the words alone.
+    }
+  }
+  return generateTags({ name: item.name, category: item.category, description: item.description, photo });
+}
+
 export type TagCatchUpResult = {
   tagged: number;
   remaining: number;
@@ -48,17 +65,8 @@ export async function tagSomeUntagged(): Promise<TagCatchUpResult> {
 
   let tagged = 0;
   let stalled = false;
-  for (const item of items as { id: string; name: string; category: string; description: string | null; photo_url: string | null }[]) {
-    let photo: { bytes: Uint8Array; mediaType: string } | null = null;
-    if (item.photo_url) {
-      try {
-        const { data: blob } = await supabase.storage.from(PHOTOS_BUCKET).download(item.photo_url);
-        if (blob) photo = { bytes: new Uint8Array(await blob.arrayBuffer()), mediaType: blob.type || "image/jpeg" };
-      } catch {
-        // Tag from the words alone.
-      }
-    }
-    const tags = await generateTags({ name: item.name, category: item.category, description: item.description, photo });
+  for (const item of items as TaggableItem[]) {
+    const tags = await tagsFor(supabase, item);
     if (tags.length === 0) {
       stalled = true;
       break;
@@ -78,4 +86,46 @@ export async function tagSomeUntagged(): Promise<TagCatchUpResult> {
     .eq("auto_tags", "{}");
 
   return { tagged, remaining: count ?? 0, stalled };
+}
+
+/**
+ * Every item in the open theatre, for "Refresh all search tags" on the Theatre
+ * page: re-tagging what's already tagged, after the tagging itself improves.
+ * Owners only, since every item is a model call.
+ */
+export async function listItemsToRetag(): Promise<{ ids: string[] } | { error: string }> {
+  const { user, profile } = await getUserAndProfile();
+  if (!user || !profile?.active_org_id) return { error: "Sign in first." };
+  if (profile.role !== "owner") return { error: "Only an owner can refresh every item’s tags." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("items")
+    .select("id")
+    .eq("org_id", profile.active_org_id)
+    .order("created_at");
+  if (error) return { error: error.message };
+  return { ids: (data ?? []).map((row: { id: string }) => row.id) };
+}
+
+/** Re-tags up to a few of those items. Stops at the first that gets nothing back. */
+export async function retagItems(ids: string[]): Promise<{ tagged: number; stalled: boolean; error?: string }> {
+  const { user, profile } = await getUserAndProfile();
+  if (!user || !profile?.active_org_id) return { tagged: 0, stalled: true, error: "Sign in first." };
+  if (profile.role !== "owner") return { tagged: 0, stalled: true, error: "Only an owner can refresh every item’s tags." };
+  const supabase = await createClient();
+  const { data: items, error } = await supabase
+    .from("items")
+    .select("id, name, category, description, photo_url")
+    .eq("org_id", profile.active_org_id)
+    .in("id", ids.slice(0, BATCH));
+  if (error || !items) return { tagged: 0, stalled: true, error: error?.message };
+
+  let tagged = 0;
+  for (const item of items as TaggableItem[]) {
+    const tags = await tagsFor(supabase, item);
+    if (tags.length === 0) return { tagged, stalled: true };
+    const { error: updateError } = await supabase.from("items").update({ auto_tags: tags }).eq("id", item.id);
+    if (!updateError) tagged += 1;
+  }
+  return { tagged, stalled: false };
 }

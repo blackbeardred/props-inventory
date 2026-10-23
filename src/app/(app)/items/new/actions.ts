@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 import { generateTags } from "@/lib/ai/tag-item";
+import { refineTags } from "@/lib/ai/tag-words";
 import { describeItemPhoto, type DescribeResult } from "@/lib/ai/describe-item";
 import { cleanTags, mergeTags } from "@/lib/ai/describe-item-parse";
 
@@ -173,7 +174,7 @@ export async function createItem(formData: FormData) {
         }
       : null,
   });
-  autoTags = mergeTags(savedTags, photoTags);
+  autoTags = refineTags(mergeTags(savedTags, photoTags), `${name} ${description ?? ""}`);
 
   const { error: insertError } = await supabase.from("items").insert({
     id: itemId,

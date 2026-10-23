@@ -18,6 +18,7 @@
  */
 
 import sharp from "sharp";
+import { refineTags } from "@/lib/ai/tag-words";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_API_VERSION = "2023-06-01";
@@ -29,25 +30,35 @@ const TAGGING_JPEG_QUALITY = 82;
 
 const TAGGING_MODEL = "claude-haiku-4-5-20251001";
 
-const MAX_TAGS = 15;
-const MAX_TAG_LENGTH = 40;
-
 const SYSTEM_PROMPT = [
   "You are tagging a theatre prop or costume so that staff can find it again by searching an inventory.",
+  "The tags are never shown to anyone; they only decide what a search matches. Someone looking for",
+  "\"wood\", \"red\" or \"fabric\" must find this item if it is wooden, red or made of fabric, even",
+  "though nobody wrote that down.",
   "",
-  "Given the item's name, category, description, and a photo when one is provided, list short lowercase search tags covering:",
-  "- what the object is, and the broader kinds of thing it belongs to (a guitar is also an instrument)",
-  "- what it is made of, including the obvious materials nobody writes down (a guitar is wood; a cloak is fabric)",
-  "- its dominant colours",
-  "- its style or period, where that is evident",
-  "- what it would plausibly be used for on stage",
+  "Look at the photo when there is one; it is the best evidence of materials and colours. Use the name",
+  "and description too.",
   "",
-  "Only include something you would confidently expect of this object — guess materials, don't invent details.",
-  "Prefer single common words that someone would actually type into a search box.",
+  "Answer with ONLY a JSON object, no markdown, in exactly this shape:",
+  '{"what": [...], "materials": [...], "colours": [...], "style": [...], "uses": [...]}',
   "",
-  "Respond with ONLY a JSON array of 5 to 15 lowercase strings. No markdown, no explanation.",
-  'Example, for "Acoustic guitar" described as "six string, with hard case":',
-  '["guitar", "instrument", "music", "wood", "strings", "acoustic", "brown", "case"]',
+  "- what: what the object is, and the broader kinds of thing it belongs to (a rapier is also a sword and a weapon).",
+  "- materials: EVERY material it is visibly or very probably made of, each as the specific material AND its",
+  "  everyday family: wood, metal, fabric, leather, glass, ceramic, plastic, paper, stone, rubber, rope.",
+  "  Mahogany is wood; brass is metal; velvet is fabric; porcelain is ceramic. Include the parts: a cane",
+  "  with a brass collar is wood and metal; an umbrella is fabric, metal and wood if its handle is wooden.",
+  "  Never leave this empty: make your best guess.",
+  "- colours: EVERY clearly visible colour, in plain words (red, blue, green, yellow, orange, purple, pink,",
+  "  brown, black, white, grey, gold, silver), plus any more precise shade worth searching (navy, cream, rust).",
+  "  Never leave this empty.",
+  "- style: period or style where evident (victorian, elizabethan, medieval, 1950s, art deco, rustic, ornate).",
+  "- uses: what it would plausibly be used for or stand in for on stage.",
+  "",
+  "Lowercase single words where possible. Don't use words that would match every item in a theatre,",
+  "like \"prop\", \"stage\" or \"theatrical\".",
+  "",
+  'Example, for "Walking cane" with a photo of a glossy reddish-brown stick with a brass band:',
+  '{"what": ["cane", "walking stick", "stick", "accessory"], "materials": ["mahogany", "wood", "brass", "metal"], "colours": ["brown", "red", "gold"], "style": ["victorian", "gentleman"], "uses": ["costume", "character", "elderly"]}',
 ].join("\n");
 
 const SUPPORTED_MEDIA_TYPES = new Set([
@@ -64,7 +75,12 @@ export type TagItemInput = {
   photo?: { bytes: Uint8Array; mediaType: string } | null;
 };
 
-function parseTagList(raw: string): string[] {
+/**
+ * The model's answer as a flat list: the structured object this prompt asks
+ * for ({what, materials, colours, style, uses}), or a plain array, which
+ * older prompts gave. Anything else is no tags.
+ */
+export function parseTagAnswer(raw: string): string[] {
   const cleaned = raw
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
@@ -76,19 +92,14 @@ function parseTagList(raw: string): string[] {
   } catch {
     return [];
   }
-  if (!Array.isArray(parsed)) return [];
-
-  const seen = new Set<string>();
-  const tags: string[] = [];
-  for (const entry of parsed) {
-    if (typeof entry !== "string") continue;
-    const tag = entry.trim().toLowerCase();
-    if (!tag || tag.length > MAX_TAG_LENGTH || seen.has(tag)) continue;
-    seen.add(tag);
-    tags.push(tag);
-    if (tags.length >= MAX_TAGS) break;
+  const strings = (value: unknown) => (Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : []);
+  if (Array.isArray(parsed)) return strings(parsed);
+  if (parsed && typeof parsed === "object") {
+    const o = parsed as Record<string, unknown>;
+    // Materials and colours first: they're what this is for.
+    return [...strings(o.what), ...strings(o.materials), ...strings(o.colours ?? o.colors), ...strings(o.style), ...strings(o.uses)];
   }
-  return tags;
+  return [];
 }
 
 /**
@@ -169,7 +180,7 @@ export async function generateTags(input: TagItemInput): Promise<string[]> {
       },
       body: JSON.stringify({
         model: TAGGING_MODEL,
-        max_tokens: 300,
+        max_tokens: 400,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content }],
       }),
@@ -190,7 +201,9 @@ export async function generateTags(input: TagItemInput): Promise<string[]> {
     const textBlock = data.content?.find((block) => block.type === "text");
     if (!textBlock?.text) return [];
 
-    return parseTagList(textBlock.text);
+    // Tidied, and the everyday word added for any material or colour the
+    // answer, the name or the description mentions (tag-words.ts).
+    return refineTags(parseTagAnswer(textBlock.text), `${name} ${input.description ?? ""}`);
   } catch (error) {
     console.error("generateTags: failed to tag item", error);
     return [];
