@@ -39,10 +39,12 @@ if (typeof window !== "undefined") {
   );
 }
 
-function wantsBrowserMenu(event: ReactMouseEvent): boolean {
+function wantsBrowserMenu(event: ReactMouseEvent, onALink: boolean): boolean {
   if (event.shiftKey) return true;
   const target = event.target as Element;
-  if (target.closest("a, input, textarea, select, [contenteditable='true']")) return true;
+  // A row that *is* a link (a place tile) asks for its own menu on it.
+  const fields = onALink ? "input, textarea, select, [contenteditable='true']" : "a, input, textarea, select, [contenteditable='true']";
+  if (target.closest(fields)) return true;
   const selection = window.getSelection();
   if (selection && !selection.isCollapsed && selection.toString().trim()) return true;
   return false;
@@ -52,15 +54,18 @@ function wantsBrowserMenu(event: ReactMouseEvent): boolean {
  * Gives a row a right-click menu. Spread `onContextMenu` onto the row and
  * render `menu` anywhere inside it. Items are worked out when the menu opens,
  * so they always match the row as it is now.
+ *
+ * `onALink`: the row is itself a link, and its own menu replaces the
+ * browser's there too (Shift still gets the browser's, for a new tab).
  */
-export function useContextMenu(title: string, getItems: () => MenuItem[]) {
+export function useContextMenu(title: string, getItems: () => MenuItem[], { onALink = false }: { onALink?: boolean } = {}) {
   const [open, setOpen] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const close = useCallback(() => setOpen(null), []);
 
   function onContextMenu(event: ReactMouseEvent) {
     const fromKeyboard = event.clientX === 0 && event.clientY === 0;
     if (lastPointerWasTouch && !fromKeyboard) return;
-    if (wantsBrowserMenu(event)) return;
+    if (wantsBrowserMenu(event, onALink)) return;
     const items = getItems();
     if (items.length === 0) return;
     event.preventDefault();

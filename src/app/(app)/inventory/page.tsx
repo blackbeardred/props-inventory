@@ -15,6 +15,7 @@ import { locationPaths, type LocationNode } from "@/lib/locations";
 import { SearchBar } from "../search/search-bar";
 import { AddToProduction } from "@/components/add-to-production";
 import { MoveToPlace } from "@/components/move-to-place";
+import { PlaceTile } from "@/components/place-tile";
 import { searchItemsLive } from "../search/actions";
 
 /*
@@ -248,15 +249,26 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   const children = locations.filter((location) =>
     place ? location.parent_location_id === place.id : !location.parent_location_id || !byId.has(location.parent_location_id)
   );
-  const tiles = children.map((child) => {
-    const inside = new Set(withDescendants(child.id, locations));
+  const countsFor = (id: string) => {
+    const inside = new Set(withDescendants(id, locations));
     return {
-      id: child.id,
-      name: child.name,
-      itemCount: placements.filter((id) => id !== null && inside.has(id)).length,
+      itemCount: placements.filter((placed) => placed !== null && inside.has(placed)).length,
       placeCount: inside.size - 1,
     };
-  });
+  };
+  const tiles = children.map((child) => ({
+    id: child.id,
+    name: child.name,
+    ...countsFor(child.id),
+    // One level further down, for the tile's right-click menu.
+    inside: locations
+      .filter((location) => location.parent_location_id === child.id)
+      .map((grandchild) => ({
+        id: grandchild.id,
+        name: grandchild.name,
+        ...countsFor(grandchild.id),
+      })),
+  }));
 
   const everywhereIds = place ? withDescendants(place.id, locations) : null;
   const looseCount = placements.filter((id) => (place ? id === place.id : id === null)).length;
@@ -358,25 +370,18 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           <ul aria-label="Places in here" className="-mx-6 flex snap-x scroll-px-6 gap-2.5 overflow-x-auto px-6 pb-1 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 lg:grid-cols-4 xl:grid-cols-5">
             {tiles.map((tile) => (
               <li key={tile.id} className="w-40 shrink-0 snap-start md:w-auto">
-                <Link
+                {/* Click to go in; right-click for what's inside. */}
+                <PlaceTile
+                  name={tile.name}
                   href={inventoryHref({ place: tile.id, view: viewParam ? view : undefined })}
-                  className="group flex min-h-16 items-start gap-2.5 rounded-lg border border-rule bg-surface px-3 py-2.5 transition-colors hover:border-accent-soft"
-                >
-                  <span
-                    aria-hidden="true"
-                    data-hex-toggle
-                    className="hex mt-1 w-4 shrink-0 bg-honey transition-[rotate] duration-200 group-hover:rotate-90"
-                  />
-                  <span className="min-w-0">
-                    <span className="block truncate font-body text-sm font-medium text-foreground">
-                      {tile.name}
-                    </span>
-                    <span className="block font-mono text-[11px] text-muted">
-                      {pluralize(tile.itemCount, "item")}
-                      {tile.placeCount > 0 ? ` · ${tile.placeCount} inside` : ""}
-                    </span>
-                  </span>
-                </Link>
+                  itemCount={tile.itemCount}
+                  placeCount={tile.placeCount}
+                  inside={tile.inside.map((grandchild) => ({
+                    ...grandchild,
+                    href: inventoryHref({ place: grandchild.id, view: viewParam ? view : undefined }),
+                  }))}
+                  addHref={`/locations/new?parent=${tile.id}`}
+                />
               </li>
             ))}
             {addTile}

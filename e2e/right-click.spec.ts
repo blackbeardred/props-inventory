@@ -146,6 +146,39 @@ test.describe("with identical copies", () => {
   });
 });
 
+test("a place: right-click shows what's inside, to go straight there", async ({ page }) => {
+  await open(page, "/inventory?view=list");
+  const tile = (name: string) => page.locator(`[data-place-tile][data-place-name="${name}"]`);
+  await tile("Props Room A").click({ button: "right" });
+  await expect(menu(page)).toContainText("Props Room A");
+  expect(await items(page)).toEqual(["A", "B", "Add a shelf or box…"]);
+  await expect(menu(page).getByRole("menuitem", { name: /^A \d/ })).toContainText("1 inside");
+  await menu(page).getByRole("menuitem", { name: /^A \d/ }).click();
+  await page.waitForURL(/place=shelfA/);
+  await expect(tile("Shakespeare Box")).toBeVisible();
+
+  // One level down, the same: in Props Room A, shelf A holds the Shakespeare Box.
+  await open(page, "/inventory?view=list");
+  await tile("Props Room A").click();
+  await expect(tile("A")).toBeVisible();
+  await tile("A").click({ button: "right" });
+  expect(await items(page)).toEqual(["Shakespeare Box", "Add a shelf or box…"]);
+  await page.keyboard.press("Escape");
+
+  await open(page, "/inventory?view=list");
+  await tile("Loft").click({ button: "right" });
+  expect(await items(page)).toEqual(["Nothing inside yet", "Add a shelf or box…"]);
+  await expect(menu(page).getByRole("menuitem").first()).toBeDisabled();
+  await menu(page).getByRole("menuitem", { name: "Add a shelf or box…" }).click();
+  await page.waitForURL(/\/locations\/new\?parent=loft/);
+
+  // A plain click still walks in, and Shift keeps the browser's own menu.
+  await open(page, "/inventory?view=list");
+  expect(await taken(tile("Costume Storage"), { shift: true })).toBe(false);
+  await tile("Costume Storage").click();
+  await page.waitForURL(/place=costume/);
+});
+
 test("Add to room…: any place, walked into if need be, with Undo", async ({ page }) => {
   const moveBar = page.locator("[data-move-bar]");
   const sheet = page.locator("[data-move-to-place]");
