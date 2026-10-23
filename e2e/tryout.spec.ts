@@ -18,6 +18,7 @@ test.describe("on a phone", () => {
     await expect(page.locator("h1")).toHaveText("Hi Tester 1,");
     await expect(page.locator("[data-tryout-welcome]")).toContainText("This is your own copy of Propolis to try!");
     await expect(page.locator("[data-tryout-welcome]")).toContainText("“Add to Home Screen”");
+    await expect(page.locator("[data-tryout-welcome]")).toContainText("On an Android phone, press the 3 dots on the top right");
     await expect(page.locator("[data-tryout-welcome]")).toContainText("if any function isn’t intuitive.");
     await expect(page).toHaveTitle("Your test copy · Propolis");
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);

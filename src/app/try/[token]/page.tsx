@@ -71,8 +71,9 @@ export default async function TryPage({ params, searchParams }: TryPageProps) {
             <div className="mt-4 space-y-3 font-body text-base leading-relaxed text-foreground" data-tryout-welcome>
               <p>
                 This is your own copy of Propolis to try! I recommend opening this service on your
-                phone. Once you’re in the web browser, press the 3 circles on the bottom right, then
-                “Share”, “View More” and “Add to Home Screen”.
+                phone. Once you’re in the web browser on an iPhone, press the 3 circles on the bottom
+                right, then “Share”, “View More” and “Add to Home Screen”. On an Android phone,
+                press the 3 dots on the top right, then “Add to Home screen” (or “Install app”).
               </p>
               <p>
                 You’re able to add and delete items, as well as search for them within rooms. Please
