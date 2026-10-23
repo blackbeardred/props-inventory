@@ -42,7 +42,8 @@ materials("plastic", ["resin", "vinyl", "acrylic", "polystyrene", "foam", "nylon
 materials("paper", ["cardboard", "card", "parchment", "papier-mache", "cardstock", "paperboard"]);
 materials("stone", ["marble", "granite", "slate", "alabaster"]);
 materials("rubber", ["latex"]);
-materials("rope", ["twine", "hemp", "jute", "cord"]);
+// Not "cord": on a prop that is nearly always a telephone or a lamp flex.
+materials("rope", ["twine", "hemp", "jute"]);
 
 /** Shade → the colour word people search for. Some map to two. */
 const COLOUR_FAMILY: Record<string, string[]> = {};

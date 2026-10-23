@@ -60,14 +60,15 @@ SQL
 
 echo "── A fresh install from schema.sql"
 check "schema.sql applies cleanly" "" "$(run "$HERE/../schema.sql")"
-FRESH_SRC="$(q "select string_agg(md5(prosrc), ',' order by proname) from pg_proc where proname in ('create_tryout','join_tryout','rename_tryout','tryout_label')")"
+FRESH_SRC="$(q "select string_agg(md5(prosrc), ',' order by proname) from pg_proc where proname in ('join_tryout','rename_tryout','tryout_label')")"
 
 echo ""
 echo "── Migration 013"
 check "applies cleanly" "" "$(run "$HERE/../migrations/013_tryout_links.sql")"
 check "applies a second time (re-runnable)" "" "$(run "$HERE/../migrations/013_tryout_links.sql")"
+# create_tryout is replaced by 016 (sample_tags_test.sh covers it).
 check "leaves the same functions a fresh install has" "$FRESH_SRC" \
-  "$(q "select string_agg(md5(prosrc), ',' order by proname) from pg_proc where proname in ('create_tryout','join_tryout','rename_tryout','tryout_label')")"
+  "$(q "select string_agg(md5(prosrc), ',' order by proname) from pg_proc where proname in ('join_tryout','rename_tryout','tryout_label')")"
 
 psql -h /tmp -p "$PORT" -U postgres -d $DB -q >/dev/null 2>&1 <<'SQL'
 grant usage on schema public, auth, storage to authenticated, anon;
@@ -81,6 +82,7 @@ q "revoke all on tryout_links from anon, authenticated" >/dev/null
 # 014 replaces the sample theatre 013 seeds (sample_photos_test.sh covers it).
 run "$HERE/../migrations/014_sample_photos.sql" >/dev/null
 run "$HERE/../migrations/015_sample_places.sql" >/dev/null
+run "$HERE/../migrations/016_sample_tags.sql" >/dev/null
 
 psql -h /tmp -p "$PORT" -U postgres -d $DB -q >/dev/null 2>&1 <<'SQL'
 insert into auth.users (id, is_anonymous) values
@@ -115,7 +117,7 @@ check "three links, three test theatres" "3|3" \
 check "  each named for its person" "Tester 1's test theatre" \
   "$(q "select o.name from tryout_links l join organizations o on o.id = l.org_id where l.label = 'Tester 1'")"
 check "  tokens are 32 hex characters" "3" "$(q "select count(*) from tryout_links where token ~ '^[0-9a-f]{32}$'")"
-check "  each has its own invite code" "3" "$(q "select count(distinct o.invite_code) from tryout_links l join organizations o on o.id = l.org_id")"
+check "  none has an invite code (016)" "0" "$(q "select count(o.invite_code) from tryout_links l join organizations o on o.id = l.org_id")"
 TOK1="$(q "select token from tryout_links where label = 'Tester 1'")"
 TOK2="$(q "select token from tryout_links where label = 'Tester 2'")"
 TOK3="$(q "select token from tryout_links where label = 'Tester 3'")"

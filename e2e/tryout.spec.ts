@@ -52,6 +52,26 @@ test.describe("on a phone", () => {
   });
 });
 
+test.describe("a tester's Theatre page", () => {
+  test.use(PHONE);
+
+  test("has no invite code to pass on and no paid refresh, but still the shared tools", async ({ page, context }) => {
+    await context.addCookies([{ name: "e2e-anonymous", value: "1", domain: "localhost", path: "/" }]);
+    await open(page, "/theatre");
+    await expect(page.locator("#members")).toContainText("As an owner you can change roles and remove members.");
+    await expect(page.locator("[data-invite-code]")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Generate new code" })).toHaveCount(0);
+    await expect(page.getByText("163ECD01")).toHaveCount(0);
+    // Search tags: what they do, but no button that spends on AI.
+    await expect(page.locator("#tags")).toContainText("what it’s made of and its colours");
+    await expect(page.locator("#tags button")).toHaveCount(0);
+    await expect(page.locator("[data-retag-all]")).toHaveCount(0);
+    await expect(page.locator("[data-rename-theatre]")).toHaveCount(1);
+    await expect(page.locator('a[href="/theatre/deleted"]')).toHaveCount(1);
+    await noSidewaysScroll(page);
+  });
+});
+
 test.describe("added to a home screen", () => {
   test.use(PHONE);
 

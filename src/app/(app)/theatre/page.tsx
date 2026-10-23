@@ -74,6 +74,11 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
   const isOwner = profile.role === "owner";
   const ownerCount = rows.filter((row) => row.role === "owner").length;
   const inviteCode = profile.organizations?.invite_code ?? null;
+  // Opened from a tryout link (migration 013): an owner of their own test
+  // copy, but with no invite code to hand out and no AI-priced refresh. The
+  // sample items come tagged (migration 016), and anything a tester adds is
+  // tagged as it's saved.
+  const tryout = Boolean(user.is_anonymous);
 
   const activeNotice = notice ? NOTICES[notice] : undefined;
 
@@ -113,7 +118,9 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
           title={profile.organizations?.name ?? "Your theatre"}
           intro={`${pluralize(rows.length, "member")}. ${
             isOwner
-              ? "As an owner you can invite people, change roles and remove members."
+              ? tryout
+                ? "As an owner you can change roles and remove members."
+                : "As an owner you can invite people, change roles and remove members."
               : "Owners can invite people and manage who's here."
           }`}
         >
@@ -146,8 +153,8 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
             </form>
           ) : null}
 
-          {isOwner ? (
-            <div className="mb-5 rounded-lg border border-rule bg-surface px-4 py-3">
+          {isOwner && !tryout ? (
+            <div data-invite-code className="mb-5 rounded-lg border border-rule bg-surface px-4 py-3">
               <p className="font-body text-sm font-medium text-foreground">Invite code</p>
               <p className="mt-1 font-body text-sm text-muted">
                 Anyone with it can join as a member, from the sign-up page.
@@ -253,7 +260,7 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
           title="Search tags"
           intro="Every item gets hidden tags for what it is, what it’s made of and its colours, from its photo and its words, so a search for “wood” or “red” finds it even when nobody wrote that down. New and edited items are tagged as they’re saved, and anything untagged is filled in on its own."
         >
-          {isOwner ? (
+          {tryout ? null : isOwner ? (
             <>
               <p className="mb-3 font-body text-sm text-muted">
                 Refreshing re-tags every item with the latest tagging: about 30 cents per 100 items.

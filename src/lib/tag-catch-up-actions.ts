@@ -96,7 +96,7 @@ export async function tagSomeUntagged(): Promise<TagCatchUpResult> {
 export async function listItemsToRetag(): Promise<{ ids: string[] } | { error: string }> {
   const { user, profile } = await getUserAndProfile();
   if (!user || !profile?.active_org_id) return { error: "Sign in first." };
-  if (profile.role !== "owner") return { error: "Only an owner can refresh every item’s tags." };
+  if (profile.role !== "owner" || user.is_anonymous) return { error: "Only an owner can refresh every item’s tags." };
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("items")
@@ -111,7 +111,9 @@ export async function listItemsToRetag(): Promise<{ ids: string[] } | { error: s
 export async function retagItems(ids: string[]): Promise<{ tagged: number; stalled: boolean; error?: string }> {
   const { user, profile } = await getUserAndProfile();
   if (!user || !profile?.active_org_id) return { tagged: 0, stalled: true, error: "Sign in first." };
-  if (profile.role !== "owner") return { tagged: 0, stalled: true, error: "Only an owner can refresh every item’s tags." };
+  if (profile.role !== "owner" || user.is_anonymous) {
+    return { tagged: 0, stalled: true, error: "Only an owner can refresh every item’s tags." };
+  }
   const supabase = await createClient();
   const { data: items, error } = await supabase
     .from("items")

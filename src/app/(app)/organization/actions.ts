@@ -10,6 +10,10 @@ function fail(message: string): never {
 
 export async function regenerateInviteCode() {
   const supabase = await createClient();
+  // A test copy (tryout link, migration 013) has no invite code: it's one
+  // tester's own, and a code passed on would let others sign up into it.
+  const { data: auth } = await supabase.auth.getUser();
+  if (auth.user?.is_anonymous) fail("A test copy can’t have an invite code.");
   const { error } = await supabase.rpc("regenerate_invite_code");
 
   if (error) {
