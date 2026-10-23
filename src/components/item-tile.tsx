@@ -373,7 +373,19 @@ function TilePanel({
             className="absolute top-0 h-2.5 w-4 -translate-x-1/2 bg-foreground [clip-path:polygon(50%_0,100%_100%,0_100%)]"
             style={{ left: `${notchAt}%` }}
           />
-          <div className="relative overflow-hidden rounded-lg border border-foreground bg-surface sm:flex sm:items-start">
+          <div
+            data-tile-panel-card
+            className="relative cursor-pointer overflow-hidden rounded-lg border border-foreground bg-surface sm:flex sm:items-start"
+            onClick={(event) => {
+              // A tap anywhere on the opened details closes them again, as
+              // a tap on an opened list card does. Links, buttons and fields
+              // keep their own meaning, and a drag to select text isn't a tap.
+              const target = event.target as Element;
+              if (target.closest("a, button, input, select, textarea, label, [role=menuitem]")) return;
+              if (window.getSelection()?.toString()) return;
+              onClose();
+            }}
+          >
             {item.photoUrl ? (
               <div data-tile-photo className="relative aspect-square w-full shrink-0 bg-background sm:w-72 lg:w-80">
                 {/* eslint-disable-next-line @next/next/no-img-element -- signed URL from a private bucket */}

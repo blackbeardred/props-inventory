@@ -127,6 +127,27 @@ test.describe("list cells (phone)", () => {
     await expect(page.locator(LIST_CELLS).nth(1)).toContainText("tap for details");
   });
 
+  test("tapping inside the opened details shuts it; links in them still work", async ({ page }) => {
+    await open(page, "/inventory?view=list");
+    const broom = cell(page, "Antique Brass Broom");
+    const panel = broom.locator("[data-cell-panel]");
+    await broom.locator("h3").tap();
+    await expect(panel).toHaveAttribute("style", /1fr/);
+    await page.waitForTimeout(350);
+    // The big photo, then a label in the details: both shut it.
+    await broom.locator("[data-cell-photo]").tap();
+    await expect(panel).toHaveAttribute("style", /0fr/);
+    await broom.locator("h3").tap();
+    await page.waitForTimeout(350);
+    await panel.locator("dt").first().tap();
+    await expect(panel).toHaveAttribute("style", /0fr/);
+    // A link inside goes where it says, and doesn't shut the card first.
+    await broom.locator("h3").tap();
+    await page.waitForTimeout(350);
+    await panel.locator('a[href*="/edit"]').first().tap();
+    await page.waitForURL(/\/items\/.+\/edit$/);
+  });
+
   test("places are full paths, so two shelves called B are told apart", async ({ page }) => {
     await open(page, "/inventory?view=list");
     await expect(cell(page, "Antique Brass Broom")).toContainText("Props Room A / A");
@@ -293,6 +314,30 @@ test.describe("grid tiles open beneath their row", () => {
       await expect(page.locator("[data-tile-panel]")).toHaveCount(1);
       await page.locator("[data-tile-panel]").getByRole("button", { name: "Close" }).tap();
       await expect(page.locator("[data-tile-panel]")).toHaveCount(0);
+    });
+
+    test("tapping anywhere inside the opened details shuts them; links still work", async ({ page }) => {
+      await open(page, "/inventory?view=grid");
+      const tile = page.locator("[data-item-tile]").nth(0);
+      const panelEl = page.locator("[data-tile-panel]");
+      await tile.locator("h3").tap();
+      await expect(panelEl).toHaveCount(1);
+      await page.waitForTimeout(350);
+      await panelEl.locator("[data-tile-photo]").tap();
+      await expect(panelEl).toHaveCount(0);
+      await expect(tile).not.toHaveAttribute("data-open", "");
+      await tile.locator("h3").tap();
+      await page.waitForTimeout(350);
+      await panelEl.locator("h3").tap();
+      await expect(panelEl).toHaveCount(0);
+      await tile.locator("h3").tap();
+      await page.waitForTimeout(350);
+      await panelEl.locator("dt").first().tap();
+      await expect(panelEl).toHaveCount(0);
+      await tile.locator("h3").tap();
+      await page.waitForTimeout(350);
+      await panelEl.locator('a[href^="/inventory?place="]').tap();
+      await page.waitForURL(/place=/);
     });
   });
 
