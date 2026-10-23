@@ -42,6 +42,7 @@ const nextConfig: NextConfig = {
             "@/lib/embedding": "./e2e/fixtures/embedding.ts",
             "@/lib/ai/see-items": "./e2e/fixtures/see-items.ts",
             "@/lib/ai/describe-item": "./e2e/fixtures/describe-item.ts",
+            "@/lib/ai/tag-item": "./e2e/fixtures/tag-item.ts",
             "@/lib/e2e-hooks": "./e2e/fixtures/hooks.ts",
           },
         },

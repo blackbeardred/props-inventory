@@ -89,6 +89,8 @@ export function resetFixtures(options?: URLSearchParams): void {
   const db = seed();
   const flags = new Set<string>();
   if (options?.get("pre012") === "1") flags.add("pre012");
+  // tagging=1: the search tagger answers (e2e/fixtures/tag-item.ts).
+  if (options?.get("tagging") === "1") flags.add("tagging");
   (globalThis as unknown as { __fixtureFlags?: Set<string> }).__fixtureFlags = flags;
   if (options?.get("role") === "member") db.memberships[0].role = "member";
   if (options?.get("deleted") === "old") {
@@ -209,7 +211,8 @@ export function query(table: string) {
   let countMode = false;
   const b: Record<string, unknown> = {};
   b.select = (s = "*", opts?: { count?: string; head?: boolean }) => { select = s; head = !!opts?.head; countMode = !!opts?.count; return b; };
-  b.eq = (col: string, v: unknown) => { rows = rows.filter((r) => r[col] === v); return b; };
+  // An empty array is written "{}", as PostgREST takes it.
+  b.eq = (col: string, v: unknown) => { rows = rows.filter((r) => (v === "{}" && Array.isArray(r[col]) ? (r[col] as unknown[]).length === 0 : r[col] === v)); return b; };
   b.neq = (col: string, v: unknown) => { rows = rows.filter((r) => r[col] !== v); return b; };
   b.in = (col: string, vs: unknown[]) => { rows = rows.filter((r) => vs.includes(r[col])); return b; };
   b.not = (col: string, op: string, v: unknown) => { if (op === "is" && v === null) rows = rows.filter((r) => r[col] !== null && r[col] !== undefined); return b; };

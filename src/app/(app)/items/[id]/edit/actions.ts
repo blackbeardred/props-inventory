@@ -182,17 +182,21 @@ export async function updateItem(formData: FormData) {
   }
 
   if (photoFile || removePhoto || wordsChanged || neverTagged) {
-    autoTags = await generateTags({
-      name,
-      category,
-      description,
-      photo: photoFile
-        ? {
-            bytes: new Uint8Array(await photoFile.arrayBuffer()),
-            mediaType: photoFile.type,
-          }
-        : null,
-    });
+    // The photo the item is keeping counts as much as a new one: tagging from
+    // the words alone missed what only the picture shows (that a "cane" is
+    // mahogany, so wood).
+    let photo: { bytes: Uint8Array; mediaType: string } | null = null;
+    if (photoFile) {
+      photo = { bytes: new Uint8Array(await photoFile.arrayBuffer()), mediaType: photoFile.type };
+    } else if (!removePhoto && oldPhotoPath) {
+      try {
+        const { data: kept } = await supabase.storage.from(PHOTOS_BUCKET).download(oldPhotoPath);
+        if (kept) photo = { bytes: new Uint8Array(await kept.arrayBuffer()), mediaType: kept.type || "image/jpeg" };
+      } catch {
+        // Tag from the words alone.
+      }
+    }
+    autoTags = await generateTags({ name, category, description, photo });
   }
 
   const { error: updateError } = await supabase

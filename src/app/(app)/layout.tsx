@@ -5,6 +5,7 @@ import { AppNav, MobileTabBar } from "@/components/app-nav";
 import { QuickActions } from "@/components/quick-actions";
 import { DeletedBar } from "@/components/deleted-bar";
 import { FingerprintCatchUp } from "@/components/fingerprint-catch-up";
+import { TagCatchUp } from "@/components/tag-catch-up";
 import { OfflineBanner } from "@/components/service-worker";
 import { OrgSwitcher } from "@/components/org-switcher";
 import { TryoutBanner } from "@/components/tryout-banner";
@@ -101,6 +102,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {/* Catches up photo fingerprints in the background, but only on a device
           that already holds the model — see the component for why. */}
       <FingerprintCatchUp orgId={profile.active_org_id} />
+      {/* …and search tags for items that never went through the form. */}
+      <TagCatchUp orgId={profile.active_org_id} />
       <MobileTabBar />
       <QuickActions />
       {/* Undo, right after a delete. Reads the address, so it waits for it. */}
