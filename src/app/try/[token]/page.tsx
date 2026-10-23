@@ -1,14 +1,24 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Notice } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { openTryout } from "./actions";
+import { AutoOpen } from "./auto-open";
 
-export const metadata: Metadata = {
-  title: "Your test copy · Propolis",
-  robots: { index: false, follow: false },
-};
+type TryParams = { params: Promise<{ token: string }> };
+
+export async function generateMetadata({ params }: TryParams): Promise<Metadata> {
+  const { token } = await params;
+  return {
+    title: "Your test copy · Propolis",
+    robots: { index: false, follow: false },
+    // Added to a home screen from here, the app opens this test copy rather
+    // than a log-in page (see manifest.webmanifest/route.ts).
+    manifest: `/try/${token}/manifest.webmanifest`,
+  };
+}
 
 type TryPageProps = {
   params: Promise<{ token: string }>;
@@ -22,7 +32,10 @@ type TryPageProps = {
  */
 export default async function TryPage({ params, searchParams }: TryPageProps) {
   const { token } = await params;
-  const error = (await searchParams).error;
+  const query = await searchParams;
+  const error = query.error;
+  // Opened from the home-screen app: straight in, no button.
+  const fromApp = query.open === "1" && typeof error !== "string";
 
   let label: string | null = null;
   let notSetUp = false;
@@ -37,6 +50,12 @@ export default async function TryPage({ params, searchParams }: TryPageProps) {
     notSetUp = labelError?.code === "PGRST202";
     const user = auth.user as { email?: string | null; is_anonymous?: boolean } | null;
     if (user && !user.is_anonymous) signedInAs = user.email ?? "your account";
+    // Already signed in (the app's been opened before): rejoining is
+    // harmless and makes the test copy the open one, so go straight there.
+    if (fromApp && label && user) {
+      const { error: joinError } = await supabase.rpc("join_tryout", { p_token: token });
+      if (!joinError) redirect("/inventory");
+    }
   }
 
   return (
@@ -47,15 +66,17 @@ export default async function TryPage({ params, searchParams }: TryPageProps) {
 
         {label ? (
           <>
-            <h1 className="mt-6 font-display text-4xl leading-tight">Hi {label}.</h1>
-            <div className="mt-4 space-y-3 font-body text-base leading-relaxed text-foreground">
+            <h1 className="mt-6 font-display text-4xl leading-tight">Hi {label},</h1>
+            {/* Arjun's own words to the people he sends links to. */}
+            <div className="mt-4 space-y-3 font-body text-base leading-relaxed text-foreground" data-tryout-welcome>
               <p>
-                This is your own copy of Propolis to try out: a made-up theatre with a few rooms,
-                shelves and boxes, some props and costumes, and two shows.
+                This is your own copy of Propolis to try! I recommend opening this service on your
+                phone. Once you’re in the web browser, press the 3 circles on the bottom right, then
+                “Share”, “View More” and “Add to Home Screen”.
               </p>
               <p>
-                Change anything you like. Add things, delete them, import a spreadsheet, take
-                photos. Nothing you do reaches anyone else’s copy.
+                You’re able to add and delete items, as well as search for them within rooms. Please
+                let me know if you have any questions, and if any function isn’t intuitive.
               </p>
             </div>
 
@@ -65,9 +86,10 @@ export default async function TryPage({ params, searchParams }: TryPageProps) {
               </div>
             ) : null}
 
-            <form action={openTryout.bind(null, token)} className="mt-8" data-open-tryout>
+            <form id="open-tryout" action={openTryout.bind(null, token)} className="mt-8" data-open-tryout>
               <SubmitButton pendingText="Opening…">Open my test copy</SubmitButton>
             </form>
+            {fromApp ? <AutoOpen formId="open-tryout" /> : null}
             <p className="mt-4 font-body text-sm text-muted">
               No account needed. To come back later, open this same link again, on this device or
               another.
