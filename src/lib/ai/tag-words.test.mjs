@@ -1,6 +1,7 @@
 // Search-tag tidying: materials and colours get their everyday family word.
 //   node --experimental-strip-types --import ./src/lib/test-resolver.mjs src/lib/ai/tag-words.test.mjs
-import { refineTags, hasMaterialAndColour } from "./tag-words.ts";
+import { refineTags, hasMaterialAndColour, wordTags } from "./tag-words.ts";
+import { mayUseAI, TRYOUT_AI_ITEMS } from "../tryout-ai-limit.ts";
 
 let pass = 0, fail = 0;
 function is(label, actual, expected) {
@@ -26,6 +27,24 @@ is("a coffee mug isn't brown, a rose isn't pink", refineTags(["mug", "rose"], "C
 is("the theatre's cast isn't metal", refineTags(["poster"], "signed by the cast").includes("metal"), false);
 is("families survive a long answer", refineTags(Array.from({ length: 30 }, (_, i) => `word${i}`), "oak").includes("wood"), true);
 is("knows when material and colour are both there", [hasMaterialAndColour(["cane", "wood", "brown"]), hasMaterialAndColour(["cane", "wood"])], [true, false]);
+
+// Word tags: past a test copy's AI allowance.
+is("word tags: the name's words, the category, and the families", wordTags("Walnut bookcase, tall", "prop", "Navy shelves"),
+  ["walnut", "bookcase", "tall", "wood", "brown", "blue"]);
+is("  a costume says so", wordTags("Velvet cloak", "costume").includes("costume"), true);
+is("  never empty for a named item", wordTags("A1", "prop"), ["a1"]);
+is("  no small words", wordTags("Pair of tongs and the poker").includes("and"), false);
+is("  no cord as rope", wordTags("Telephone", "prop", "coiled cord").includes("rope"), false);
+
+// The allowance.
+is("ten AI items per tester", TRYOUT_AI_ITEMS, 10);
+is("no limit with an account", mayUseAI(null, null), true);
+const nine = new Set(["a", "b", "c", "d", "e", "f", "g", "h", "i"]);
+const ten = new Set([...nine, "j"]);
+is("a tester's tenth new item uses the model", mayUseAI(nine, null), true);
+is("  the eleventh doesn't", mayUseAI(ten, null), false);
+is("  one of the first ten does when edited", mayUseAI(ten, "c"), true);
+is("  a later one, or a sample item, doesn't", mayUseAI(ten, "zz"), false);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

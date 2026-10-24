@@ -129,6 +129,21 @@ export function refineTags(tags: string[], text = ""): string[] {
   return kept;
 }
 
+const SMALL_WORDS = new Set(["and", "the", "with", "for", "from", "its", "one", "two", "pair"]);
+
+/**
+ * Tags with no model: the words of the name and the category, plus the
+ * family words its name and description give away ("oak" → wood, "navy" →
+ * blue). For items past a test copy's AI allowance (tryout-ai-limit.ts).
+ * Never empty for a named item, so the catch-up doesn't ask for it again.
+ */
+export function wordTags(name: string, category?: string | null, description?: string | null): string[] {
+  const own = words(name).filter((w) => w.length > 2 && !SMALL_WORDS.has(w));
+  const tags = refineTags([...own, ...(category ? [category] : [])], `${name} ${description ?? ""}`);
+  const fallback = name.trim().toLowerCase().slice(0, MAX_TAG_LENGTH);
+  return tags.length || !fallback ? tags : [fallback];
+}
+
 /** True when the tags name at least one material family and one colour. */
 export function hasMaterialAndColour(tags: string[]): boolean {
   const set = new Set(tags);

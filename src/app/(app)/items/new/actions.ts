@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 import { generateTags } from "@/lib/ai/tag-item";
-import { refineTags } from "@/lib/ai/tag-words";
+import { refineTags, wordTags } from "@/lib/ai/tag-words";
+import { aiAllowance, mayUseAI } from "@/lib/tryout-ai-limit";
 import { describeItemPhoto, type DescribeResult } from "@/lib/ai/describe-item";
 import { cleanTags, mergeTags } from "@/lib/ai/describe-item-parse";
 
@@ -163,17 +164,22 @@ export async function createItem(formData: FormData) {
   } catch {
     photoTags = [];
   }
-  const savedTags = await generateTags({
-    name,
-    category,
-    description,
-    photo: photoFile
-      ? {
-          bytes: new Uint8Array(await photoFile.arrayBuffer()),
-          mediaType: photoFile.type,
-        }
-      : null,
-  });
+  // In a test copy, the model tags a tester's first ten items; after that,
+  // word tags (tryout-ai-limit.ts).
+  const useAI = mayUseAI(await aiAllowance(supabase, user, profile.active_org_id), null);
+  const savedTags = useAI
+    ? await generateTags({
+        name,
+        category,
+        description,
+        photo: photoFile
+          ? {
+              bytes: new Uint8Array(await photoFile.arrayBuffer()),
+              mediaType: photoFile.type,
+            }
+          : null,
+      })
+    : wordTags(name, category, description);
   autoTags = refineTags(mergeTags(savedTags, photoTags), `${name} ${description ?? ""}`);
 
   const { error: insertError } = await supabase.from("items").insert({

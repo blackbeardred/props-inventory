@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getUserAndProfile } from "@/lib/auth";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 import { generateTags } from "@/lib/ai/tag-item";
+import { wordTags } from "@/lib/ai/tag-words";
+import { aiAllowance, mayUseAI } from "@/lib/tryout-ai-limit";
 
 /**
  * Tags a few of the open theatre's untagged items (see TagCatchUp).
@@ -63,10 +65,14 @@ export async function tagSomeUntagged(): Promise<TagCatchUpResult> {
     .limit(BATCH);
   if (error || !items) return { tagged: 0, remaining: 0, stalled: true };
 
+  // In a test copy, past the tester's AI allowance: word tags.
+  const allowance = await aiAllowance(supabase, user, orgId);
   let tagged = 0;
   let stalled = false;
   for (const item of items as TaggableItem[]) {
-    const tags = await tagsFor(supabase, item);
+    const tags = mayUseAI(allowance, item.id)
+      ? await tagsFor(supabase, item)
+      : wordTags(item.name, item.category, item.description);
     if (tags.length === 0) {
       stalled = true;
       break;

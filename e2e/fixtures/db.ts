@@ -21,7 +21,7 @@ const colours = ["#8a6d3b", "#5c8c70", "#9b3a22", "#3e8c9a", "#7e5410", "#6b5f4c
 
 function seed(): Record<string, Row[]> {
   const DB: Record<string, Row[]> = {
-    organizations: [{ id: "org1", name: "SPARC", invite_code: "163ECD01" }],
+    organizations: [{ id: "org1", name: "SPARC", invite_code: "163ECD01", created_at: now }],
     profiles: [{ id: "u1", full_name: "testname", avatar_url: null, active_org_id: "org1" }],
     memberships: [{ user_id: "u1", org_id: "org1", role: "owner", created_at: "2026-09-24T00:00:00Z" }],
     locations: [

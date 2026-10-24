@@ -119,5 +119,12 @@ check "  with no invite code" "" "$(q "select invite_code from organizations whe
 check "  and still a name" "Tester 4's test theatre" "$(q "select name from organizations where id = '$ORG4'")"
 
 echo ""
+echo "── A tester's own items (src/lib/tryout-ai-limit.ts)"
+own() { q "select count(*) from items where org_id = '$1' and created_at > (select created_at from organizations where id = '$1')"; }
+check "the sample items aren't counted as a tester's own" "0|0" "$(own $ORG1)|$(own $ORG4)"
+q "insert into items (org_id, name) values ('$ORG4', 'Spinning wheel')" >/dev/null
+check "  something they add is" "1" "$(own $ORG4)"
+
+echo ""
 echo "════ $PASS passed, $FAIL failed ════"
 [ "$FAIL" -eq 0 ] || exit 1

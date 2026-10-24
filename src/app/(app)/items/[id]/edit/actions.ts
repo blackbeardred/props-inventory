@@ -7,6 +7,8 @@ import { trashItem } from "@/lib/recently-deleted";
 import { withUndo } from "@/lib/undo-href";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 import { generateTags } from "@/lib/ai/tag-item";
+import { wordTags } from "@/lib/ai/tag-words";
+import { aiAllowance, mayUseAI } from "@/lib/tryout-ai-limit";
 import { leaveTwins, linkAsTwins } from "@/lib/twins-data";
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
@@ -181,7 +183,11 @@ export async function updateItem(formData: FormData) {
     photoPath = null;
   }
 
-  if (photoFile || removePhoto || wordsChanged || neverTagged) {
+  if ((photoFile || removePhoto || wordsChanged || neverTagged) &&
+    !mayUseAI(await aiAllowance(supabase, user, profile.active_org_id), itemId)) {
+    // A test copy's item past its AI allowance (tryout-ai-limit.ts).
+    autoTags = wordTags(name, category, description);
+  } else if (photoFile || removePhoto || wordsChanged || neverTagged) {
     // The photo the item is keeping counts as much as a new one: tagging from
     // the words alone missed what only the picture shows (that a "cane" is
     // mahogany, so wood).
@@ -248,12 +254,21 @@ export async function regenerateTags(formData: FormData) {
 
   const { data: existingItem } = await supabase
     .from("items")
-    .select("name, category, description, photo_url")
+    .select("name, category, description, photo_url, org_id")
     .eq("id", itemId)
     .maybeSingle();
 
   if (!existingItem) {
     redirect("/inventory");
+  }
+
+  if (!mayUseAI(await aiAllowance(supabase, user, existingItem.org_id), itemId)) {
+    const { error: wordsError } = await supabase
+      .from("items")
+      .update({ auto_tags: wordTags(existingItem.name, existingItem.category, existingItem.description) })
+      .eq("id", itemId);
+    if (wordsError) fail(itemId, wordsError.message);
+    redirect(`/items/${itemId}/edit?notice=tags-regenerated`);
   }
 
   let photo: { bytes: Uint8Array; mediaType: string } | null = null;

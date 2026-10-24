@@ -71,3 +71,43 @@ test("with no tagger, refreshing stops and says why", async ({ page }) => {
   await expect(page.locator("#tags").getByRole("status")).toContainText("Stopped after 0 of 22", { timeout: 20_000 });
   await expect(page.locator("#tags").getByRole("status")).toContainText("API key");
 });
+
+test.describe("a tester's own items (test links)", () => {
+  test.use({ fixtureOptions: "tagging=1" });
+
+  test("the first ten are tagged by the model, the rest by their words", async ({ page, context }) => {
+    test.setTimeout(180_000);
+    await context.addCookies([{ name: "e2e-anonymous", value: "1", domain: "localhost", path: "/" }]);
+    const names = [
+      "Spinning wheel", "Rocking horse", "Hat stand", "Gramophone", "Sea chest", "Butter churn",
+      "Harp", "Sedan chair", "Mangle", "Hourglass", "Walnut bookcase",
+    ];
+    for (const name of names) {
+      await open(page, "/items/new");
+      await page.locator('form [name="name"]').fill(name);
+      await page.getByRole("button", { name: "Add item" }).click();
+      await page.waitForURL(/\/inventory/);
+    }
+    await open(page, "/inventory?view=list");
+    // The fixture model marks what it tags "tagged": the first ten only.
+    expect(await matches(page, "tagged")).toBe(10);
+    // The eleventh still turns up for what it's made of.
+    await page.locator("main input[type=text]").fill("wood");
+    await expect(page.locator("main")).toContainText("Walnut bookcase");
+    await page.locator("main input[type=text]").fill("bookcase");
+    await expect(page.locator("main")).toContainText("Walnut bookcase");
+  });
+
+  test("someone with an account has no limit", async ({ page }) => {
+    test.setTimeout(180_000);
+    for (const name of ["Spinning wheel", "Rocking horse", "Hat stand", "Gramophone", "Sea chest", "Butter churn", "Harp", "Sedan chair", "Mangle", "Hourglass", "Walnut bookcase"]) {
+      await open(page, "/items/new");
+      await page.locator('form [name="name"]').fill(name);
+      await page.getByRole("button", { name: "Add item" }).click();
+      await page.waitForURL(/\/inventory/);
+    }
+    await open(page, "/inventory?view=list");
+    // All eleven, plus the sample items the catch-up tags as it goes.
+    await expect.poll(() => matches(page, "tagged"), { timeout: 30_000, intervals: [2000] }).toBe(32);
+  });
+});
