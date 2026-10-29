@@ -9,6 +9,8 @@ const PUBLIC_PATHS = new Set([
   "/signup",
   "/forgot-password",
   "/privacy",
+  // The research survey (migration 017): answered by people with no account.
+  "/survey",
   "/auth/callback",
 ]);
 // Tryout links (/try/<token>, migration 013): opened by people with no

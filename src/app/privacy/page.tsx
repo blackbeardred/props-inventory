@@ -14,7 +14,7 @@ export const metadata: Metadata = {
  */
 const OPERATOR = "Arjun Bhatkhande";
 const CONTACT_EMAIL = "arjunallenbhatkhande@gmail.com";
-const EFFECTIVE = "October 14, 2026";
+const EFFECTIVE = "October 27, 2026";
 
 /** The contact address, as a link that opens an email. */
 function Contact() {
@@ -211,6 +211,17 @@ export default function PrivacyPage() {
           <p>
             Propolis is for the people who run a theatre&rsquo;s storage, and isn&rsquo;t meant
             for children under 13. School and youth theatres should have staff hold the accounts.
+          </p>
+        </Section>
+
+        <Section title="Surveys">
+          <p>
+            We sometimes ask people who work in theater to answer a short research survey, with
+            no account needed. We keep the answers you give. An email address is kept only if
+            you choose to leave one, and is used only to contact you about that research. To stop
+            the same person sending answers over and over, a scrambled form of your network
+            address is kept for about an hour and then deleted. Survey answers are read only by
+            us. To have yours removed, write to us at <Contact />.
           </p>
         </Section>
 

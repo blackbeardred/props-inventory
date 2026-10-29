@@ -285,6 +285,15 @@ export function query(table: string) {
 export const TRYOUT_TOKEN = "0123456789abcdef0123456789abcdef";
 
 export function rpc(name: string, args: Record<string, unknown>) {
+  if (name === "submit_survey") {
+    // In the browser (the survey page calls it from there). A test sets
+    // __surveyFail to see how a refusal reads; __surveySent records what
+    // was sent.
+    const g = globalThis as unknown as { __surveyFail?: string; __surveySent?: unknown[] };
+    if (g.__surveyFail) return Promise.resolve({ data: null, error: { code: "P0001", message: g.__surveyFail } });
+    (g.__surveySent ??= []).push(args);
+    return Promise.resolve({ data: null, error: null });
+  }
   if (name === "tryout_label") {
     return Promise.resolve({ data: args.p_token === TRYOUT_TOKEN ? "Tester 1" : null, error: null });
   }
