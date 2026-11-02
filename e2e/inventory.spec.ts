@@ -161,11 +161,22 @@ test.describe("list cells (phone)", () => {
     const photo = broom.locator("[data-cell-photo]");
     const shut = await photo.boundingBox();
     expect([shut!.width, shut!.height]).toEqual([48, 48]);
+    // Watch the photo's width every frame while it opens, rather than
+    // sampling once at a fixed delay, which a busy machine can miss.
+    await photo.evaluate((img) => {
+      const seen: number[] = [];
+      (window as unknown as { __widths: number[] }).__widths = seen;
+      const tick = () => {
+        seen.push(img.getBoundingClientRect().width);
+        if (seen.length < 120) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
     await broom.locator("h3").click();
-    await page.waitForTimeout(120);
-    const mid = (await photo.boundingBox())!.width;
-    await page.waitForTimeout(450);
+    await page.waitForTimeout(600);
     const open1 = (await photo.boundingBox())!;
+    const widths = await page.evaluate(() => (window as unknown as { __widths: number[] }).__widths);
+    const mid = Math.max(...widths.filter((w) => w > 48.5 && w < open1.width - 0.5), 0);
     const card = await broom.locator(":scope > div").evaluate((el) => {
       const s = getComputedStyle(el);
       return el.getBoundingClientRect().width - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight);

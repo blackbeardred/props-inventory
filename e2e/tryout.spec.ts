@@ -44,6 +44,7 @@ test.describe("on a phone", () => {
     await expect(page.locator("#theatres")).toHaveCount(1);
     for (const id of ["email", "password"]) await expect(page.locator(`#${id}`)).toHaveCount(0);
     await expect(page.getByLabel("Join another theatre with its invite code")).toHaveCount(0);
+    await expect(page.locator("[data-create-theatre]")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Leave" })).toHaveCount(0);
     await expect(page.locator("main")).toContainText("Your test copy stays as it is");
     // A tester may still log in or sign up for real.

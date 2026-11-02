@@ -285,6 +285,16 @@ export function query(table: string) {
 export const TRYOUT_TOKEN = "0123456789abcdef0123456789abcdef";
 
 export function rpc(name: string, args: Record<string, unknown>) {
+  if (name === "create_organization_and_profile") {
+    // As the real function: a new organization, the caller its owner, and it
+    // becomes the active one; their name is kept if they already have one.
+    const id = `org-${Math.random().toString(36).slice(2, 8)}`;
+    DB.organizations.push({ id, name: String(args.org_name), invite_code: id.slice(4).toUpperCase().padEnd(8, "X"), created_at: new Date().toISOString() });
+    DB.memberships.push({ user_id: "u1", org_id: id, role: "owner", created_at: new Date().toISOString() });
+    const me = DB.profiles.find((p) => p.id === "u1");
+    if (me) me.active_org_id = id;
+    return Promise.resolve({ data: id, error: null });
+  }
   if (name === "submit_survey") {
     // In the browser (the survey page calls it from there). A test sets
     // __surveyFail to see how a refusal reads; __surveySent records what

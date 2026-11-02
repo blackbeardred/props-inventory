@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AVATARS_BUCKET } from "@/lib/supabase/storage";
@@ -166,6 +167,9 @@ export async function switchOrganization(formData: FormData) {
     fail(error.message);
   }
 
+  // The header (theater name and switcher) is in the shared layout, which a
+  // redirect alone doesn't redraw.
+  revalidatePath("/", "layout");
   redirect("/inventory");
 }
 
@@ -191,6 +195,42 @@ export async function leaveOrganization(formData: FormData) {
 }
 
 /** Joins an additional organization without leaving the current one. */
+/** The longest theater name (rename_organization, migration 012, allows the same). */
+const MAX_THEATRE_NAME = 100;
+
+/**
+ * Starts a new theater with the signed-in person as its owner, and makes it
+ * the one they're in, through create_organization_and_profile (the same
+ * function onboarding uses; it keeps their name and their other theaters).
+ * Not for test-link users, whose copy is the only theater they're meant to
+ * have.
+ */
+export async function createTheatre(formData: FormData) {
+  const name = String(formData.get("theatreName") ?? "").replace(/\s+/g, " ").trim();
+  if (!name) fail("Give the new theater a name.");
+  if (name.length > MAX_THEATRE_NAME) fail(`That name is too long: ${MAX_THEATRE_NAME} characters at most.`);
+
+  const { supabase, user } = await requireUser();
+  if ((user as { is_anonymous?: boolean }).is_anonymous) {
+    fail("A test copy can’t start new theaters. Sign up for an account to make your own.");
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { error } = await supabase.rpc("create_organization_and_profile", {
+    org_name: name,
+    member_name: profile?.full_name ?? user.email ?? "Owner",
+  });
+  if (error) fail(error.message);
+
+  revalidatePath("/", "layout");
+  redirect("/theatre?notice=theatre-created");
+}
+
 export async function joinOrganization(formData: FormData) {
   const inviteCode = String(formData.get("inviteCode") ?? "").trim();
 

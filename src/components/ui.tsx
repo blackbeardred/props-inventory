@@ -144,6 +144,8 @@ export function TextField({
   autoComplete,
   defaultValue,
   minLength,
+  maxLength,
+  helpText,
 }: {
   label: string;
   name: string;
@@ -152,6 +154,8 @@ export function TextField({
   autoComplete?: string;
   defaultValue?: string;
   minLength?: number;
+  maxLength?: number;
+  helpText?: string;
 }) {
   return (
     <label className="block">
@@ -165,8 +169,12 @@ export function TextField({
         autoComplete={autoComplete}
         defaultValue={defaultValue}
         minLength={minLength}
+        maxLength={maxLength}
         className="min-h-11 w-full rounded-md border border-rule bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors focus:border-accent md:min-h-0"
       />
+      {helpText ? (
+        <span className="mt-1.5 block font-body text-xs text-muted">{helpText}</span>
+      ) : null}
     </label>
   );
 }

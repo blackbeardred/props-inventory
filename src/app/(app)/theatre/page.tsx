@@ -37,6 +37,10 @@ function first(value: string | string[] | undefined) {
 }
 
 const NOTICES: Record<string, { title: string; body: string }> = {
+  "theatre-created": {
+    title: "Your new theater is ready",
+    body: "You’re its owner, and it’s the theater you’re in now. Add rooms and items from Inventory, or share the invite code below so your crew can join.",
+  },
   "theatre-renamed": {
     title: "Renamed",
     body: "Everyone in the theatre sees the new name from their next page.",

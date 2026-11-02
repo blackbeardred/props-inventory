@@ -18,6 +18,7 @@ import { getUserAndProfile } from "@/lib/auth";
 import { AVATARS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
 import { logout, switchAccount } from "@/app/actions";
 import {
+  createTheatre,
   joinOrganization,
   leaveOrganization,
   switchOrganization,
@@ -235,6 +236,22 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               />
               <SubmitButton pendingText="Joining…" variant="ghost">
                 Join a theatre
+              </SubmitButton>
+            </form>
+          )}
+
+          {tryout ? null : (
+            <form action={createTheatre} className="mt-8 space-y-5 border-t border-rule pt-6" data-create-theatre>
+              <TextField
+                label="Start a new theater"
+                name="theatreName"
+                autoComplete="organization"
+                maxLength={100}
+                helpText="You’ll be its owner, with its own inventory and invite code. Your other theaters stay as they are."
+                required
+              />
+              <SubmitButton pendingText="Creating…" variant="ghost">
+                Create theater
               </SubmitButton>
             </form>
           )}

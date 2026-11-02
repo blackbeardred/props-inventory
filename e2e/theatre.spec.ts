@@ -81,3 +81,23 @@ test("Log out signs out and goes to the front door", async ({ page }) => {
   await open(page, "/inventory");
   expect(new URL(page.url()).pathname).toBe("/login");
 });
+
+test("Start a new theater: you own it, you're in it, and your other theater stays", async ({ page }) => {
+  await open(page, "/account");
+  const form = page.locator("[data-create-theatre]");
+  await expect(form).toContainText("You’ll be its owner");
+  await form.getByLabel("Start a new theater").fill("  Riverside   Players ");
+  await form.getByRole("button", { name: "Create theater" }).click();
+  await page.waitForURL(/\/theatre\?notice=theatre-created/);
+  await expect(page.locator("main")).toContainText("Your new theater is ready");
+  await expect(page.locator("#members")).toContainText("Riverside Players");
+  await expect(page.locator("#members")).toContainText("Owner");
+  // Both theaters, the new one current, from the switcher in the header.
+  const switcher = page.locator("header details").first();
+  await expect(switcher.locator("summary")).toContainText("Riverside Players");
+  await switcher.locator("summary").click();
+  await expect(switcher).toContainText("SPARC");
+  await expect(switcher.getByRole("link", { name: "Join or start a theater" })).toHaveAttribute("href", "/account#theatres");
+  await open(page, "/account");
+  await expect(page.locator("#theatres li")).toHaveCount(2);
+});
