@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   Badge,
-  FileField,
   Notice,
   PageHeading,
   TextField,
@@ -12,6 +11,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { DeleteButton } from "@/components/delete-button";
 import { SettingsSection as Section } from "@/components/settings-section";
 import { InstallApp } from "@/components/install-app";
+import { AvatarField } from "@/components/avatar-field";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { getUserAndProfile } from "@/lib/auth";
@@ -136,25 +136,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           intro="Your name and picture show up on the members list and anywhere your work is attributed."
         >
           <form action={updateProfile} className="space-y-5">
-            <div className="flex items-center gap-4">
-              {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- signed URL, same reasoning as item photos
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  className="h-16 w-16 rounded-full object-cover"
-                />
-              ) : (
-                <div className="h-16 w-16 rounded-full border border-dashed border-rule" />
-              )}
-              {avatarUrl ? (
-                <label className="flex items-center gap-2 font-body text-sm text-muted">
-                  <input type="checkbox" name="removeAvatar" />
-                  Remove current picture
-                </label>
-              ) : null}
-            </div>
-
             <TextField
               label="Display name"
               name="fullName"
@@ -163,12 +144,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               required
             />
 
-            <FileField
-              label={avatarUrl ? "Replace picture" : "Profile picture"}
-              name="avatar"
-              accept="image/png,image/jpeg,image/webp"
-              helpText="JPG, PNG, or WEBP — up to 4MB."
-            />
+            <AvatarField existingUrl={avatarUrl} />
 
             <SubmitButton pendingText="Saving…">Save</SubmitButton>
           </form>
