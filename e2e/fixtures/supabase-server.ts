@@ -25,6 +25,13 @@ export async function createClient() {
               : { id: "u1", email: "stage.manager@example.com", is_anonymous: false },
         },
       }),
+      signOut: async () => {
+        const jar = await cookies();
+        jar.delete("e2e-anonymous");
+        jar.set("e2e-signed-out", "1", { path: "/" });
+        signedOut = true;
+        return { error: null };
+      },
       signInAnonymously: async () => {
         const jar = await cookies();
         if (jar.has("e2e-no-anonymous")) {

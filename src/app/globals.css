@@ -87,6 +87,15 @@ body {
  * whoever reaches for the shape next. Give it a height as well and you get a
  * hexagon stretched along one axis, which is what every use of this class
  * was doing until someone looked at one closely. */
+/* The landing page's section links scroll rather than jump, unless the
+ * person has asked for less motion. Only there: the app's own pages scroll
+ * themselves (cells opening, swipes) and must move at once. */
+@media (prefers-reduced-motion: no-preference) {
+  html:has([data-landing]) {
+    scroll-behavior: smooth;
+  }
+}
+
 .hex {
   clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
   aspect-ratio: 2 / 1.7320508;

@@ -22,6 +22,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const error = first(params.error);
   const next = first(params.next) ?? "/inventory";
+  // Arrived from "Switch account" on the account page.
+  const switched = first(params.switched) === "1";
 
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-16">
@@ -29,7 +31,17 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           pages kept for offline use belong to the last person signed in. */}
       <ClearOfflinePages />
       <div className="w-full max-w-sm">
-        <PageHeading title="Log in" intro="Welcome back." />
+        <PageHeading
+          title="Log in"
+          intro={switched ? "Log in with the other account." : "Welcome back."}
+        />
+        {switched && !first(params.error) ? (
+          <div className="mb-6" data-switched-account>
+            <Notice title="You’re signed out">
+              The account you were using is signed out on this device.
+            </Notice>
+          </div>
+        ) : null}
 
         {!supabaseConfigured ? (
           <Notice title="Connect Supabase to log in">

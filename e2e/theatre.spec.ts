@@ -37,6 +37,7 @@ test("Your account: name, theatres, sign-in, this device, and nothing about the 
   await expect(page.locator('input[type="password"]')).toHaveCount(2);
   await expect(page.getByText(/Install the app|Installed on this device/).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Switch account" })).toBeVisible();
   for (const id of ["members", "photos", "deleted"]) {
     await expect(page.locator(`#${id}`)).toHaveCount(0);
   }
@@ -58,4 +59,25 @@ test("the fingerprint page counts what's outstanding", async ({ page }) => {
   await open(page, "/items/fingerprints");
   await expect(page.locator("main")).not.toContainText("Couldn't read the inventory");
   await expect(page.locator("main h1")).toBeVisible();
+});
+
+test("Switch account signs out and goes straight to log in", async ({ page }) => {
+  await open(page, "/account");
+  await page.getByRole("button", { name: "Switch account" }).click();
+  await page.waitForURL(/\/login\?switched=1$/);
+  await expect(page.locator("[data-switched-account]")).toContainText("You’re signed out");
+  await expect(page.locator("main")).toContainText("Log in with the other account.");
+  await expect(page.getByLabel("Email")).toHaveValue("");
+  // Really signed out: the app sends you back to log in.
+  await open(page, "/inventory");
+  expect(new URL(page.url()).pathname).toBe("/login");
+});
+
+test("Log out signs out and goes to the front door", async ({ page }) => {
+  await open(page, "/account");
+  await page.getByRole("button", { name: "Log out" }).click();
+  await page.waitForURL((url) => url.pathname === "/");
+  await expect(page.locator("h1")).toContainText("Every prop");
+  await open(page, "/inventory");
+  expect(new URL(page.url()).pathname).toBe("/login");
 });

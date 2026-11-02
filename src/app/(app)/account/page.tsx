@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { getUserAndProfile } from "@/lib/auth";
 import { AVATARS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
-import { logout } from "@/app/actions";
+import { logout, switchAccount } from "@/app/actions";
 import {
   joinOrganization,
   leaveOrganization,
@@ -319,17 +319,24 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           <InstallApp />
         </Section>
 
-        <Section title="Signing out">
+        <Section id="signing-out" title="Signing out">
           <p className="mb-3 font-body text-sm text-muted">
             {tryout
-              ? "Your test copy stays as it is. Open your link again to get back to it."
-              : "Logging out also forgets the pages this device kept for offline use."}
+              ? "Your test copy stays as it is. Open your link again to get back to it. To use a Propolis account instead, switch account."
+              : "Switch account signs you out and takes you straight to log in with another one. Either way, this device forgets the pages it kept for offline use."}
           </p>
-          <form action={logout}>
-            <SubmitButton pendingText="Signing out…" variant="ghost">
-              Log out
-            </SubmitButton>
-          </form>
+          <div className="flex flex-wrap gap-3">
+            <form action={logout}>
+              <SubmitButton pendingText="Signing out…" variant="ghost">
+                Log out
+              </SubmitButton>
+            </form>
+            <form action={switchAccount}>
+              <SubmitButton pendingText="Switching…" variant="ghost">
+                Switch account
+              </SubmitButton>
+            </form>
+          </div>
         </Section>
 
         <p className="border-t border-rule pt-8 font-body text-sm text-muted">
