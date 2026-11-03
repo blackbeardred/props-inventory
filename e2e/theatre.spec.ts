@@ -101,3 +101,39 @@ test("Start a new theater: you own it, you're in it, and your other theater stay
   await open(page, "/account");
   await expect(page.locator("#theatres li")).toHaveCount(2);
 });
+
+test("the theater switcher closes on a click elsewhere, on Escape, and on a new page", async ({ page }) => {
+  // A second theater, so the header's name becomes a menu.
+  await open(page, "/account");
+  const form = page.locator("[data-create-theatre]");
+  await form.getByLabel("Start a new theater").fill("Riverside Players");
+  await form.getByRole("button", { name: "Create theater" }).click();
+  await page.waitForURL(/\/theatre\?notice=theatre-created/);
+
+  const switcher = page.locator("header details").first();
+  const isOpen = () => switcher.evaluate((el) => (el as HTMLDetailsElement).open);
+
+  await switcher.locator("summary").click();
+  expect(await isOpen()).toBe(true);
+  // A click on the page, clear of the menu (which, open, covers the heading).
+  await page.getByText("Your new theater is ready").click();
+  await expect.poll(isOpen).toBe(false);
+
+  // Clicking inside the open menu doesn't close it; its own summary still toggles it.
+  await switcher.locator("summary").click();
+  await switcher.getByText("(current)").click();
+  expect(await isOpen()).toBe(true);
+  await switcher.locator("summary").click();
+  await expect.poll(isOpen).toBe(false);
+
+  await switcher.locator("summary").click();
+  await page.keyboard.press("Escape");
+  await expect.poll(isOpen).toBe(false);
+  await expect(switcher.locator("summary")).toBeFocused();
+
+  // Following the menu's own link leaves it shut on the next page.
+  await switcher.locator("summary").click();
+  await switcher.getByRole("link", { name: "Join or start a theater" }).click();
+  await page.waitForURL(/\/account/);
+  await expect.poll(isOpen).toBe(false);
+});

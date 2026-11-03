@@ -1,11 +1,13 @@
 import Link from "next/link";
 import type { MembershipSummary } from "@/lib/auth";
+import { DismissableDetails } from "@/components/dismissable-details";
 import { switchOrganization } from "@/app/(app)/account/actions";
 
 /**
  * The organization name in the header. With one membership it's just a link
  * home; with several it opens into a list you can switch between. Built on
- * <details> so it needs no client JavaScript.
+ * <details>, so it opens without JavaScript; DismissableDetails adds closing
+ * on a click outside, Escape, or moving to another page.
  */
 export function OrgSwitcher({
   memberships,
@@ -29,7 +31,7 @@ export function OrgSwitcher({
   }
 
   return (
-    <details className="relative">
+    <DismissableDetails className="relative">
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 font-display text-sm text-muted transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
         {activeName} <span aria-hidden="true">▾</span>
       </summary>
@@ -68,6 +70,6 @@ export function OrgSwitcher({
           Join or start a theater
         </Link>
       </div>
-    </details>
+    </DismissableDetails>
   );
 }
