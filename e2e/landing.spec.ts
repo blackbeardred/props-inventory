@@ -60,6 +60,36 @@ test.describe("signed out", () => {
     await expect(page.locator('img[src="/landing/doublet.jpg"]')).toBeVisible();
   });
 
+  test("the feature and role cards open when tapped, and close again", async ({ page }) => {
+    await open(page, "/");
+    // Measured rather than asked about visibility: a shut panel's text still has
+    // a box of its own, so "visible" and "in viewport" can't tell shut from open.
+    const panel = (name: string) => page.getByRole("button", { name }).evaluate((button) => {
+      const el = document.getElementById(button.getAttribute("aria-controls") ?? "");
+      return { height: el?.getBoundingClientRect().height ?? -1, inert: el?.hasAttribute("inert") ?? false };
+    });
+
+    const shelf = page.getByRole("button", { name: "Every shelf, mapped" });
+    await expect(shelf).toHaveAttribute("aria-expanded", "false");
+    expect(await panel("Every shelf, mapped")).toEqual({ height: 0, inert: true });
+    await shelf.click();
+    await expect(shelf).toHaveAttribute("aria-expanded", "true");
+    await expect.poll(async () => (await panel("Every shelf, mapped")).height).toBeGreaterThan(20);
+    expect((await panel("Every shelf, mapped")).inert).toBe(false);
+    await expect(page.locator("#what-it-does").getByText("Rooms hold shelves")).toBeInViewport();
+    // Opening one leaves the others shut.
+    expect(await panel("Find it from a photo")).toEqual({ height: 0, inert: true });
+    await shelf.click();
+    await expect.poll(async () => (await panel("Every shelf, mapped")).height).toBe(0);
+
+    const managers = page.getByRole("button", { name: "Stage managers" });
+    expect(await panel("Stage managers")).toEqual({ height: 0, inert: true });
+    await managers.click();
+    await expect(managers).toHaveAttribute("aria-expanded", "true");
+    await expect.poll(async () => (await panel("Stage managers")).height).toBeGreaterThan(80);
+    await expect(page.locator("#who-its-for").getByText("Pull lists you can tick off backstage")).toBeInViewport();
+  });
+
   test("sign-up links to the privacy policy", async ({ page }) => {
     await open(page, "/signup");
     await expect(page.getByRole("link", { name: "privacy policy" })).toHaveAttribute("href", "/privacy");

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Honeycomb } from "@/components/landing/honeycomb";
+import { RevealCard } from "@/components/landing/reveal-card";
 import { getUserAndProfile } from "@/lib/auth";
 import { supabaseConfigured } from "@/lib/supabase/config";
 
@@ -159,13 +160,20 @@ export default async function Home() {
               boxes, and a show that needs half of it by Thursday.
             </p>
           </div>
-          <ul className="mt-8 grid gap-4 md:mt-10 md:grid-cols-2 md:gap-6 xl:mt-14 xl:grid-cols-3">
+          {/* Each card shows its title; tapping it opens the line beneath. items-start
+              so an opened card doesn't stretch the closed ones beside it. */}
+          <ul className="mt-8 grid items-start gap-4 md:mt-10 md:grid-cols-2 md:gap-6 xl:mt-14 xl:grid-cols-3">
             {FEATURES.map(([title, body]) => (
-              <li key={title} className="space-y-4 rounded-2xl bg-background p-8">
-                <Hex className="w-8" />
-                <h3 className="font-display text-2xl font-semibold leading-tight tracking-[-0.005em] text-foreground">{title}</h3>
-                <p className="font-body text-base leading-[1.55] text-muted">{body}</p>
-              </li>
+              <RevealCard
+                key={title}
+                layout="stack"
+                hexClassName="w-8"
+                headingClassName="font-display text-2xl font-semibold leading-tight tracking-[-0.005em] text-foreground"
+                className="rounded-2xl bg-background p-8"
+                heading={title}
+              >
+                <p className="pt-4 font-body text-base leading-[1.55] text-muted">{body}</p>
+              </RevealCard>
             ))}
           </ul>
         </div>
@@ -203,18 +211,25 @@ export default async function Home() {
               everyone looking at the same storage.
             </p>
           </div>
-          <ul className="mt-8 grid gap-4 md:mt-10 md:grid-cols-2 md:gap-6 xl:mt-12 xl:grid-cols-4">
+          {/* Each card shows only who it's for; tapping it opens what Propolis
+              does for them. */}
+          <ul className="mt-8 grid items-start gap-4 md:mt-10 md:grid-cols-2 md:gap-6 xl:mt-12 xl:grid-cols-4">
             {ROLES.map(([role, line, a, b]) => (
-              <li key={role} className="flex flex-col gap-3.5 rounded-2xl bg-surface px-6 py-7">
-                <p className="flex items-center gap-2.5 font-mono text-[13px] font-bold uppercase tracking-[0.1em] text-accent-ink">
-                  <Hex className="w-4" />
-                  {role}
-                </p>
-                <h3 className="font-display text-[21px] font-semibold leading-[1.25] text-foreground">{line}</h3>
-                <hr className="border-rule" />
-                <p className="font-body text-[15px] leading-[1.55] text-muted">{a}</p>
-                <p className="font-body text-[15px] leading-[1.55] text-muted">{b}</p>
-              </li>
+              <RevealCard
+                key={role}
+                layout="inline"
+                hexClassName="w-4"
+                headingClassName="font-mono text-[13px] font-bold uppercase tracking-[0.1em] text-accent-ink"
+                className="rounded-2xl bg-surface px-6 py-7"
+                heading={role}
+              >
+                <div className="flex flex-col gap-3.5 pt-3.5">
+                  <p className="font-display text-[21px] font-semibold leading-[1.25] text-foreground">{line}</p>
+                  <hr className="border-rule" />
+                  <p className="font-body text-[15px] leading-[1.55] text-muted">{a}</p>
+                  <p className="font-body text-[15px] leading-[1.55] text-muted">{b}</p>
+                </div>
+              </RevealCard>
             ))}
           </ul>
         </div>
