@@ -199,7 +199,7 @@ export function SurveyForm() {
             data-scale-row={row.value}
           >
             <span className="font-body text-[15px] text-foreground">{row.label}</span>
-            <div className="grid grid-cols-3 gap-1.5 md:w-[21rem]">
+            <div className={`grid grid-cols-3 gap-1.5 ${q.levels.length > 3 ? "md:w-[30rem] md:grid-cols-6" : "md:w-[21rem]"}`}>
               {q.levels.map((level) => (
                 <label
                   key={level.value}

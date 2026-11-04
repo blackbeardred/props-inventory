@@ -13,13 +13,13 @@ const choose = (page: import("@playwright/test").Page, question: string, label: 
 test.describe("on a phone, with no account", () => {
   test.use(PHONE);
 
-  test("opens without signing in, and asks 15 questions", async ({ page, context }) => {
+  test("opens without signing in, and asks 17 questions", async ({ page, context }) => {
     await context.addCookies([signedOut]);
     await open(page, "/survey");
     expect(new URL(page.url()).pathname).toBe("/survey");
     await expect(page).toHaveTitle("Theater storage survey");
     await expect(page.locator("h1")).toHaveText("How does your theater keep track of what’s in storage?");
-    await expect(page.locator("[data-question]")).toHaveCount(14);
+    await expect(page.locator("[data-question]")).toHaveCount(16);
     await expect(page.getByLabel(/Open to a 15-minute follow-up call/)).toBeVisible();
     // Neutral: the product isn't named in the questions.
     await expect(page.locator("[data-survey-form]")).not.toContainText("Propolis");

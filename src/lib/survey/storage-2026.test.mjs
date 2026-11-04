@@ -10,7 +10,7 @@ function is(label, actual, expected) {
 }
 
 is("the survey id fits submit_survey's rule", /^[a-z0-9-]{1,40}$/.test(SURVEY_ID), true);
-is("15 questions in three sections, plus the email", [SECTIONS.length, QUESTIONS.length], [3, 14]);
+is("17 questions in three sections, plus the email", [SECTIONS.length, QUESTIONS.length], [3, 16]);
 is("question ids are unique", new Set(QUESTIONS.map((q) => q.id)).size, QUESTIONS.length);
 for (const q of QUESTIONS) {
   const values = q.kind === "scale" ? q.rows.map((r) => r.value) : q.kind === "text" ? [] : q.choices.map((c) => c.value);
