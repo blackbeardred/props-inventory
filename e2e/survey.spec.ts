@@ -13,14 +13,14 @@ const choose = (page: import("@playwright/test").Page, question: string, label: 
 test.describe("on a phone, with no account", () => {
   test.use(PHONE);
 
-  test("opens without signing in, and asks 17 questions", async ({ page, context }) => {
+  test("opens without signing in, and asks 19 questions", async ({ page, context }) => {
     await context.addCookies([signedOut]);
     await open(page, "/survey");
     expect(new URL(page.url()).pathname).toBe("/survey");
     await expect(page).toHaveTitle("Theater storage survey");
     await expect(page.locator("h1")).toHaveText("How does your theater keep track of what’s in storage?");
-    await expect(page.locator("[data-question]")).toHaveCount(16);
-    await expect(page.getByLabel(/Open to a 15-minute follow-up call/)).toBeVisible();
+    await expect(page.locator("[data-question]")).toHaveCount(18);
+    await expect(page.getByLabel(/open to a 15-minute follow-up call/)).toBeVisible();
     // Neutral: the product isn't named in the questions.
     await expect(page.locator("[data-survey-form]")).not.toContainText("Propolis");
     await noSidewaysScroll(page);
@@ -45,7 +45,9 @@ test.describe("on a phone, with no account", () => {
     await choose(page, "company", "High school or college");
     await choose(page, "tracking", "Paper lists or binders");
     await choose(page, "tracking", "An inventory app or software");
-    await page.locator("#tracking_detail").fill("Sortly");
+    await choose(page, "tracking", "Other");
+    await page.locator("#tracking_detail").fill("A whiteboard");
+    await page.locator("#software_name").fill("Sortly");
     // "None of these" can't sit with anything else.
     await choose(page, "problems", "Couldn’t find something we knew we had");
     await choose(page, "problems", "None of these");
@@ -65,8 +67,9 @@ test.describe("on a phone, with no account", () => {
           role: "other",
           role_other: "Dramaturg",
           company: "school",
-          tracking: ["paper", "software"],
-          tracking_detail: "Sortly",
+          tracking: ["paper", "software", "other"],
+          tracking_detail: "A whiteboard",
+          software_name: "Sortly",
           problems: ["none"],
           frustration: "Nobody knows where the swords are.",
           importance: { search: "very", offline: "not" },

@@ -105,7 +105,7 @@ export const SECTIONS: Section[] = [
         kind: "multi",
         prompt: "How does your company keep track of what’s in storage?",
         hint: "Choose all that apply.",
-        detail: { value: "software", prompt: "Which app or software?" },
+        detail: { value: "other", prompt: "What else?" },
         choices: [
           { value: "memory", label: "Nobody does; people remember" },
           { value: "paper", label: "Paper lists or binders" },
@@ -113,8 +113,13 @@ export const SECTIONS: Section[] = [
           { value: "photos", label: "Photos in a shared folder or on phones" },
           { value: "software", label: "An inventory app or software" },
           { value: "bins", label: "Labeled bins or shelves only" },
-          { value: "other", label: "Something else" },
+          { value: "other", label: "Other" },
         ],
+      },
+      {
+        id: "software_name",
+        kind: "text",
+        prompt: "If you use an inventory app or software, which one?",
       },
       {
         id: "find",
@@ -172,7 +177,11 @@ export const SECTIONS: Section[] = [
         id: "frustration",
         kind: "text",
         prompt: "What’s the most frustrating part of managing storage today?",
-        placeholder: "A story about the last time something went wrong is perfect.",
+      },
+      {
+        id: "last_time",
+        kind: "text",
+        prompt: "What did you do the last time something went wrong?",
       },
     ],
   },

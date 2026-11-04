@@ -10,7 +10,7 @@ function is(label, actual, expected) {
 }
 
 is("the survey id fits submit_survey's rule", /^[a-z0-9-]{1,40}$/.test(SURVEY_ID), true);
-is("17 questions in three sections, plus the email", [SECTIONS.length, QUESTIONS.length], [3, 16]);
+is("19 questions in three sections, plus the email", [SECTIONS.length, QUESTIONS.length], [3, 18]);
 is("question ids are unique", new Set(QUESTIONS.map((q) => q.id)).size, QUESTIONS.length);
 for (const q of QUESTIONS) {
   const values = q.kind === "scale" ? q.rows.map((r) => r.value) : q.kind === "text" ? [] : q.choices.map((c) => c.value);
@@ -27,10 +27,10 @@ is("unknown questions are dropped", Object.keys(cleanAnswers({ role: "asm", snea
 
 is("several choices, in the survey's order, without repeats",
   cleanAnswers({ role: "asm", tracking: ["photos", "paper", "photos", "nonsense"] }).answers.tracking, ["paper", "photos"]);
-is("the software detail is kept with software",
-  cleanAnswers({ role: "asm", tracking: ["software"], tracking_detail: "Sortly" }).answers.tracking_detail, "Sortly");
+is("the \"What else?\" detail is kept with Other",
+  cleanAnswers({ role: "asm", tracking: ["other"], tracking_detail: "A whiteboard" }).answers.tracking_detail, "A whiteboard");
 is("…and dropped without it",
-  cleanAnswers({ role: "asm", tracking: ["paper"], tracking_detail: "Sortly" }).answers.tracking_detail, undefined);
+  cleanAnswers({ role: "asm", tracking: ["paper"], tracking_detail: "A whiteboard" }).answers.tracking_detail, undefined);
 is("None of these stands alone", cleanAnswers({ role: "asm", problems: ["cant-find", "none"] }).answers.problems, ["none"]);
 
 is("ratings keep real rows and levels",

@@ -277,10 +277,10 @@ export function SurveyForm() {
             <span className="pt-1 font-mono text-xs font-bold text-honey-ink tabular-nums">{TOTAL}</span>
             <span>
               <span className="block font-display text-xl leading-snug text-foreground">
-                Open to a 15-minute follow-up call? Leave your email.
+                Are you open to a 15-minute follow-up call? Please leave your email.
               </span>
               <span className="mt-1 block font-body text-sm text-muted">
-                Optional. It’s used only to contact you about this research.
+                Optional. Used only to contact you about this research.
               </span>
             </span>
           </label>
