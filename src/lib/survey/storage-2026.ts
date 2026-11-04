@@ -174,11 +174,6 @@ export const SECTIONS: Section[] = [
         ],
       },
       {
-        id: "frustration",
-        kind: "text",
-        prompt: "What’s the most frustrating part of managing storage today?",
-      },
-      {
         id: "last_time",
         kind: "text",
         prompt: "What did you do the last time something went wrong?",
@@ -219,18 +214,6 @@ export const SECTIONS: Section[] = [
           { value: "volunteers", label: "Volunteers" },
           { value: "students", label: "Students" },
           { value: "nobody", label: "Honestly, nobody has time" },
-        ],
-      },
-      {
-        id: "pay",
-        kind: "single",
-        prompt: "If a tool fixed this, would your company pay for it?",
-        choices: [
-          { value: "yes", label: "Yes" },
-          { value: "maybe", label: "Maybe, depending on the price" },
-          { value: "free-only", label: "Only if it’s free" },
-          { value: "not-my-call", label: "It’s not my decision" },
-          { value: "dont-know", label: "Don’t know" },
         ],
       },
       {

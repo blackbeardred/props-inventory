@@ -13,13 +13,13 @@ const choose = (page: import("@playwright/test").Page, question: string, label: 
 test.describe("on a phone, with no account", () => {
   test.use(PHONE);
 
-  test("opens without signing in, and asks 19 questions", async ({ page, context }) => {
+  test("opens without signing in, and asks 17 questions", async ({ page, context }) => {
     await context.addCookies([signedOut]);
     await open(page, "/survey");
     expect(new URL(page.url()).pathname).toBe("/survey");
     await expect(page).toHaveTitle("Theater storage survey");
     await expect(page.locator("h1")).toHaveText("How does your theater keep track of what’s in storage?");
-    await expect(page.locator("[data-question]")).toHaveCount(18);
+    await expect(page.locator("[data-question]")).toHaveCount(16);
     await expect(page.getByLabel(/open to a 15-minute follow-up call/)).toBeVisible();
     // Neutral: the product isn't named in the questions.
     await expect(page.locator("[data-survey-form]")).not.toContainText("Propolis");
@@ -29,7 +29,7 @@ test.describe("on a phone, with no account", () => {
   test("the only required question is the role, and nothing is sent without it", async ({ page, context }) => {
     await context.addCookies([signedOut]);
     await open(page, "/survey");
-    await choose(page, "pay", "Yes");
+    await choose(page, "pay_model", "Either would work");
     await page.getByRole("button", { name: "Send my answers" }).click();
     await expect(page.locator("#role-missing")).toContainText("Choose your main role");
     expect(await sent(page)).toEqual([]);
@@ -54,7 +54,7 @@ test.describe("on a phone, with no account", () => {
     await expect(page.locator('[data-question="problems"]').getByLabel("Couldn’t find something we knew we had")).not.toBeChecked();
     await page.locator('[data-scale-row="search"]').getByText("Very", { exact: true }).click();
     await page.locator('[data-scale-row="offline"]').getByText("Not important").click();
-    await page.locator("#frustration").fill("Nobody knows where the swords are.");
+    await page.locator("#last_time").fill("Nobody knows where the swords are.");
     await page.locator("#email").fill(" Pat@Example.COM ");
     await noSidewaysScroll(page);
     await page.getByRole("button", { name: "Send my answers" }).click();
@@ -71,7 +71,7 @@ test.describe("on a phone, with no account", () => {
           tracking_detail: "A whiteboard",
           software_name: "Sortly",
           problems: ["none"],
-          frustration: "Nobody knows where the swords are.",
+          last_time: "Nobody knows where the swords are.",
           importance: { search: "very", offline: "not" },
         },
         p_email: "pat@example.com",
@@ -83,7 +83,7 @@ test.describe("on a phone, with no account", () => {
     await context.addCookies([signedOut]);
     await open(page, "/survey");
     await choose(page, "role", "Stage manager");
-    await page.locator("#frustration").fill("Finding things.");
+    await page.locator("#last_time").fill("Finding things.");
     await page.locator("#email").fill("pat at example");
     await page.getByRole("button", { name: "Send my answers" }).click();
     await expect(page.locator("[data-survey-error]")).toContainText("That email address doesn’t look right");
@@ -95,7 +95,7 @@ test.describe("on a phone, with no account", () => {
     });
     await page.getByRole("button", { name: "Send my answers" }).click();
     await expect(page.locator("[data-survey-error]")).toContainText("too many answers today");
-    await expect(page.locator("#frustration")).toHaveValue("Finding things.");
+    await expect(page.locator("#last_time")).toHaveValue("Finding things.");
     await expect(page.locator('[data-question="role"]').getByLabel("Stage manager", { exact: true })).toBeChecked();
   });
 });
