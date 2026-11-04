@@ -269,7 +269,7 @@ export const SECTIONS: Section[] = [
       {
         id: "anything_else",
         kind: "text",
-        prompt: "Anything else I should know?",
+        prompt: "Is there anything else I should know about your theater’s inventory management system?",
       },
     ],
   },
