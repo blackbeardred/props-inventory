@@ -55,15 +55,15 @@ export default function PrivacyPage() {
         <p className="font-body text-[15px] leading-relaxed text-foreground">
           Propolis helps theatres keep track of their props, costumes and set pieces: what they
           own, where it&rsquo;s stored, and what each production has pulled. It is run by{" "}
-          {OPERATOR} (&ldquo;we&rdquo;). This policy explains what information Propolis collects,
+          {OPERATOR} (&ldquo;I&rdquo; or &ldquo;me&rdquo;). This policy explains what information Propolis collects,
           how it&rsquo;s used, who it&rsquo;s shared with, and the choices you have. If anything
-          here is unclear, write to us at <Contact />.
+          here is unclear, write to me at <Contact />.
         </p>
 
-        <Section title="What we collect">
+        <Section title="What I collect">
           <p>
             <strong className="font-semibold">Your account.</strong> Your email address and
-            password (stored by our sign-in provider in scrambled form, never readable by us),
+            password (stored by my sign-in provider in scrambled form, never readable by me),
             your display name, and a profile picture if you add one.
           </p>
           <p>
@@ -98,18 +98,18 @@ export default function PrivacyPage() {
             as your IP address and browser type, and may keep it briefly in their logs.
           </p>
           <p>
-            We don&rsquo;t use advertising, analytics or tracking tools, and we don&rsquo;t collect
+            I don&rsquo;t use advertising, analytics or tracking tools, and I don&rsquo;t collect
             your location.
           </p>
         </Section>
 
-        <Section title="How we use it">
+        <Section title="How I use it">
           <ul>
             <li>To run Propolis: show your theatre its inventory, search it, match photos, build pull lists and checklists, and print labels.</li>
             <li>To sign you in, keep your account secure, and send the emails sign-in needs (confirming your address, resetting a password).</li>
             <li>To fix problems and improve Propolis.</li>
           </ul>
-          <p>We don&rsquo;t sell your information, and we don&rsquo;t use it for advertising.</p>
+          <p>I don&rsquo;t sell your information, and I don&rsquo;t use it for advertising.</p>
         </Section>
 
         <Section title="The AI features">
@@ -123,7 +123,7 @@ export default function PrivacyPage() {
             <li>reading a photo of a prop table to mark what a production has pulled.</li>
           </ul>
           <p>
-            Anthropic processes this for us under its commercial terms. Its published policy is
+            Anthropic processes this for me under its commercial terms. Its published policy is
             to delete these inputs and outputs within 30 days and not to use them to train its
             models. Anthropic&rsquo;s own privacy information is at{" "}
             <a
@@ -153,34 +153,34 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="Who we share it with">
+        <Section title="Who I share it with">
           <p>
-            Only the companies that help us run Propolis, each handling information on our behalf
+            Only the companies that help me run Propolis, each handling information on my behalf
             and only for that purpose:
           </p>
           <ul>
             <li><strong className="font-semibold">Supabase</strong>: the database, sign-in and photo storage.</li>
             <li><strong className="font-semibold">Vercel</strong>: hosting the website.</li>
             <li><strong className="font-semibold">Anthropic</strong>: the AI features described above.</li>
-            <li><strong className="font-semibold">Our email provider</strong>: sending sign-in emails.</li>
+            <li><strong className="font-semibold">My email provider</strong>: sending sign-in emails.</li>
             <li><strong className="font-semibold">Hugging Face</strong>: serving the photo recognition model your device downloads. No inventory information is sent to it.</li>
           </ul>
           <p>
-            We may also share information if the law requires it, or to protect the safety of our
+            I may also share information if the law requires it, or to protect the safety of my
             users or the service.
           </p>
         </Section>
 
-        <Section title="How long we keep it">
+        <Section title="How long I keep it">
           <p>
-            We keep your account and your theatre&rsquo;s inventory for as long as you use
+            I keep your account and your theatre&rsquo;s inventory for as long as you use
             Propolis. Anything you delete goes to Recently deleted for 30 days, so it can be
-            restored, and is then removed for good, photos included. Our providers may keep
+            restored, and is then removed for good, photos included. My providers may keep
             backups for a limited time after that.
           </p>
           <p>
             To close your account or remove a theatre entirely, write to <Contact /> and
-            we&rsquo;ll delete it, along with its photos.
+            I&rsquo;ll delete it, along with its photos.
           </p>
         </Section>
 
@@ -190,11 +190,11 @@ export default function PrivacyPage() {
             <li>Export your theatre&rsquo;s inventory as a spreadsheet whenever you like.</li>
             <li>Leave a theatre from Theatre › Your theatres.</li>
             <li>Don&rsquo;t turn on photo recognition, or don&rsquo;t use the AI features, if you&rsquo;d rather not.</li>
-            <li>Ask us for a copy of your information, or to delete it, at <Contact />.</li>
+            <li>Ask me for a copy of your information, or to delete it, at <Contact />.</li>
           </ul>
           <p>
             Depending on where you live, you may have further rights over your information; write
-            to us and we&rsquo;ll help.
+            to me and I&rsquo;ll help.
           </p>
         </Section>
 
@@ -202,7 +202,7 @@ export default function PrivacyPage() {
           <p>
             Propolis is served only over encrypted connections, each theatre&rsquo;s information
             is kept apart by the database itself, and photos are stored privately. No system is
-            perfectly secure, but we take reasonable steps to protect your information and will
+            perfectly secure, but I take reasonable steps to protect your information and will
             tell you if something goes wrong that affects it.
           </p>
         </Section>
@@ -216,18 +216,18 @@ export default function PrivacyPage() {
 
         <Section title="Surveys">
           <p>
-            We sometimes ask people who work in theater to answer a short research survey, with
-            no account needed. We keep the answers you give. An email address is kept only if
+            I sometimes ask people who work in theater to answer a short research survey, with
+            no account needed. I keep the answers you give. An email address is kept only if
             you choose to leave one, and is used only to contact you about that research. To stop
             the same person sending answers over and over, a scrambled form of your network
             address is kept for about an hour and then deleted. Survey answers are read only by
-            us. To have yours removed, write to us at <Contact />.
+            me. To have yours removed, write to me at <Contact />.
           </p>
         </Section>
 
         <Section title="Changes">
           <p>
-            If we change this policy, we&rsquo;ll update the date at the top, and tell you in the
+            If I change this policy, I&rsquo;ll update the date at the top, and tell you in the
             app or by email if the change is significant.
           </p>
         </Section>
