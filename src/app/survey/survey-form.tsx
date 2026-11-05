@@ -236,7 +236,19 @@ export function SurveyForm() {
       {q.kind === "single" ? single(q) : null}
       {q.kind === "multi" ? multi(q) : null}
       {q.kind === "scale" ? scale(q) : null}
-      {q.kind === "text" ? (
+      {q.kind === "text" && q.short ? (
+        <input
+          id={q.id}
+          type="text"
+          autoComplete="organization"
+          maxLength={MAX_SHORT}
+          placeholder={q.placeholder}
+          value={String(answers[q.id] ?? "")}
+          onChange={(e) => set(q.id, e.target.value)}
+          className={`${field} mt-4`}
+        />
+      ) : null}
+      {q.kind === "text" && !q.short ? (
         <textarea
           id={q.id}
           rows={4}

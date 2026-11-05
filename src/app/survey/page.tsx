@@ -33,8 +33,8 @@ export default function SurveyPage() {
           prop curator or director, I’d love to hear how it works where you are.
         </p>
         <p className="text-muted">
-          There’s no sign-in, and your answers are anonymous unless you leave a phone number at
-          the end. Only the first question is required.
+          There’s no sign-in, and your answers stay anonymous unless you give your theater’s
+          name or a phone number. Only the first question is required.
         </p>
       </div>
 

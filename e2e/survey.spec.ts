@@ -13,13 +13,13 @@ const choose = (page: import("@playwright/test").Page, question: string, label: 
 test.describe("on a phone, with no account", () => {
   test.use(PHONE);
 
-  test("opens without signing in, and asks 17 questions", async ({ page, context }) => {
+  test("opens without signing in, and asks 18 questions", async ({ page, context }) => {
     await context.addCookies([signedOut]);
     await open(page, "/survey");
     expect(new URL(page.url()).pathname).toBe("/survey");
     await expect(page).toHaveTitle("Theater storage survey");
     await expect(page.locator("h1")).toHaveText("How does your theater keep track of what’s in storage?");
-    await expect(page.locator("[data-question]")).toHaveCount(16);
+    await expect(page.locator("[data-question]")).toHaveCount(17);
     await expect(page.getByLabel(/open to a 15-minute follow-up call/)).toBeVisible();
     // Neutral: the product isn't named in the questions.
     await expect(page.locator("[data-survey-form]")).not.toContainText("Propolis");
@@ -42,6 +42,7 @@ test.describe("on a phone, with no account", () => {
     await open(page, "/survey");
     await choose(page, "role", "Other");
     await page.locator("#role_other").fill("  Dramaturg ");
+    await page.locator("#theater_name").fill(" Bayside Players ");
     await choose(page, "company", "High school or college");
     await choose(page, "tracking", "Paper lists or binders");
     await choose(page, "tracking", "An inventory app or software");
@@ -66,6 +67,7 @@ test.describe("on a phone, with no account", () => {
         p_answers: {
           role: "other",
           role_other: "Dramaturg",
+          theater_name: "Bayside Players",
           company: "school",
           tracking: ["paper", "software", "other"],
           tracking_detail: "A whiteboard",

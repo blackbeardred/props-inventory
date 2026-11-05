@@ -33,7 +33,7 @@ export type MultiQuestion = Base & {
   exclusive?: string;
 };
 export type ScaleQuestion = Base & { kind: "scale"; rows: Choice[]; levels: Choice[] };
-export type TextQuestion = Base & { kind: "text"; placeholder?: string };
+export type TextQuestion = Base & { kind: "text"; placeholder?: string; short?: boolean };
 export type Question = SingleQuestion | MultiQuestion | ScaleQuestion | TextQuestion;
 export type Section = { title: string; questions: Question[] };
 
@@ -56,6 +56,12 @@ export const SECTIONS: Section[] = [
           { value: "production-manager", label: "Production manager or technical director" },
           { value: "other", label: "Other" },
         ],
+      },
+      {
+        id: "theater_name",
+        kind: "text",
+        short: true,
+        prompt: "What’s the name of your theater?",
       },
       {
         id: "company",
@@ -309,7 +315,7 @@ export function cleanAnswers(raw: RawAnswers): CleanResult {
       }
       if (Object.keys(rated).length) answers[q.id] = rated;
     } else {
-      const t = text(v, MAX_TEXT);
+      const t = text(v, q.short ? MAX_SHORT : MAX_TEXT);
       if (t) answers[q.id] = t;
     }
     if (q.required && answers[q.id] === undefined) missing.push(q.id);
