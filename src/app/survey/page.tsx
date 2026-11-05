@@ -4,7 +4,7 @@ import { SurveyForm } from "./survey-form";
 
 export const metadata: Metadata = {
   title: "Theater storage survey",
-  description: "About six minutes on how your theater keeps track of props, costumes and set pieces.",
+  description: "About five minutes on how your theater keeps track of props, costumes and set pieces.",
   robots: { index: false, follow: false },
 };
 
@@ -21,7 +21,7 @@ export default function SurveyPage() {
       {/* eslint-disable-next-line @next/next/no-img-element -- a static SVG from public/brand */}
       <img src="/brand/propolis-icon.svg" alt="" width={44} height={44} className="block" />
       <p className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.12em] text-honey-ink">
-        Research survey · About 6 minutes
+        Research survey · About 5 minutes
       </p>
       <h1 className="mt-3 font-display text-4xl leading-tight text-balance sm:text-5xl">
         How does your theater keep track of what’s in storage?
