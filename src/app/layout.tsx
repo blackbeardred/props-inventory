@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Courier_Prime, Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegistration } from "@/components/service-worker";
+import { SiteFooter } from "@/components/site-footer";
 
 const fraunces = Fraunces({
   variable: "--font-display",
@@ -60,6 +61,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="honeycomb min-h-full flex flex-col">
         <TitleStrip />
         {children}
+        <SiteFooter />
         <ServiceWorkerRegistration />
       </body>
     </html>

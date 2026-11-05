@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Honeycomb } from "@/components/landing/honeycomb";
 import { RevealCard } from "@/components/landing/reveal-card";
 import { getUserAndProfile } from "@/lib/auth";
+import { copyrightNotice } from "@/lib/copyright";
 import { supabaseConfigured } from "@/lib/supabase/config";
 
 /**
@@ -293,7 +294,7 @@ export default async function Home() {
             </nav>
           </div>
           <div className="mt-12 flex flex-col gap-2 border-t border-muted pt-6 font-body text-base text-background/60 md:flex-row md:justify-between">
-            <p>© 2026 Propolis</p>
+            <p data-copyright>{copyrightNotice()}</p>
             <p>Made for the people behind the curtain.</p>
           </div>
         </div>

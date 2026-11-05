@@ -10,6 +10,7 @@ import { OfflineBanner } from "@/components/service-worker";
 import { OrgSwitcher } from "@/components/org-switcher";
 import { TryoutBanner } from "@/components/tryout-banner";
 import { getUserAndProfile } from "@/lib/auth";
+import { copyrightNotice } from "@/lib/copyright";
 import { createClient } from "@/lib/supabase/server";
 import { AVATARS_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/supabase/storage";
 
@@ -97,6 +98,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             room to breathe, so the last thing on a page isn't under it. */}
         <div className="mx-auto w-full max-w-5xl px-6 pb-28 pt-8 md:py-12 xl:max-w-7xl xl:px-8 2xl:max-w-[96rem]">
           {children}
+          <footer data-app-footer data-print-hide className="mt-16 border-t border-rule pt-6 font-body text-xs text-muted">
+            {copyrightNotice()}
+          </footer>
         </div>
       </main>
       {/* Catches up photo fingerprints in the background, but only on a device
