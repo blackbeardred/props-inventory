@@ -1,6 +1,6 @@
 // The storage survey's questions and answer tidying (src/lib/survey/storage-2026.ts).
 //   node --experimental-strip-types src/lib/survey/storage-2026.test.mjs
-import { SECTIONS, QUESTIONS, SURVEY_ID, cleanAnswers, cleanEmail, MAX_TEXT } from "./storage-2026.ts";
+import { SECTIONS, QUESTIONS, SURVEY_ID, cleanAnswers, cleanEmail, cleanPhone, MAX_TEXT } from "./storage-2026.ts";
 
 let pass = 0, fail = 0;
 function is(label, actual, expected) {
@@ -10,7 +10,7 @@ function is(label, actual, expected) {
 }
 
 is("the survey id fits submit_survey's rule", /^[a-z0-9-]{1,40}$/.test(SURVEY_ID), true);
-is("17 questions in three sections, plus the email", [SECTIONS.length, QUESTIONS.length], [3, 16]);
+is("17 questions in three sections, plus the phone number", [SECTIONS.length, QUESTIONS.length], [3, 16]);
 is("question ids are unique", new Set(QUESTIONS.map((q) => q.id)).size, QUESTIONS.length);
 for (const q of QUESTIONS) {
   const values = q.kind === "scale" ? q.rows.map((r) => r.value) : q.kind === "text" ? [] : q.choices.map((c) => c.value);
@@ -46,6 +46,11 @@ is("answered counts questions with an answer", cleanAnswers({ role: "asm", pay_m
 is("an empty email is fine", cleanEmail("  "), "");
 is("an email is tidied", cleanEmail(" Pat@Example.COM "), "pat@example.com");
 is("not an email", cleanEmail("pat at example"), null);
+is("an empty phone number is fine", cleanPhone("  "), "");
+is("a phone number is tidied", cleanPhone(" (831)  555-0142 "), "(831) 555-0142");
+is("an international number with an extension", cleanPhone("+1 831.555.0142 ext. 12"), "+1 831.555.0142 ext. 12");
+is("too few digits", cleanPhone("555-0142"), null);
+is("not a phone number", cleanPhone("call me maybe"), null);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

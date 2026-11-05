@@ -55,7 +55,7 @@ test.describe("on a phone, with no account", () => {
     await page.locator('[data-scale-row="search"]').getByText("Very", { exact: true }).click();
     await page.locator('[data-scale-row="offline"]').getByText("Not important").click();
     await page.locator("#last_time").fill("Nobody knows where the swords are.");
-    await page.locator("#email").fill(" Pat@Example.COM ");
+    await page.locator("#phone").fill(" (831)  555-0142 ");
     await noSidewaysScroll(page);
     await page.getByRole("button", { name: "Send my answers" }).click();
 
@@ -73,23 +73,23 @@ test.describe("on a phone, with no account", () => {
           problems: ["none"],
           last_time: "Nobody knows where the swords are.",
           importance: { search: "very", offline: "not" },
+          phone: "(831) 555-0142",
         },
-        p_email: "pat@example.com",
       },
     ]);
   });
 
-  test("a bad email, or a refusal, says why and keeps the answers", async ({ page, context }) => {
+  test("a bad phone number, or a refusal, says why and keeps the answers", async ({ page, context }) => {
     await context.addCookies([signedOut]);
     await open(page, "/survey");
     await choose(page, "role", "Stage manager");
     await page.locator("#last_time").fill("Finding things.");
-    await page.locator("#email").fill("pat at example");
+    await page.locator("#phone").fill("call me maybe");
     await page.getByRole("button", { name: "Send my answers" }).click();
-    await expect(page.locator("[data-survey-error]")).toContainText("That email address doesn’t look right");
+    await expect(page.locator("[data-survey-error]")).toContainText("That phone number doesn’t look right");
     expect(await sent(page)).toEqual([]);
 
-    await page.locator("#email").fill("");
+    await page.locator("#phone").fill("");
     await page.evaluate(() => {
       (globalThis as unknown as { __surveyFail?: string }).__surveyFail = "The survey has had too many answers today. Please try again tomorrow.";
     });

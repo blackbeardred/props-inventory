@@ -89,9 +89,10 @@ export const SECTIONS: Section[] = [
         hint: "Props, costumes and set pieces together.",
         choices: [
           { value: "under-200", label: "Under 200" },
-          { value: "200-1000", label: "200–1,000" },
-          { value: "1000-5000", label: "1,000–5,000" },
-          { value: "over-5000", label: "Over 5,000" },
+          { value: "200-500", label: "200–500" },
+          { value: "500-1000", label: "500–1,000" },
+          { value: "1000-2000", label: "1,000–2,000" },
+          { value: "over-2000", label: "Over 2,000" },
           { value: "not-sure", label: "Not sure" },
         ],
       },
@@ -252,7 +253,7 @@ export const SECTIONS: Section[] = [
       {
         id: "anything_else",
         kind: "text",
-        prompt: "Is there anything else I should know about your theater’s inventory management system?",
+        prompt: "Is there anything else I should know about your theater’s current inventory management system?",
       },
     ],
   },
@@ -315,6 +316,15 @@ export function cleanAnswers(raw: RawAnswers): CleanResult {
   }
   const answered = QUESTIONS.filter((q) => answers[q.id] !== undefined).length;
   return { answers, missing, answered };
+}
+
+/** A typed phone number, tidied; "" when left empty; null when it isn't one. */
+export function cleanPhone(raw: unknown): string | null {
+  const p = typeof raw === "string" ? raw.trim().replace(/\s+/g, " ") : "";
+  if (!p) return "";
+  const digits = p.replace(/\D/g, "").length;
+  const shaped = /^\+?[\d\s().-]+(\s*(x|ext\.?)\s*\d{1,6})?$/i.test(p);
+  return p.length <= 40 && shaped && digits >= 10 && digits <= 18 ? p : null;
 }
 
 /** A typed email, tidied; "" when left empty; null when it isn't an email. */

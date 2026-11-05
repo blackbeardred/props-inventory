@@ -8,7 +8,7 @@ import {
   SECTIONS,
   SURVEY_ID,
   cleanAnswers,
-  cleanEmail,
+  cleanPhone,
   type MultiQuestion,
   type Question,
   type ScaleQuestion,
@@ -24,7 +24,7 @@ const field =
 
 /** Question numbers run through the whole survey, sections and all. */
 const NUMBERS = new Map(SECTIONS.flatMap((s) => s.questions).map((q, i) => [q.id, i + 1]));
-const TOTAL = NUMBERS.size + 1; // and the email at the end
+const TOTAL = NUMBERS.size + 1; // and the phone number at the end
 
 function Prompt({ q }: { q: Question }) {
   return (
@@ -45,7 +45,7 @@ function Prompt({ q }: { q: Question }) {
 
 export function SurveyForm() {
   const [answers, setAnswers] = useState<Answers>({});
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [website, setWebsite] = useState(""); // a field only bots fill in
   const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -63,11 +63,13 @@ export function SurveyForm() {
       document.getElementById("q-role")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-    const tidyEmail = cleanEmail(email);
-    if (tidyEmail === null) {
-      setError("That email address doesn’t look right. Check it, or leave it empty.");
+    const tidyPhone = cleanPhone(phone);
+    if (tidyPhone === null) {
+      setError("That phone number doesn’t look right. Check it, or leave it empty.");
       return;
     }
+    // The number travels with the answers; the email column stays empty.
+    if (tidyPhone) clean.phone = tidyPhone;
     setStatus("sending");
     if (website) {
       // Filled in by a bot: thank it and send nothing.
@@ -78,7 +80,6 @@ export function SurveyForm() {
       const { error: rpcError } = await createClient().rpc("submit_survey", {
         p_survey: SURVEY_ID,
         p_answers: clean,
-        p_email: tidyEmail || null,
       });
       if (rpcError) {
         setStatus("idle");
@@ -273,11 +274,11 @@ export function SurveyForm() {
           Stay in touch
         </h2>
         <div className="mt-8">
-          <label htmlFor="email" className="flex gap-3">
+          <label htmlFor="phone" className="flex gap-3">
             <span className="pt-1 font-mono text-xs font-bold text-honey-ink tabular-nums">{TOTAL}</span>
             <span>
               <span className="block font-display text-xl leading-snug text-foreground">
-                Are you open to a 15-minute follow-up call? Please leave your email.
+                Are you open to a 15-minute follow-up call? Please leave your phone number!
               </span>
               <span className="mt-1 block font-body text-sm text-muted">
                 Optional. Used only to contact you about this research.
@@ -285,13 +286,13 @@ export function SurveyForm() {
             </span>
           </label>
           <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            inputMode="email"
-            maxLength={254}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            id="phone"
+            type="tel"
+            autoComplete="tel"
+            inputMode="tel"
+            maxLength={40}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
             className={`${field} mt-4`}
           />
         </div>

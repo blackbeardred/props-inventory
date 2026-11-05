@@ -217,7 +217,7 @@ export default function PrivacyPage() {
         <Section title="Surveys">
           <p>
             I sometimes ask people who work in theater to answer a short research survey, with
-            no account needed. I keep the answers you give. An email address is kept only if
+            no account needed. I keep the answers you give. A phone number is kept only if
             you choose to leave one, and is used only to contact you about that research. To stop
             the same person sending answers over and over, a scrambled form of your network
             address is kept for about an hour and then deleted. Survey answers are read only by
