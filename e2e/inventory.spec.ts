@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { test, expect, PHONE, DESKTOP, open, noSidewaysScroll, tappable, LIST_CELLS } from "./helpers";
+import { parseXlsx } from "../src/lib/xlsx";
 
 // Inventory: rooms as tiles you walk into, the list and the grid, and what
 // opening an item does to its picture.
@@ -71,7 +73,7 @@ test.describe("walking in like folders (phone)", () => {
   test("desk jobs (labels, export, import) are left to the desktop", async ({ page }) => {
     await open(page, "/inventory?place=roomA");
     await expect(page.getByRole("link", { name: "Print labels" })).toBeHidden();
-    await expect(page.getByRole("link", { name: "Export" })).toBeHidden();
+    await expect(page.locator("[data-export-menu]")).toBeHidden();
   });
 });
 
@@ -81,8 +83,35 @@ test.describe("desktop", () => {
   test("labels, export and import are in the header", async ({ page }) => {
     await open(page, "/inventory?place=roomA");
     await expect(page.getByRole("link", { name: "Print labels" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Export" })).toBeVisible();
+    await expect(page.locator("[data-export-menu] summary")).toBeVisible();
     await expect(page.getByRole("link", { name: "Import spreadsheet" })).toBeVisible();
+  });
+
+  test("Export offers an Excel workbook and a CSV, and closes once you've chosen", async ({ page }) => {
+    await open(page, "/inventory");
+    const menu = page.locator("[data-export-menu]");
+    const isOpen = () => menu.evaluate((el) => (el as HTMLDetailsElement).open);
+    await menu.locator("summary").click();
+    const xlsx = menu.getByRole("link", { name: "Excel workbook (.xlsx)" });
+    await expect(xlsx).toHaveAttribute("href", "/items/export?format=xlsx");
+    await expect(menu.getByRole("link", { name: "CSV (.csv)" })).toHaveAttribute("href", "/items/export");
+
+    // A real download, through the browser, of a real workbook.
+    const [download] = await Promise.all([page.waitForEvent("download"), xlsx.click()]);
+    expect(download.suggestedFilename()).toMatch(/^inventory-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    const bytes = readFileSync((await download.path())!);
+    expect([bytes[0], bytes[1]]).toEqual([0x50, 0x4b]); // "PK": a ZIP, as an .xlsx is
+    const { table } = await parseXlsx(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    expect(table[0].slice(0, 6)).toEqual(["Name", "Category", "Quantity", "Condition", "Location", "Description"]);
+    expect(table.length).toBeGreaterThan(1);
+
+    // Downloading doesn't leave the page, so the menu has to close by itself.
+    await expect.poll(isOpen).toBe(false);
+
+    const csv = await page.request.get("/items/export");
+    expect(csv.headers()["content-type"]).toContain("text/csv");
+    const workbook = await page.request.get("/items/export?format=xlsx");
+    expect(workbook.headers()["content-type"]).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   });
 
   test("List or Grid is remembered", async ({ page }) => {

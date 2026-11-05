@@ -2,7 +2,8 @@
 
 /**
  * A <details> dropdown that closes the way people expect a menu to: on a
- * click or tap anywhere outside it, on Escape, and when the page changes.
+ * click or tap anywhere outside it, on Escape, on choosing something in it,
+ * and when the page changes.
  *
  * A bare <details> only closes when its own summary is clicked again, so a
  * menu built on one stays hanging open after you click away. The element
@@ -13,15 +14,13 @@
  */
 
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ComponentPropsWithoutRef } from "react";
 
-export function DismissableDetails({
-  className,
-  children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
+/** Any attribute a <details> takes (a class, a data- hook for tests), except
+ *  its open state and submit handler, which this owns. */
+type Props = Omit<ComponentPropsWithoutRef<"details">, "open" | "onSubmit">;
+
+export function DismissableDetails({ children, ...rest }: Props) {
   const ref = useRef<HTMLDetailsElement>(null);
   const pathname = usePathname();
 
@@ -41,11 +40,25 @@ export function DismissableDetails({
       details.querySelector("summary")?.focus();
     };
 
+    // Choosing a link in the menu closes it. A download (the export menu)
+    // stays on the same page, so the route-change rule below never fires.
+    // Closed on the next tick, so the link's own navigation or download
+    // goes ahead first.
+    const onClick = (event: MouseEvent) => {
+      if ((event.target as Element | null)?.closest?.("a[href]")) {
+        setTimeout(() => {
+          details.open = false;
+        }, 0);
+      }
+    };
+
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    details.addEventListener("click", onClick);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      details.removeEventListener("click", onClick);
     };
   }, []);
 
@@ -57,8 +70,8 @@ export function DismissableDetails({
 
   return (
     <details
+      {...rest}
       ref={ref}
-      className={className}
       // Choosing something (switching theater submits a form) closes it too.
       onSubmit={() => {
         if (ref.current) ref.current.open = false;

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DismissableDetails } from "@/components/dismissable-details";
 import { cookies } from "next/headers";
 import { RememberView } from "@/components/remember-view";
 import { ITEMS_VIEW_COOKIE } from "@/lib/items-view";
@@ -501,12 +502,30 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
             <Link href="/locations/labels" className={DESK_BUTTON}>
               Print labels
             </Link>
-            <a
-              href={here ? `/items/export?location=${here}` : "/items/export"}
-              className={DESK_BUTTON}
-            >
-              Export
-            </a>
+            {/* Excel first: it's what most people open a spreadsheet in, and
+                the workbook keeps quantities as numbers and links clickable.
+                CSV stays for anything that wants plain text. */}
+            <DismissableDetails className="relative hidden md:block" data-export-menu>
+              <summary
+                className={`${BUTTON} cursor-pointer list-none gap-1 [&::-webkit-details-marker]:hidden`}
+              >
+                Export <span aria-hidden="true">▾</span>
+              </summary>
+              <div className="absolute right-0 z-20 mt-2 w-52 rounded-md border border-rule bg-surface p-1 shadow-lg">
+                <a
+                  href={`/items/export?format=xlsx${here ? `&location=${here}` : ""}`}
+                  className="block rounded px-3 py-1.5 font-body text-sm text-foreground transition-colors hover:bg-accent-soft/15 hover:text-accent"
+                >
+                  Excel workbook (.xlsx)
+                </a>
+                <a
+                  href={here ? `/items/export?location=${here}` : "/items/export"}
+                  className="block rounded px-3 py-1.5 font-body text-sm text-foreground transition-colors hover:bg-accent-soft/15 hover:text-accent"
+                >
+                  CSV (.csv)
+                </a>
+              </div>
+            </DismissableDetails>
             <Link href="/items/import" className={DESK_BUTTON}>
               Import spreadsheet
             </Link>

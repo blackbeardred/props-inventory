@@ -10,6 +10,11 @@
  * Columns an import brought in that this app has no field for come back out
  * under their original headings, so a round trip doesn't quietly lose the
  * donor, the acquisition date or the inventory number.
+ *
+ * Two formats, the same table: CSV by default, or an Excel workbook with
+ * `?format=xlsx`. The workbook is the one most people want: quantities are
+ * real numbers, picture links can be clicked, the heading row is frozen and
+ * filterable, and no cell can be mistaken for a formula.
  */
 
 import { NextResponse } from "next/server";
@@ -18,6 +23,7 @@ import { toCsv } from "@/lib/csv";
 import { buildLocationChoices, type LocationNode } from "@/lib/locations";
 import type { ItemRow } from "@/lib/inventory";
 import { buildExportTable } from "@/lib/export";
+import { buildXlsx, XLSX_CONTENT_TYPE } from "@/lib/xlsx-write";
 import { PHOTOS_BUCKET } from "@/lib/supabase/storage";
 
 /** Long enough to download the pictures, short enough not to be a public link. */
@@ -38,6 +44,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const locationId = url.searchParams.get("location");
   const withPhotos = url.searchParams.get("photos") !== "0";
+  const asWorkbook = url.searchParams.get("format") === "xlsx";
 
   let query = supabase
     .from("items")
@@ -94,6 +101,24 @@ export async function GET(request: Request) {
   });
 
   const today = new Date().toISOString().slice(0, 10);
+
+  if (asWorkbook) {
+    const headings = table[0];
+    const workbook = buildXlsx({
+      name: "Inventory",
+      rows: table,
+      numberColumns: [headings.indexOf("Quantity")],
+      linkColumns: withPhotos ? [headings.indexOf("Photo")] : [],
+    });
+    return new NextResponse(new Blob([workbook as BlobPart], { type: XLSX_CONTENT_TYPE }), {
+      headers: {
+        "content-type": XLSX_CONTENT_TYPE,
+        "content-disposition": `attachment; filename="inventory-${today}.xlsx"`,
+        "cache-control": "no-store",
+      },
+    });
+  }
+
   const filename = `inventory-${today}.csv`;
 
   // A byte-order mark, because Excel otherwise reads a UTF-8 file as Latin-1
