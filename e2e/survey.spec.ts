@@ -13,13 +13,13 @@ const choose = (page: import("@playwright/test").Page, question: string, label: 
 test.describe("on a phone, with no account", () => {
   test.use(PHONE);
 
-  test("opens without signing in, and asks 18 questions", async ({ page, context }) => {
+  test("opens without signing in, and asks 15 questions", async ({ page, context }) => {
     await context.addCookies([signedOut]);
     await open(page, "/survey");
     expect(new URL(page.url()).pathname).toBe("/survey");
     await expect(page).toHaveTitle("Theater storage survey");
     await expect(page.locator("h1")).toHaveText("How does your theater keep track of what’s in storage?");
-    await expect(page.locator("[data-question]")).toHaveCount(17);
+    await expect(page.locator("[data-question]")).toHaveCount(14);
     await expect(page.getByLabel(/open to a 15-minute follow-up call/)).toBeVisible();
     // Neutral: the product isn't named in the questions.
     await expect(page.locator("[data-survey-form]")).not.toContainText("Propolis");
@@ -55,7 +55,7 @@ test.describe("on a phone, with no account", () => {
     await expect(page.locator('[data-question="problems"]').getByLabel("Couldn’t find something we knew we had")).not.toBeChecked();
     await page.locator('[data-scale-row="search"]').getByText("Very", { exact: true }).click();
     await page.locator('[data-scale-row="offline"]').getByText("Not important").click();
-    await page.locator("#last_time").fill("Nobody knows where the swords are.");
+    await page.locator("#anything_else").fill("Nobody knows where the swords are.");
     await page.locator("#phone").fill(" (831)  555-0142 ");
     await noSidewaysScroll(page);
     await page.getByRole("button", { name: "Send my answers" }).click();
@@ -73,7 +73,7 @@ test.describe("on a phone, with no account", () => {
           tracking_detail: "A whiteboard",
           software_name: "Sortly",
           problems: ["none"],
-          last_time: "Nobody knows where the swords are.",
+          anything_else: "Nobody knows where the swords are.",
           importance: { search: "very", offline: "not" },
           phone: "(831) 555-0142",
         },
@@ -85,7 +85,7 @@ test.describe("on a phone, with no account", () => {
     await context.addCookies([signedOut]);
     await open(page, "/survey");
     await choose(page, "role", "Stage manager");
-    await page.locator("#last_time").fill("Finding things.");
+    await page.locator("#anything_else").fill("Finding things.");
     await page.locator("#phone").fill("call me maybe");
     await page.getByRole("button", { name: "Send my answers" }).click();
     await expect(page.locator("[data-survey-error]")).toContainText("That phone number doesn’t look right");
@@ -97,7 +97,7 @@ test.describe("on a phone, with no account", () => {
     });
     await page.getByRole("button", { name: "Send my answers" }).click();
     await expect(page.locator("[data-survey-error]")).toContainText("too many answers today");
-    await expect(page.locator("#last_time")).toHaveValue("Finding things.");
+    await expect(page.locator("#anything_else")).toHaveValue("Finding things.");
     await expect(page.locator('[data-question="role"]').getByLabel("Stage manager", { exact: true })).toBeChecked();
   });
 });

@@ -10,7 +10,7 @@ function is(label, actual, expected) {
 }
 
 is("the survey id fits submit_survey's rule", /^[a-z0-9-]{1,40}$/.test(SURVEY_ID), true);
-is("18 questions in three sections, plus the phone number", [SECTIONS.length, QUESTIONS.length], [3, 17]);
+is("15 questions in three sections, plus the phone number", [SECTIONS.length, QUESTIONS.length], [3, 14]);
 is("question ids are unique", new Set(QUESTIONS.map((q) => q.id)).size, QUESTIONS.length);
 for (const q of QUESTIONS) {
   const values = q.kind === "scale" ? q.rows.map((r) => r.value) : q.kind === "text" ? [] : q.choices.map((c) => c.value);
@@ -38,10 +38,10 @@ is("ratings keep real rows and levels",
   { search: "very", offline: "not" });
 is("no ratings, no answer", cleanAnswers({ role: "asm", importance: {} }).answers.importance, undefined);
 
-is("written answers are trimmed", cleanAnswers({ role: "asm", last_time: "  Swords.  " }).answers.last_time, "Swords.");
-is("…and capped", cleanAnswers({ role: "asm", last_time: "a".repeat(MAX_TEXT + 50) }).answers.last_time.length, MAX_TEXT);
-is("blank written answers are left out", cleanAnswers({ role: "asm", last_time: "   " }).answers.last_time, undefined);
-is("answered counts questions with an answer", cleanAnswers({ role: "asm", pay_model: "either", last_time: "x" }).answered, 3);
+is("written answers are trimmed", cleanAnswers({ role: "asm", anything_else: "  Swords.  " }).answers.anything_else, "Swords.");
+is("…and capped", cleanAnswers({ role: "asm", anything_else: "a".repeat(MAX_TEXT + 50) }).answers.anything_else.length, MAX_TEXT);
+is("blank written answers are left out", cleanAnswers({ role: "asm", anything_else: "   " }).answers.anything_else, undefined);
+is("answered counts questions with an answer", cleanAnswers({ role: "asm", pay_model: "either", anything_else: "x" }).answered, 3);
 
 is("an empty email is fine", cleanEmail("  "), "");
 is("an email is tidied", cleanEmail(" Pat@Example.COM "), "pat@example.com");

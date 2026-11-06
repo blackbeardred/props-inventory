@@ -78,17 +78,6 @@ export const SECTIONS: Section[] = [
         ],
       },
       {
-        id: "productions",
-        kind: "single",
-        prompt: "About how many productions does it stage a year?",
-        choices: [
-          { value: "1-2", label: "1–2" },
-          { value: "3-5", label: "3–5" },
-          { value: "6-10", label: "6–10" },
-          { value: "11-plus", label: "More than 10" },
-        ],
-      },
-      {
         id: "items",
         kind: "single",
         prompt: "Roughly how many items are in storage?",
@@ -180,11 +169,6 @@ export const SECTIONS: Section[] = [
           { value: "none", label: "None of these" },
         ],
       },
-      {
-        id: "last_time",
-        kind: "text",
-        prompt: "What did you do the last time something went wrong?",
-      },
     ],
   },
   {
@@ -207,20 +191,6 @@ export const SECTIONS: Section[] = [
           { value: "in-use", label: "Seeing what’s in use or out on loan" },
           { value: "offline", label: "Working on a phone in storage with no signal" },
           { value: "photo-search", label: "Finding an item from a photo" },
-        ],
-      },
-      {
-        id: "upkeep",
-        kind: "multi",
-        prompt: "Who would keep an inventory up to date at your company?",
-        hint: "Choose all that apply.",
-        choices: [
-          { value: "me", label: "Me" },
-          { value: "props", label: "The props master" },
-          { value: "stage-management", label: "Stage management" },
-          { value: "volunteers", label: "Volunteers" },
-          { value: "students", label: "Students" },
-          { value: "nobody", label: "Honestly, nobody has time" },
         ],
       },
       {
