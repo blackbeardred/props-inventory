@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "How well does it recognise?": the recognition check.
+ * "How well does it recognize?": the recognition check.
  *
  * Every confirmed picture is a photo with a known answer. Holding each one
  * out and asking which item the rest of the collection says it is gives a
@@ -83,7 +83,7 @@ export function RecognitionCheck() {
 
   return (
     <section data-recognition-check className="mt-10 max-w-2xl border-t border-rule pt-6">
-      <h2 className="font-display text-lg text-foreground">How well does it recognise?</h2>
+      <h2 className="font-display text-lg text-foreground">How well does it recognize?</h2>
       <p className="mt-1 font-body text-sm text-muted">
         Every photo someone confirmed with “That’s it” or a ticked prop-table match is a test with
         a known answer. This holds each one out and checks whether the right item comes back

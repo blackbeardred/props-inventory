@@ -26,7 +26,7 @@ export default async function FingerprintsPage() {
     <>
       <PageHeading
         title="Photo fingerprints"
-        intro="So a photograph of the prop table can recognise the things you already own, rather than guessing from their names."
+        intro="So a photograph of the prop table can recognize the things you already own, rather than guessing from their names."
       />
       {orgId ? (
         <>

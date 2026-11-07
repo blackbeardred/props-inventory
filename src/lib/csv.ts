@@ -431,7 +431,7 @@ export function validateRow(
     if (matched) {
       category = matched;
     } else {
-      warnings.push(`Didn't recognise category "${categoryRaw}" — treated as a prop`);
+      warnings.push(`Didn't recognize category "${categoryRaw}" — treated as a prop`);
     }
   }
 
@@ -453,7 +453,7 @@ export function validateRow(
     if (matched) {
       condition = matched;
     } else {
-      warnings.push(`Didn't recognise condition "${conditionRaw}" — left blank`);
+      warnings.push(`Didn't recognize condition "${conditionRaw}" — left blank`);
     }
   }
 

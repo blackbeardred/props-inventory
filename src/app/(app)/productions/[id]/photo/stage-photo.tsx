@@ -453,7 +453,7 @@ export function StagePhoto({ productionId }: { productionId: string }) {
       <section>
         <p className="font-body text-sm text-muted">
           Take a photo of the prop table or a corner of the set, or pick one
-          you’ve already got. Everything it recognises is listed for you to
+          you’ve already got. Everything it recognizes is listed for you to
           confirm — nothing is marked until you say so.
         </p>
 

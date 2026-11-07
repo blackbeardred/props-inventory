@@ -234,7 +234,7 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
 
         <Section
           id="photos"
-          title="Recognising photos"
+          title="Recognizing photos"
           intro="Each item photo gets a visual fingerprint, so a picture of the prop table can be matched against what you own."
         >
           <div className="flex flex-wrap gap-3">

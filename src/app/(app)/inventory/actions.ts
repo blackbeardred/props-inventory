@@ -81,10 +81,10 @@ export async function listPullTargets(): Promise<
  */
 export async function addToPullList(itemId: string, target: PullTarget): Promise<AddResult> {
   if (!ID.test(itemId) || !ID.test(target.productionId)) {
-    return { ok: false, message: "That item or production wasn’t recognised." };
+    return { ok: false, message: "That item or production wasn’t recognized." };
   }
   if (target.pullListId !== null && !ID.test(target.pullListId)) {
-    return { ok: false, message: "That pull list wasn’t recognised." };
+    return { ok: false, message: "That pull list wasn’t recognized." };
   }
 
   const supabase = await createClient();

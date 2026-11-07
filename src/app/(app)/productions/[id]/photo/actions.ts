@@ -110,7 +110,7 @@ export async function readStagePhoto(
     return {
       ok: false,
       error:
-        "Nothing recognisable in that one. A flatter angle with fewer things overlapping usually helps.",
+        "Nothing recognizable in that one. A flatter angle with fewer things overlapping usually helps.",
     };
   }
 
