@@ -64,7 +64,7 @@ GLOBE=cccccccc-0000-0000-0000-00000000000a
 BEAR=cccccccc-0000-0000-0000-00000000000b
 
 echo "── schema.sql"
-out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../schema.sql" 2>&1 | grep -i "^ERROR" | head -2)
+out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../schema.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -2)
 check "schema.sql loads" "" "$out"
 check "exactly the two intended policies, nothing else" "$INTENDED" "$(policies)"
 check "read is SELECT, manage is ALL" "ALL,SELECT" \
@@ -141,18 +141,18 @@ q "delete from item_photo_embeddings where item_id='$BEAR';" >/dev/null
 echo ""
 echo "── Migration 010"
 out=$(apply010)
-check "applies" "" "$(echo "$out" | grep -i "^ERROR" | head -2)"
+check "applies" "" "$(echo "$out" | grep -E "(^|: )ERROR:" | head -2)"
 check "names the policies it swept" "0" "$(echo "$out" | grep -c 'Dropping stray policy')"
 check "exactly the two intended policies remain" "$INTENDED" "$(policies)"
 cross_org_checks "after 010"
-check "applies a second time" "" "$(apply010 | grep -i "^ERROR" | head -2)"
+check "applies a second time" "" "$(apply010 | grep -E "(^|: )ERROR:" | head -2)"
 check "…still exactly two" "$INTENDED" "$(policies)"
 
 echo ""
 echo "── A stray under any other name is swept too"
 q "create policy \"temporary debugging\" on item_photo_embeddings for all using (true) with check (true);" >/dev/null
 out=$(apply010)
-check "applies" "" "$(echo "$out" | grep -i "^ERROR" | head -2)"
+check "applies" "" "$(echo "$out" | grep -E "(^|: )ERROR:" | head -2)"
 check "and says what it dropped" "1" "$(echo "$out" | grep -c 'Dropping stray policy "temporary debugging"')"
 check "exactly two again" "$INTENDED" "$(policies)"
 cross_org_checks "after sweeping"

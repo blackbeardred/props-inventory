@@ -57,17 +57,17 @@ SQL
 
 echo "── Applying schema and migrations 001-003"
 for file in "$HERE/../schema.sql" "$HERE"/../migrations/00[123]_*.sql; do
-  out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$file" 2>&1 | grep -i "^ERROR" | head -3)
+  out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$file" 2>&1 | grep -E "(^|: )ERROR:" | head -3)
   if [ -n "$out" ]; then echo "  FAIL  $(basename "$file"): $out"; FAIL=$((FAIL+1));
   else echo "  ok    $(basename "$file")"; fi
 done
 
 echo ""
 echo "── Migration 004"
-out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/004_import_data.sql" 2>&1 | grep -i "^ERROR" | head -3)
+out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/004_import_data.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -3)
 check "applies cleanly" "" "$out"
 
-out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/004_import_data.sql" 2>&1 | grep -i "^ERROR" | head -3)
+out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/004_import_data.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -3)
 check "applies a second time (re-runnable)" "" "$out"
 
 check "the old 3-argument search document is gone" "0" \

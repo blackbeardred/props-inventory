@@ -48,16 +48,16 @@ do $$ begin if not exists (select 1 from pg_roles where rolname='authenticated')
 SQL
 
 echo "── schema.sql, with Recently Deleted in it"
-out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../schema.sql" 2>&1 | grep -i "^ERROR" | head -2)
+out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../schema.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -2)
 check "schema.sql loads" "" "$out"
 check "the table is there" "1" "$(q "select count(*) from information_schema.tables where table_name='deleted_records'")"
 
 echo ""
 echo "── Migration 007 on a database that predates it"
 q "drop table deleted_records;" >/dev/null
-out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/007_recently_deleted.sql" 2>&1 | grep -i "^ERROR" | head -2)
+out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/007_recently_deleted.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -2)
 check "applies" "" "$out"
-out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/007_recently_deleted.sql" 2>&1 | grep -i "^ERROR" | head -2)
+out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/007_recently_deleted.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -2)
 check "applies a second time" "" "$out"
 check "row-level security is on" "t" "$(q "select relrowsecurity from pg_class where relname='deleted_records'")"
 check "three policies, none for update" "delete,insert,select" \

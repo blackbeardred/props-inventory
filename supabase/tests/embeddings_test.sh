@@ -25,7 +25,7 @@ if ! pg_isready -h /tmp -p "$PORT" >/dev/null 2>&1; then
 fi
 
 q() { psql -h /tmp -p "$PORT" -U postgres -d $DB -tAc "$1" 2>&1 | tail -1; }
-apply() { psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$1" 2>&1 | grep -i "^ERROR" | head -3; }
+apply() { psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$1" 2>&1 | grep -E "(^|: )ERROR:" | head -3; }
 
 check() { # label expected actual
   if [ "$2" = "$3" ]; then PASS=$((PASS+1)); echo "  PASS  $1"
@@ -148,7 +148,7 @@ SQL
 check "the draft's table really is missing model" "0" \
   "$(legacy "select count(*) from information_schema.columns where table_name='item_photo_embeddings' and column_name='model'")"
 
-out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB2 -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/006_item_photo_embeddings.sql" 2>&1 | grep -i "^ERROR" | head -2)
+out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB2 -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/006_item_photo_embeddings.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -2)
 check "006 now upgrades it instead of failing" "" "$out"
 check "photo_url was added"  "1" \
   "$(legacy "select count(*) from information_schema.columns where table_name='item_photo_embeddings' and column_name='photo_url'")"
@@ -162,7 +162,7 @@ check "the draft's two policies are gone, not left OR'd alongside" "2" \
 check "and the surviving write policy guards the item's owner" "1" \
   "$(legacy "select count(*) from pg_policies where tablename='item_photo_embeddings' and with_check like '%items%'")"
 check "upgrading twice is still fine" "" \
-  "$(psql -h /tmp -p "$PORT" -U postgres -d $DB2 -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/006_item_photo_embeddings.sql" 2>&1 | grep -i "^ERROR" | head -2)"
+  "$(psql -h /tmp -p "$PORT" -U postgres -d $DB2 -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/006_item_photo_embeddings.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -2)"
 
 echo ""
 echo "── What the fingerprints do"

@@ -49,7 +49,7 @@ do $$ begin if not exists (select 1 from pg_roles where rolname='authenticated')
 SQL
 
 echo "── schema.sql, with reference photos in it"
-out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../schema.sql" 2>&1 | grep -i "^ERROR" | head -2)
+out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../schema.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -2)
 check "schema.sql loads" "" "$out"
 check "the table is there" "1" "$(q "select count(*) from pg_tables where tablename='item_reference_photos'")"
 
@@ -69,7 +69,7 @@ $fn$;
 SQL
 check "match_items is the 006 version before" "0" \
   "$(q "select count(*) from pg_proc where proname='match_items' and prosrc like '%item_reference_photos%'")"
-apply() { psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/008_item_reference_photos.sql" 2>&1 | grep -i "^ERROR" | head -2; }
+apply() { psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/008_item_reference_photos.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -2; }
 check "applies" "" "$(apply)"
 # A table made by the first copy of 008 allowed only two sources.
 q "alter table item_reference_photos drop constraint item_reference_photos_source_check; alter table item_reference_photos add constraint item_reference_photos_source_check check (source in ('find_by_photo','prop_table'));" >/dev/null

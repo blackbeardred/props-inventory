@@ -49,7 +49,7 @@ SQL
 
 echo "── Schema and migrations 001-004"
 for file in "$HERE/../schema.sql" "$HERE"/../migrations/00[1234]_*.sql; do
-  out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$file" 2>&1 | grep -i "^ERROR" | head -2)
+  out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$file" 2>&1 | grep -E "(^|: )ERROR:" | head -2)
   if [ -n "$out" ]; then echo "  FAIL  $(basename "$file"): $out"; FAIL=$((FAIL+1));
   else echo "  ok    $(basename "$file")"; fi
 done
@@ -65,9 +65,9 @@ SQL
 
 echo ""
 echo "── Migration 005"
-out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/005_checklist.sql" 2>&1 | grep -i "^ERROR" | head -2)
+out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/005_checklist.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -2)
 check "applies to a database that predates it" "" "$out"
-out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/005_checklist.sql" 2>&1 | grep -i "^ERROR" | head -2)
+out=$(psql -h /tmp -p "$PORT" -U postgres -d $DB -q -v ON_ERROR_STOP=1 -f "$HERE/../migrations/005_checklist.sql" 2>&1 | grep -E "(^|: )ERROR:" | head -2)
 check "applies a second time" "" "$out"
 
 check "existing rows would read as open" "open" \
