@@ -46,7 +46,7 @@ test.describe("Refresh all search tags (Theatre)", () => {
   test("an owner re-tags every item, with progress", async ({ page }) => {
     await open(page, "/theatre");
     const section = page.locator("#tags");
-    await expect(section).toContainText("what it’s made of and its colours");
+    await expect(section).toContainText("what it’s made of and its colors");
     await section.getByRole("button", { name: "Refresh all search tags" }).click();
     await expect(section.getByRole("status")).toContainText("Done: all 22 items have fresh tags.", { timeout: 30_000 });
     await open(page, "/inventory?view=list");

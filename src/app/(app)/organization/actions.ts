@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { NOT_SET_UP, isHandoverToken, schoolNotSetUp } from "@/lib/school";
 
 function fail(message: string): never {
   redirect(`/theatre?error=${encodeURIComponent(message)}`);
@@ -90,4 +91,45 @@ export async function removeMember(formData: FormData) {
   }
 
   redirect("/theatre#members");
+}
+
+/**
+ * School mode on or off (migration 018). The database does the checking:
+ * owners only, never a test copy, and turning it on only with exactly one
+ * account (it names who to remove otherwise). Turning it on clears the
+ * invite code; turning it off cancels any handover link.
+ */
+export async function setSchoolMode(formData: FormData) {
+  const on = formData.get("school") === "on";
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_school_mode", { p_school: on });
+  if (error) fail(schoolNotSetUp(error) ? NOT_SET_UP : error.message);
+  revalidatePath("/", "layout");
+  redirect(`/theatre?notice=${on ? "school-on" : "school-off"}`);
+}
+
+export type HandoverState = { token: string | null; madeAt: string | null; error: string | null };
+
+/**
+ * A one-time link for the next teacher. Making one replaces any earlier
+ * link, which stops working. The link is shown once, on the page that made
+ * it: nobody can read the stored links back, by design.
+ */
+export async function createHandover(prev: HandoverState, formData: FormData): Promise<HandoverState> {
+  void prev;
+  void formData;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_school_handover");
+  if (error) return { token: null, madeAt: null, error: schoolNotSetUp(error) ? NOT_SET_UP : error.message };
+  if (typeof data !== "string" || !isHandoverToken(data)) {
+    return { token: null, madeAt: null, error: "The link didn’t come back. Try again." };
+  }
+  return { token: data, madeAt: new Date().toISOString(), error: null };
+}
+
+export async function cancelHandover() {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cancel_school_handover");
+  if (error) fail(schoolNotSetUp(error) ? NOT_SET_UP : error.message);
+  redirect("/theatre?notice=handover-cancelled#handover");
 }

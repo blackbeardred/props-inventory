@@ -1,6 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 
-export type OrgSummary = { name: string; invite_code: string | null } | null;
+export type OrgSummary = {
+  name: string;
+  invite_code: string | null;
+  /**
+   * A school theater: one account, the teacher's (migration 018). Missing
+   * before 018 is run, which reads as "not a school".
+   */
+  is_school?: boolean;
+} | null;
 
 export type MembershipSummary = {
   org_id: string;
@@ -49,7 +57,10 @@ export async function getUserAndProfile() {
       .maybeSingle(),
     supabase
       .from("memberships")
-      .select("org_id, role, organizations(name, invite_code)")
+      // Every column, rather than a list, so the page still loads before
+      // migration 018 adds is_school: naming a column that isn't there yet
+      // would fail the whole query.
+      .select("org_id, role, organizations(*)")
       .eq("user_id", user.id)
       .order("created_at"),
   ]);

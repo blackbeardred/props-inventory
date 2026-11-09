@@ -2,12 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { safeNext } from "@/lib/school";
 
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const nextParam = String(formData.get("next") ?? "/inventory");
-  const next = nextParam.startsWith("/") ? nextParam : "/inventory";
+  // A path on this site only: "//elsewhere.com" starts with a slash too.
+  const next = safeNext(formData.get("next"), "/inventory");
 
   if (!email || !password) {
     return redirect(

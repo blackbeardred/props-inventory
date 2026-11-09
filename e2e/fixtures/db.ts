@@ -21,7 +21,7 @@ const colours = ["#8a6d3b", "#5c8c70", "#9b3a22", "#3e8c9a", "#7e5410", "#6b5f4c
 
 function seed(): Record<string, Row[]> {
   const DB: Record<string, Row[]> = {
-    organizations: [{ id: "org1", name: "SPARC", invite_code: "163ECD01", created_at: now }],
+    organizations: [{ id: "org1", name: "SPARC", invite_code: "163ECD01", is_school: false, created_at: now }],
     profiles: [{ id: "u1", full_name: "testname", avatar_url: null, active_org_id: "org1" }],
     memberships: [{ user_id: "u1", org_id: "org1", role: "owner", created_at: "2026-09-24T00:00:00Z" }],
     locations: [
@@ -42,6 +42,7 @@ function seed(): Record<string, Row[]> {
     item_photo_embeddings: [],
     item_reference_photos: [],
     item_twins: [],
+    school_handovers: [],
   };
   names.forEach((name, i) => {
     DB.items.push({
@@ -81,6 +82,11 @@ export const DB: Record<string, Row[]> = new Proxy({} as Record<string, Row[]>, 
  *   pictures=1    the second brass candlestick (it6) has two extra pictures
  *   twins=1       the two brass candlesticks (it5, it6) are twins
  *   pre012=1      migration 012 hasn't been run: renaming the theatre fails
+ *   school=1      the sample theatre is a school (migration 018): one
+ *                 account, no invite code
+ *   crew=1        Pat is a member of the sample theatre too
+ *   handover=1    another theatre, Hillside High Drama, is a school whose
+ *                 teacher (Ms Ortiz) has made a handover link: HANDOVER_TOKEN
  *   copies=1      five more Silver Trays (it12 is in Props Room A): one
  *                 more loose in Props Room A, two in the Loft (one out on
  *                 Noises Off!), one in the Shakespeare Box, one on shelf B
@@ -101,6 +107,23 @@ export function resetFixtures(options?: URLSearchParams): void {
       { id: "dr-expired", org_id: "org1", kind: "item", label: "Broken umbrella", detail: "Unassigned", photo_paths: ["org1/umbrella.jpg"], deleted_by: "u1", deleted_at: daysAgo(40),
         snapshot: { kind: "item", item: { id: "it-umbrella", org_id: "org1", name: "Broken umbrella" }, lines: [], embedding: null } }
     );
+  }
+  if (options?.get("school") === "1") {
+    db.organizations[0].is_school = true;
+    db.organizations[0].invite_code = null;
+  }
+  if (options?.get("crew") === "1") {
+    db.profiles.push({ id: "u2", full_name: "Pat", avatar_url: null, active_org_id: "org1" });
+    db.memberships.push({ user_id: "u2", org_id: "org1", role: "member", created_at: "2026-09-25T00:00:00Z" });
+  }
+  if (options?.get("handover") === "1") {
+    db.organizations.push({ id: "org-hill", name: "Hillside High Drama", invite_code: null, is_school: true, created_at: now });
+    db.profiles.push({ id: "u-old", full_name: "Ms Ortiz", avatar_url: null, active_org_id: "org-hill" });
+    db.memberships.push({ user_id: "u-old", org_id: "org-hill", role: "owner", created_at: now });
+    db.school_handovers.push({
+      token: HANDOVER_TOKEN, org_id: "org-hill", created_by: "u-old", created_at: now,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    });
   }
   if (options?.get("pictures") === "1") {
     // The second brass candlestick (it6) has two extra pictures, kept from
@@ -284,12 +307,86 @@ export function query(table: string) {
 /** The one tryout link the sample theatre has (migration 013). */
 export const TRYOUT_TOKEN = "0123456789abcdef0123456789abcdef";
 
+/** Hillside High Drama's handover link, with handover=1 (migration 018). */
+export const HANDOVER_TOKEN = "fedcba9876543210fedcba9876543210";
+
+const ONE_ACCOUNT = "School theatres have one account, the teacher's.";
+const fail = (message: string) => Promise.resolve({ data: null, error: { code: "P0001", message } });
+
+/** Migration 018's school functions, in miniature, for the signed-in u1. */
+function schoolRpc(name: string, args: Record<string, unknown>) {
+  const me = DB.profiles.find((p) => p.id === "u1");
+  const org = DB.organizations.find((o) => o.id === me?.active_org_id);
+  const mine = DB.memberships.find((m) => m.user_id === "u1" && m.org_id === org?.id);
+  const handovers = (DB.school_handovers ??= []);
+  if (name === "set_school_mode") {
+    if (!org || mine?.role !== "owner") return fail("Only an owner can change this setting.");
+    if (args.p_school) {
+      const others = DB.memberships
+        .filter((m) => m.org_id === org.id && m.user_id !== "u1")
+        .map((m) => (DB.profiles.find((p) => p.id === m.user_id)?.full_name as string) || "Unnamed member");
+      if (others.length) return fail(`Remove everyone else first: ${others.join(", ")}. A school theatre has one account, the teacher's.`);
+      org.is_school = true;
+      org.invite_code = null;
+    } else {
+      DB.school_handovers = handovers.filter((h) => h.org_id !== org.id);
+      org.is_school = false;
+    }
+    return Promise.resolve({ data: null, error: null });
+  }
+  if (name === "regenerate_invite_code") {
+    if (!org || mine?.role !== "owner") return fail("Only an organization owner can regenerate the invite code");
+    if (org.is_school) return fail(ONE_ACCOUNT);
+    org.invite_code = "NEWCODE1";
+    return Promise.resolve({ data: "NEWCODE1", error: null });
+  }
+  if (name === "create_school_handover") {
+    if (!org || mine?.role !== "owner") return fail("Only the teacher can hand the theatre over.");
+    if (!org.is_school) return fail("Handover links are for school theatres.");
+    const token = Array.from({ length: 32 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
+    DB.school_handovers = handovers.filter((h) => h.org_id !== org.id);
+    DB.school_handovers.push({ token, org_id: org.id, created_by: "u1", created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 7 * 864e5).toISOString() });
+    return Promise.resolve({ data: token, error: null });
+  }
+  if (name === "cancel_school_handover") {
+    if (!org || mine?.role !== "owner") return fail("Only the teacher can cancel a handover link.");
+    DB.school_handovers = handovers.filter((h) => h.org_id !== org.id);
+    return Promise.resolve({ data: null, error: null });
+  }
+  const live = handovers.find((h) => h.token === args.p_token && String(h.expires_at) > new Date().toISOString());
+  const target = live && DB.organizations.find((o) => o.id === live.org_id && o.is_school);
+  if (name === "school_handover_info") {
+    if (!live || !target) return Promise.resolve({ data: [], error: null });
+    const from = DB.profiles.find((p) => p.id === live.created_by);
+    return Promise.resolve({ data: [{ theatre_name: target.name, from_name: from?.full_name ?? null, expires_at: live.expires_at }], error: null });
+  }
+  if (name === "accept_school_handover") {
+    if (!live || !target) return fail("This handover link isn't working. Ask the teacher for a new one.");
+    if (DB.memberships.some((m) => m.org_id === target.id && m.user_id === "u1")) return fail("You're already the teacher for this theatre.");
+    // The swap: the old teacher out, then u1 in, as owner, with it open.
+    DB.memberships = DB.memberships.filter((m) => m.org_id !== target.id);
+    DB.memberships.push({ user_id: "u1", org_id: target.id, role: "owner", created_at: new Date().toISOString() });
+    if (me) {
+      me.active_org_id = target.id;
+      const cleaned = String(args.member_name ?? "").replace(/\s+/g, " ").trim();
+      if (!me.full_name && cleaned) me.full_name = cleaned;
+    }
+    DB.school_handovers = handovers.filter((h) => h.org_id !== target.id);
+    return Promise.resolve({ data: target.id, error: null });
+  }
+  return null;
+}
+
 export function rpc(name: string, args: Record<string, unknown>) {
+  const school = schoolRpc(name, args);
+  if (school) return school;
   if (name === "create_organization_and_profile") {
     // As the real function: a new organization, the caller its owner, and it
     // becomes the active one; their name is kept if they already have one.
+    // A school (p_is_school, migration 018) gets no invite code.
     const id = `org-${Math.random().toString(36).slice(2, 8)}`;
-    DB.organizations.push({ id, name: String(args.org_name), invite_code: id.slice(4).toUpperCase().padEnd(8, "X"), created_at: new Date().toISOString() });
+    const isSchool = args.p_is_school === true;
+    DB.organizations.push({ id, name: String(args.org_name), invite_code: isSchool ? null : id.slice(4).toUpperCase().padEnd(8, "X"), is_school: isSchool, created_at: new Date().toISOString() });
     DB.memberships.push({ user_id: "u1", org_id: id, role: "owner", created_at: new Date().toISOString() });
     const me = DB.profiles.find((p) => p.id === "u1");
     if (me) me.active_org_id = id;

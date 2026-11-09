@@ -12,7 +12,10 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { getUserAndProfile } from "@/lib/auth";
 import { SettingsSection as Section } from "@/components/settings-section";
-import { regenerateInviteCode, removeMember, renameTheatre, setMemberRole } from "../organization/actions";
+import { regenerateInviteCode, removeMember, renameTheatre, setMemberRole, setSchoolMode } from "../organization/actions";
+import { DismissableDetails } from "@/components/dismissable-details";
+import { listNames, othersToRemove } from "@/lib/school";
+import { HandoverPanel } from "./handover-panel";
 import { formatDate, pluralize } from "@/lib/inventory";
 
 export const metadata: Metadata = {
@@ -41,11 +44,38 @@ const NOTICES: Record<string, { title: string; body: string }> = {
     title: "Your new theater is ready",
     body: "You’re its owner, and it’s the theater you’re in now. Add rooms and items from Inventory, or share the invite code below so your crew can join.",
   },
+  "school-created": {
+    title: "Your school theater is ready",
+    body: "It has one account: yours. Nobody else can join it, so no student accounts or student data. Add rooms and items from Inventory.",
+  },
+  "school-on": {
+    title: "This is now a school theater",
+    body: "It has one account, yours. The invite code no longer works.",
+  },
+  "school-off": {
+    title: "School mode is off",
+    body: "Make an invite code below when you want others to join.",
+  },
+  "handover-cancelled": {
+    title: "Handover link cancelled",
+    body: "Any handover link you made no longer works.",
+  },
+  "handover-accepted": {
+    title: "You’re the teacher now",
+    body: "This school theater is yours: its inventory, productions and Recently deleted. The previous teacher no longer has access.",
+  },
   "theatre-renamed": {
     title: "Renamed",
     body: "Everyone in the theatre sees the new name from their next page.",
   },
 };
+
+// A button that opens a small confirm box, which closes on a click
+// anywhere else (DismissableDetails).
+const CONFIRM_SUMMARY =
+  "inline-flex min-h-11 cursor-pointer list-none items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface md:min-h-0 [&::-webkit-details-marker]:hidden";
+const CONFIRM_PANEL =
+  "absolute left-0 z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-md border border-rule bg-surface p-4 shadow-lg";
 
 export default async function TheatrePage({ searchParams }: TheatrePageProps) {
   if (!supabaseConfigured) {
@@ -83,6 +113,10 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
   // sample items come tagged (migration 016), and anything a tester adds is
   // tagged as it's saved.
   const tryout = Boolean(user.is_anonymous);
+  // A school theater (migration 018): one account, the teacher's. Nothing
+  // about adding people is shown, and the database refuses it anyway.
+  const school = Boolean(profile.organizations?.is_school);
+  const others = othersToRemove(rows, user.id);
 
   const activeNotice = notice ? NOTICES[notice] : undefined;
 
@@ -99,7 +133,11 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
     <>
       <PageHeading
         title="Theatre"
-        intro="Who’s here, how people join, and the tools the whole theatre shares."
+        intro={
+          school
+            ? "Your school theater, and the tools that come with it."
+            : "Who’s here, how people join, and the tools the whole theatre shares."
+        }
       />
 
       {activeNotice ? (
@@ -120,13 +158,17 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
         <Section
           id="members"
           title={profile.organizations?.name ?? "Your theatre"}
-          intro={`${pluralize(rows.length, "member")}. ${
-            isOwner
-              ? tryout
-                ? "As an owner you can change roles and remove members."
-                : "As an owner you can invite people, change roles and remove members."
-              : "Owners can invite people and manage who's here."
-          }`}
+          intro={
+            school
+              ? "A school theater: one account, the teacher’s."
+              : `${pluralize(rows.length, "member")}. ${
+                  isOwner
+                    ? tryout
+                      ? "As an owner you can change roles and remove members."
+                      : "As an owner you can invite people, change roles and remove members."
+                    : "Owners can invite people and manage who's here."
+                }`
+          }
         >
           {isOwner ? (
             <form
@@ -157,7 +199,17 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
             </form>
           ) : null}
 
-          {isOwner && !tryout ? (
+          {school ? (
+            <div data-school-note className="rounded-lg border border-rule bg-surface px-4 py-3">
+              <p className="font-body text-sm font-medium text-foreground">One account: yours</p>
+              <p className="mt-1 font-body text-sm text-muted">
+                Students don’t get accounts, so Propolis holds no student data. Keep students’ names
+                out of item notes and production names too.
+              </p>
+            </div>
+          ) : null}
+
+          {isOwner && !tryout && !school ? (
             <div data-invite-code className="mb-5 rounded-lg border border-rule bg-surface px-4 py-3">
               <p className="font-body text-sm font-medium text-foreground">Invite code</p>
               <p className="mt-1 font-body text-sm text-muted">
@@ -177,7 +229,7 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
             </div>
           ) : null}
 
-          {membersError ? (
+          {school ? null : membersError ? (
             <Notice title="Couldn’t load members">{membersError.message}</Notice>
           ) : (
             // A list rather than a table: a table scrolled sideways on a
@@ -232,6 +284,63 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
           )}
         </Section>
 
+        {school && isOwner && !tryout ? (
+          <Section
+            id="handover"
+            title="Hand over to a new teacher"
+            intro="For when someone else takes over drama. They accept a one-time link and become the teacher, and you’re removed at the same moment, so there are never two accounts."
+          >
+            <HandoverPanel />
+          </Section>
+        ) : null}
+
+        {isOwner && !tryout ? (
+          <Section
+            id="school"
+            title="School setting"
+            intro="A school theater has one account, the teacher’s. Students never get accounts, so Propolis holds no student data."
+          >
+            {school ? (
+              <DismissableDetails className="relative" data-school-confirm>
+                <summary className={CONFIRM_SUMMARY}>Turn off school mode</summary>
+                <div className={CONFIRM_PANEL}>
+                  <p className="font-body text-sm text-foreground">
+                    Others can join once you make an invite code. If you invite students, their names
+                    and accounts are stored.
+                  </p>
+                  <form action={setSchoolMode} className="mt-3">
+                    <input type="hidden" name="school" value="off" />
+                    <SubmitButton pendingText="Turning off…">Turn it off</SubmitButton>
+                  </form>
+                </div>
+              </DismissableDetails>
+            ) : others.length > 0 ? (
+              <div data-school-blocked>
+                <p className="mb-3 font-body text-sm text-muted">
+                  To make this a school theater, remove everyone else first: {listNames(others)}. You can
+                  remove them in the list above.
+                </p>
+                <button type="button" disabled className={`${CONFIRM_SUMMARY} cursor-not-allowed opacity-60`}>
+                  Make this a school
+                </button>
+              </div>
+            ) : (
+              <DismissableDetails className="relative" data-school-confirm>
+                <summary className={CONFIRM_SUMMARY}>Make this a school</summary>
+                <div className={CONFIRM_PANEL}>
+                  <p className="font-body text-sm text-foreground">
+                    The invite code stops working and nobody else can join. You can turn this off later.
+                  </p>
+                  <form action={setSchoolMode} className="mt-3">
+                    <input type="hidden" name="school" value="on" />
+                    <SubmitButton pendingText="Saving…">Make it a school</SubmitButton>
+                  </form>
+                </div>
+              </DismissableDetails>
+            )}
+          </Section>
+        ) : null}
+
         <Section
           id="photos"
           title="Recognizing photos"
@@ -262,7 +371,7 @@ export default async function TheatrePage({ searchParams }: TheatrePageProps) {
         <Section
           id="tags"
           title="Search tags"
-          intro="Every item gets hidden tags for what it is, what it’s made of and its colours, from its photo and its words, so a search for “wood” or “red” finds it even when nobody wrote that down. New and edited items are tagged as they’re saved, and anything untagged is filled in on its own."
+          intro="Every item gets hidden tags for what it is, what it’s made of and its colors, from its photo and its words, so a search for “wood” or “red” finds it even when nobody wrote that down. New and edited items are tagged as they’re saved, and anything untagged is filled in on its own."
         >
           {tryout ? null : isOwner ? (
             <>

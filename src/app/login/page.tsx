@@ -5,6 +5,7 @@ import { Notice, PageHeading, TextField } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { login } from "./actions";
+import { safeNext } from "@/lib/school";
 
 export const metadata: Metadata = {
   title: "Log in · Propolis",
@@ -21,7 +22,8 @@ function first(value: string | string[] | undefined) {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const error = first(params.error);
-  const next = first(params.next) ?? "/inventory";
+  // A path on this site only (src/lib/school.ts, safeNext).
+  const next = safeNext(first(params.next), "/inventory");
   // Arrived from "Switch account" on the account page.
   const switched = first(params.switched) === "1";
 
@@ -83,7 +85,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </p>
             <p className="mt-2 font-body text-sm text-muted">
               Need an account?{" "}
-              <Link href="/signup" className="text-accent hover:underline">
+              <Link
+                href={next === "/inventory" ? "/signup" : `/signup?next=${encodeURIComponent(next)}`}
+                className="text-accent hover:underline"
+              >
                 Sign up
               </Link>
             </p>

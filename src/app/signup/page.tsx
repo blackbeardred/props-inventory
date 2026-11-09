@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Notice, PageHeading, TextField } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { supabaseConfigured } from "@/lib/supabase/config";
+import { safeNext } from "@/lib/school";
 import { signup } from "./actions";
 
 export const metadata: Metadata = {
@@ -21,13 +22,19 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
   const params = await searchParams;
   const error = first(params.error);
   const notice = first(params.notice);
+  // Sent here from a handover link (migration 018): back there afterwards.
+  const next = safeNext(first(params.next), "");
 
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm">
         <PageHeading
           title="Create your account"
-          intro="You'll set up your organization right after this."
+          intro={
+            next.startsWith("/handover/")
+              ? "Then you’ll go straight back to take over the school theater."
+              : "You'll set up your organization right after this."
+          }
         />
 
         {!supabaseConfigured ? (
@@ -51,6 +58,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
               </div>
             ) : null}
             <form action={signup} className="space-y-5">
+              {next ? <input type="hidden" name="next" value={next} /> : null}
               <TextField
                 label="Email"
                 name="email"
@@ -85,7 +93,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
             </p>
             <p className="mt-6 font-body text-sm text-muted">
               Already have an account?{" "}
-              <Link href="/login" className="text-accent hover:underline">
+              <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="text-accent hover:underline">
                 Log in
               </Link>
             </p>

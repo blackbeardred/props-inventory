@@ -9,6 +9,7 @@ import {
 } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { DeleteButton } from "@/components/delete-button";
+import { SchoolCheckbox } from "@/components/school-checkbox";
 import { SettingsSection as Section } from "@/components/settings-section";
 import { InstallApp } from "@/components/install-app";
 import { AvatarField } from "@/components/avatar-field";
@@ -181,6 +182,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                         {isActive ? (
                           <Badge tone="success">Current</Badge>
                         ) : null}
+                        {membership.organizations?.is_school ? (
+                          <Badge tone="muted">School</Badge>
+                        ) : null}
                       </div>
                     </div>
 
@@ -200,7 +204,13 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                           </SubmitButton>
                         </form>
                       )}
-                      {tryout ? null : (
+                      {tryout ? null : membership.organizations?.is_school ? (
+                        // The teacher is a school's only account: leaving
+                        // would strand it, so the database refuses.
+                        <span className="font-body text-xs text-muted" data-school-leave-note>
+                          To leave, hand it over from Theatre
+                        </span>
+                      ) : (
                         <form action={leaveOrganization}>
                           <input
                             type="hidden"
@@ -247,9 +257,10 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 name="theatreName"
                 autoComplete="organization"
                 maxLength={100}
-                helpText="You’ll be its owner, with its own inventory and invite code. Your other theaters stay as they are."
+                helpText="You’ll be its owner, with its own inventory. Your other theaters stay as they are."
                 required
               />
+              <SchoolCheckbox />
               <SubmitButton pendingText="Creating…" variant="ghost">
                 Create theater
               </SubmitButton>

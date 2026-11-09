@@ -64,7 +64,7 @@ test.describe("a tester's Theatre page", () => {
     await expect(page.getByRole("button", { name: "Generate new code" })).toHaveCount(0);
     await expect(page.getByText("163ECD01")).toHaveCount(0);
     // Search tags: what they do, but no button that spends on AI.
-    await expect(page.locator("#tags")).toContainText("what it’s made of and its colours");
+    await expect(page.locator("#tags")).toContainText("what it’s made of and its colors");
     await expect(page.locator("#tags button")).toHaveCount(0);
     await expect(page.locator("[data-retag-all]")).toHaveCount(0);
     await expect(page.locator("[data-rename-theatre]")).toHaveCount(1);

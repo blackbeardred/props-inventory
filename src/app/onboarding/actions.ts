@@ -2,10 +2,12 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { NOT_SET_UP, schoolNotSetUp } from "@/lib/school";
 
 export async function createOrganization(formData: FormData) {
   const fullName = String(formData.get("fullName") ?? "").trim();
   const orgName = String(formData.get("orgName") ?? "").trim();
+  const isSchool = formData.get("isSchool") === "1";
 
   if (!fullName || !orgName) {
     return redirect(
@@ -24,13 +26,17 @@ export async function createOrganization(formData: FormData) {
     return redirect("/login?next=/onboarding");
   }
 
+  // p_is_school is only sent for a school, so making an ordinary theater
+  // still works before migration 018 is run.
   const { error } = await supabase.rpc("create_organization_and_profile", {
     org_name: orgName,
     member_name: fullName,
+    ...(isSchool ? { p_is_school: true } : {}),
   });
 
   if (error) {
-    return redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
+    const message = isSchool && schoolNotSetUp(error) ? NOT_SET_UP : error.message;
+    return redirect(`/onboarding?error=${encodeURIComponent(message)}`);
   }
 
   return redirect("/inventory");

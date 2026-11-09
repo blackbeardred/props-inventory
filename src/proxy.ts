@@ -13,9 +13,9 @@ const PUBLIC_PATHS = new Set([
   "/survey",
   "/auth/callback",
 ]);
-// Tryout links (/try/<token>, migration 013): opened by people with no
-// account yet.
-const PUBLIC_PREFIXES = ["/try/"];
+// Tryout links (/try/<token>, migration 013) and school handover links
+// (/handover/<token>, migration 018): opened by people with no account yet.
+const PUBLIC_PREFIXES = ["/try/", "/handover/"];
 // Routes a signed-in user shouldn't see again (bounce to the app instead).
 const AUTH_PATHS = new Set(["/login", "/signup"]);
 

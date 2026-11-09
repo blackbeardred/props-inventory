@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Notice, PageHeading, TextField } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { SchoolCheckbox } from "@/components/school-checkbox";
 import { getUserAndProfile } from "@/lib/auth";
 import { createOrganization, joinOrganization } from "./actions";
 
@@ -63,6 +64,7 @@ export default async function OnboardingPage({
             autoComplete="organization"
             required
           />
+          <SchoolCheckbox />
           <SubmitButton pendingText="Creating organization…">
             Create organization
           </SubmitButton>

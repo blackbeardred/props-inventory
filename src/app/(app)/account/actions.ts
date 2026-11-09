@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AVATARS_BUCKET } from "@/lib/supabase/storage";
+import { NOT_SET_UP, schoolNotSetUp } from "@/lib/school";
 
 const MAX_AVATAR_BYTES = 4 * 1024 * 1024;
 
@@ -207,6 +208,7 @@ const MAX_THEATRE_NAME = 100;
  */
 export async function createTheatre(formData: FormData) {
   const name = String(formData.get("theatreName") ?? "").replace(/\s+/g, " ").trim();
+  const isSchool = formData.get("isSchool") === "1";
   if (!name) fail("Give the new theater a name.");
   if (name.length > MAX_THEATRE_NAME) fail(`That name is too long: ${MAX_THEATRE_NAME} characters at most.`);
 
@@ -221,14 +223,17 @@ export async function createTheatre(formData: FormData) {
     .eq("id", user.id)
     .maybeSingle();
 
+  // p_is_school is only sent for a school, so an ordinary theater can still
+  // be started before migration 018 is run.
   const { error } = await supabase.rpc("create_organization_and_profile", {
     org_name: name,
     member_name: profile?.full_name ?? user.email ?? "Owner",
+    ...(isSchool ? { p_is_school: true } : {}),
   });
-  if (error) fail(error.message);
+  if (error) fail(isSchool && schoolNotSetUp(error) ? NOT_SET_UP : error.message);
 
   revalidatePath("/", "layout");
-  redirect("/theatre?notice=theatre-created");
+  redirect(`/theatre?notice=${isSchool ? "school-created" : "theatre-created"}`);
 }
 
 export async function joinOrganization(formData: FormData) {
