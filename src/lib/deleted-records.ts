@@ -8,7 +8,7 @@ import { pluralize } from "@/lib/inventory";
 export const KEEP_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export type DeletedKind = "item" | "location" | "production" | "pull_list" | "pull_list_item";
+export type DeletedKind = "item" | "location" | "production" | "pull_list" | "pull_list_item" | "pull_list_group";
 
 export const KIND_LABELS: Record<DeletedKind, string> = {
   item: "Item",
@@ -16,6 +16,7 @@ export const KIND_LABELS: Record<DeletedKind, string> = {
   production: "Production",
   pull_list: "Pull list",
   pull_list_item: "Pull-list line",
+  pull_list_group: "Costume",
 };
 
 type Row = Record<string, unknown>;
@@ -35,9 +36,21 @@ export type Snapshot =
       twinSet?: string | null;
     }
   | { kind: "location"; location: Row; childIds: string[]; itemIds: string[] }
-  | { kind: "production"; production: Row; lists: Row[]; lines: Row[] }
-  | { kind: "pull_list"; list: Row; lines: Row[]; productionName: string }
-  | { kind: "pull_list_item"; line: Row; productionId: string; productionName: string; listName: string };
+  // `groups`: the costumes on the lists (migration 019). Absent before it.
+  | { kind: "production"; production: Row; lists: Row[]; lines: Row[]; groups?: Row[] }
+  | { kind: "pull_list"; list: Row; lines: Row[]; productionName: string; groups?: Row[] }
+  | { kind: "pull_list_item"; line: Row; productionId: string; productionName: string; listName: string }
+  // A costume (migration 019). `lines`: its pieces, when they went with it.
+  // `pieceIds`: the pieces left on the list, so a restore gathers them back.
+  | {
+      kind: "pull_list_group";
+      group: Row;
+      lines: Row[];
+      pieceIds: string[];
+      productionId: string;
+      productionName: string;
+      listName: string;
+    };
 
 /** When a snapshot stops being restorable. */
 export function expiresAt(deletedAt: string | Date): Date {

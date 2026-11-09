@@ -40,6 +40,12 @@ export type ChecklistRow = {
    */
   pullStatus?: "pending" | "pulled" | "returned";
   photoUrl?: string;
+  /**
+   * The character whose costume it's part of (migration 019), shown before
+   * the name: "Margaret · Corset". Whoever's in the storage room then knows
+   * which costume a piece is for.
+   */
+  costume?: string | null;
 };
 
 export type ChecklistContainer = {

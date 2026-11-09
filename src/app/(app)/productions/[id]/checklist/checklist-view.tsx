@@ -103,6 +103,7 @@ function Row({
                   : "text-foreground"
             }`}
           >
+            {row.costume ? <span data-costume-label>{row.costume} · </span> : null}
             {row.name}
             {row.quantityNeeded > 1 ? ` ×${row.quantityNeeded}` : ""}
           </p>

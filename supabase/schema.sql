@@ -1018,7 +1018,8 @@ create table if not exists deleted_records (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null references organizations(id) on delete cascade,
   kind text not null
-    check (kind in ('item', 'location', 'production', 'pull_list', 'pull_list_item')),
+    -- 'pull_list_group' (a costume, with its pieces) since migration 019.
+    check (kind in ('item', 'location', 'production', 'pull_list', 'pull_list_item', 'pull_list_group')),
   -- What the list shows: the thing's name, and a line about what went with it.
   label text not null,
   detail text,
@@ -1664,3 +1665,56 @@ grant execute on function accept_school_handover(text, text) to authenticated;
 revoke all on function create_school_handover_for(uuid) from public, anon, authenticated;
 revoke all on function create_organization_and_profile(text, text, boolean) from public, anon;
 grant execute on function create_organization_and_profile(text, text, boolean) to authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Costumes on pull lists (migration 019): named groups of lines, such as
+-- "Margaret costume". The deleted_records kind check above includes
+-- 'pull_list_group'. See supabase/migrations/019_costumes.sql.
+-- ═══════════════════════════════════════════════════════════════════════
+
+create table if not exists pull_list_groups (
+  id uuid primary key default gen_random_uuid(),
+  pull_list_id uuid not null references pull_lists(id) on delete cascade,
+  name text not null check (char_length(btrim(name)) between 1 and 80),
+  -- Order on the list; new groups go last.
+  position integer not null default 0,
+  created_at timestamptz not null default now(),
+  -- For the two-column foreign key below.
+  unique (id, pull_list_id)
+);
+
+create index if not exists pull_list_groups_pull_list_idx on pull_list_groups (pull_list_id);
+
+alter table pull_list_groups enable row level security;
+
+drop policy if exists "org members can manage their pull list groups" on pull_list_groups;
+create policy "org members can manage their pull list groups" on pull_list_groups
+  for all
+  using (
+    pull_list_id in (
+      select pl.id from pull_lists pl
+      join productions p on p.id = pl.production_id
+      where p.org_id = auth_org_id()
+    )
+  )
+  with check (
+    pull_list_id in (
+      select pl.id from pull_lists pl
+      join productions p on p.id = pl.production_id
+      where p.org_id = auth_org_id()
+    )
+  );
+
+alter table pull_list_items add column if not exists group_id uuid;
+
+-- The line and its group must be on the same pull list. Deleting the group
+-- clears group_id only (Postgres 15+), leaving the line on its list.
+alter table pull_list_items drop constraint if exists pull_list_items_group_fk;
+alter table pull_list_items add constraint pull_list_items_group_fk
+  foreign key (group_id, pull_list_id)
+  references pull_list_groups (id, pull_list_id)
+  on delete set null (group_id);
+
+create index if not exists pull_list_items_group_idx on pull_list_items (group_id)
+  where group_id is not null;

@@ -312,13 +312,14 @@ export async function trashProduction(supabase: Client, productionId: string): P
   const { data: lines } = listIds.length
     ? await supabase.from("pull_list_items").select("*").in("pull_list_id", listIds)
     : { data: [] as Row[] };
+  const groups = await groupsOn(supabase, listIds);
 
   const kept = await keep(supabase, {
     orgId: String(row.org_id),
     kind: "production",
     label: String(row.name),
     detail: productionDetail(listIds.length, (lines ?? []).length),
-    snapshot: { kind: "production", production: row, lists: (lists ?? []) as Row[], lines: (lines ?? []) as Row[] },
+    snapshot: { kind: "production", production: row, lists: (lists ?? []) as Row[], lines: (lines ?? []) as Row[], groups },
   });
   if ("message" in kept) return { ok: false, message: kept.message };
 
@@ -341,13 +342,14 @@ export async function trashPullList(supabase: Client, pullListId: string): Promi
   if (!production) return { ok: false, message: "That pull list’s production isn’t there any more." };
 
   const { data: lines } = await supabase.from("pull_list_items").select("*").eq("pull_list_id", pullListId);
+  const groups = await groupsOn(supabase, [pullListId]);
 
   const kept = await keep(supabase, {
     orgId: production.org_id,
     kind: "pull_list",
     label: String(row.name),
     detail: `from ${production.name} · ${pluralize((lines ?? []).length, "line")}`,
-    snapshot: { kind: "pull_list", list: row, lines: (lines ?? []) as Row[], productionName: production.name },
+    snapshot: { kind: "pull_list", list: row, lines: (lines ?? []) as Row[], productionName: production.name, groups },
   });
   if ("message" in kept) return { ok: false, message: kept.message };
 
@@ -396,6 +398,75 @@ export async function trashPullListItem(supabase: Client, pullListItemId: string
   return { ok: true, recordId: kept.id, label: name };
 }
 
+/**
+ * The costumes on these lists (migration 019), for a snapshot. Empty before
+ * 019 is run, when the table isn't there.
+ */
+async function groupsOn(supabase: Client, listIds: string[]): Promise<Row[]> {
+  if (!listIds.length) return [];
+  const { data, error } = await supabase.from("pull_list_groups").select("*").in("pull_list_id", listIds);
+  return error ? [] : ((data ?? []) as Row[]);
+}
+
+/**
+ * Deletes a costume (migration 019). With `withPieces`, its lines go too and
+ * come back with it; without, they stay on the list as loose lines (the
+ * database clears their group_id), and a restore gathers them back in.
+ */
+export async function trashPullListGroup(
+  supabase: Client,
+  groupId: string,
+  { withPieces }: { withPieces: boolean }
+): Promise<TrashResult> {
+  const { data: found } = await supabase
+    .from("pull_list_groups")
+    .select("*, pull_lists(name, production_id, productions(org_id, name))")
+    .eq("id", groupId)
+    .maybeSingle();
+  if (!found) return { ok: false, message: "That costume isn’t there any more." };
+  const { pull_lists: list, ...group } = found as Row & {
+    pull_lists: { name: string; production_id: string; productions: { org_id: string; name: string } | null } | null;
+  };
+  if (!list?.productions) return { ok: false, message: "That costume’s pull list isn’t there any more." };
+
+  const { data: pieces } = await supabase.from("pull_list_items").select("*").eq("group_id", groupId);
+  const lines = (pieces ?? []) as Row[];
+
+  const kept = await keep(supabase, {
+    orgId: list.productions.org_id,
+    kind: "pull_list_group",
+    label: String(group.name),
+    detail: withPieces
+      ? `from ${list.productions.name} · ${pluralize(lines.length, "piece")}`
+      : `from ${list.productions.name} · pieces left on the list`,
+    snapshot: {
+      kind: "pull_list_group",
+      group,
+      lines: withPieces ? lines : [],
+      pieceIds: withPieces ? [] : ids(lines),
+      productionId: list.production_id,
+      productionName: list.productions.name,
+      listName: list.name,
+    },
+  });
+  if ("message" in kept) return { ok: false, message: kept.message };
+
+  if (withPieces && lines.length) {
+    const { error } = await supabase.from("pull_list_items").delete().in("id", ids(lines));
+    if (error) {
+      await unkeep(supabase, kept.id);
+      return { ok: false, message: error.message };
+    }
+  }
+  const { error } = await supabase.from("pull_list_groups").delete().eq("id", groupId);
+  if (error) {
+    if (withPieces && lines.length) await putBack(supabase, "pull_list_items", lines);
+    await unkeep(supabase, kept.id);
+    return { ok: false, message: error.message };
+  }
+  return { ok: true, recordId: kept.id, label: String(group.name) };
+}
+
 // ── Restoring ───────────────────────────────────────────────────────────
 
 /** Puts rows back with their original ids; rows already there are left alone. */
@@ -416,11 +487,19 @@ async function existing(supabase: Client, table: string, wanted: string[]): Prom
   return new Set(ids(data as Row[]));
 }
 
-/** Lines whose item and list are both still here, and how many aren't. */
+/**
+ * Lines whose item and list are both still here, and how many aren't. A
+ * line whose costume (migration 019) has gone since comes back loose rather
+ * than failing on it.
+ */
 async function restorableLines(supabase: Client, lines: Row[]) {
   const items = await existing(supabase, "items", lines.map((l) => String(l.item_id)));
   const lists = await existing(supabase, "pull_lists", lines.map((l) => String(l.pull_list_id)));
-  const keep = lines.filter((l) => items.has(String(l.item_id)) && lists.has(String(l.pull_list_id)));
+  const groupIds = lines.map((l) => l.group_id).filter((g): g is string => typeof g === "string" && g !== "");
+  const groups = groupIds.length ? await existing(supabase, "pull_list_groups", groupIds) : new Set<string>();
+  const keep = lines
+    .filter((l) => items.has(String(l.item_id)) && lists.has(String(l.pull_list_id)))
+    .map((l) => (l.group_id && !groups.has(String(l.group_id)) ? { ...l, group_id: null } : l));
   return { keep, dropped: lines.length - keep.length };
 }
 
@@ -507,6 +586,8 @@ export async function restoreRecord(supabase: Client, recordId: string): Promise
   } else if (snap.kind === "production") {
     failure = await putBack(supabase, "productions", [snap.production]);
     if (!failure) failure = await putBack(supabase, "pull_lists", snap.lists);
+    // Costumes before their pieces, which point at them.
+    if (!failure && snap.groups?.length) failure = await putBack(supabase, "pull_list_groups", snap.groups);
     if (!failure) {
       const { keep, dropped } = await restorableLines(supabase, snap.lines);
       failure = await putBack(supabase, "pull_list_items", keep);
@@ -519,6 +600,7 @@ export async function restoreRecord(supabase: Client, recordId: string): Promise
       return { ok: false, message: `Its production, ${snap.productionName}, has been deleted. Restore that first, then this list.` };
     }
     failure = await putBack(supabase, "pull_lists", [snap.list]);
+    if (!failure && snap.groups?.length) failure = await putBack(supabase, "pull_list_groups", snap.groups);
     if (!failure) {
       const { keep, dropped } = await restorableLines(supabase, snap.lines);
       failure = await putBack(supabase, "pull_list_items", keep);
@@ -533,8 +615,33 @@ export async function restoreRecord(supabase: Client, recordId: string): Promise
     if (!(await existing(supabase, "items", [String(snap.line.item_id)])).size) {
       return { ok: false, message: `${record.label} itself has been deleted. Restore the item first, then this line.` };
     }
-    failure = await putBack(supabase, "pull_list_items", [snap.line]);
+    const { keep } = await restorableLines(supabase, [snap.line]);
+    failure = await putBack(supabase, "pull_list_items", keep);
+    if (!failure && keep[0]?.group_id !== snap.line.group_id) notes.push("Its costume has been deleted since, so it’s back on the list on its own.");
     href = `/productions/${snap.productionId}`;
+  } else if (snap.kind === "pull_list_group") {
+    const listId = String(snap.group.pull_list_id);
+    if (!(await existing(supabase, "pull_lists", [listId])).size) {
+      return { ok: false, message: `${snap.productionName}’s ${snap.listName} has been deleted. Restore that first, then this costume.` };
+    }
+    failure = await putBack(supabase, "pull_list_groups", [snap.group]);
+    if (!failure && snap.lines.length) {
+      const { keep, dropped } = await restorableLines(supabase, snap.lines);
+      failure = await putBack(supabase, "pull_list_items", keep);
+      if (dropped) notes.push(`${pluralize(dropped, "piece")} didn’t come back: ${dropped === 1 ? "its item has" : "their items have"} been deleted since.`);
+    }
+    if (!failure && snap.pieceIds.length) {
+      // The pieces left on the list go back in, unless they've been put in
+      // another costume or taken off the list since.
+      const { error } = await supabase
+        .from("pull_list_items")
+        .update({ group_id: String(snap.group.id) })
+        .in("id", snap.pieceIds)
+        .eq("pull_list_id", listId)
+        .is("group_id", null);
+      failure = error?.message ?? null;
+    }
+    href = `/productions/${snap.productionId}?open=${String(snap.group.id)}#costume-${String(snap.group.id)}`;
   }
 
   if (failure) return { ok: false, message: `Couldn’t restore ${record.label}: ${failure}` };

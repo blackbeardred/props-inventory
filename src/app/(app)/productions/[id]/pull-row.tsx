@@ -11,11 +11,12 @@ import { updatePullListItemStatus } from "./actions";
 /** In the order things happen to a prop, which is also the order on screen. */
 const STATUSES: PullListItemStatus[] = ["pending", "pulled", "returned"];
 
-function statusForm(productionId: string, pullListItemId: string, status: PullListItemStatus) {
+function statusForm(productionId: string, pullListItemId: string, status: PullListItemStatus, keepOpen?: string) {
   const data = new FormData();
   data.set("productionId", productionId);
   data.set("pullListItemId", pullListItemId);
   data.set("newStatus", status);
+  if (keepOpen) data.set("keepOpen", keepOpen);
   return data;
 }
 
@@ -35,8 +36,11 @@ export function PullRow({
   pullListItemId,
   status,
   name,
+  keepOpen,
   children,
 }: {
+  /** The costume this line is in (migration 019), kept open after a swipe. */
+  keepOpen?: string;
   productionId: string;
   pullListItemId: string;
   status: PullListItemStatus;
@@ -52,7 +56,7 @@ export function PullRow({
     if (already) return;
     setSent(true);
     startSaving(async () => {
-      await updatePullListItemStatus(statusForm(productionId, pullListItemId, "pulled"));
+      await updatePullListItemStatus(statusForm(productionId, pullListItemId, "pulled", keepOpen));
     });
   }
   const swipe = useSwipeLeft(markPulled);

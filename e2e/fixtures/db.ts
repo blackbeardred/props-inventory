@@ -38,6 +38,7 @@ function seed(): Record<string, Row[]> {
     productions: [{ id: "prod1", org_id: "org1", name: "Noises Off!", status: "planning", start_date: "2026-11-01", end_date: "2026-12-02", created_at: now }],
     pull_lists: [{ id: "pl1", production_id: "prod1", name: "Pull List", created_at: now }],
     pull_list_items: [],
+    pull_list_groups: [],
     deleted_records: [],
     item_photo_embeddings: [],
     item_reference_photos: [],
@@ -87,6 +88,10 @@ export const DB: Record<string, Row[]> = new Proxy({} as Record<string, Row[]>, 
  *   crew=1        Pat is a member of the sample theatre too
  *   handover=1    another theatre, Hillside High Drama, is a school whose
  *                 teacher (Ms Ortiz) has made a handover link: HANDOVER_TOKEN
+ *   costumes=1    a past show, "Brigadoon (2024)", whose pull list had a
+ *                 Margaret costume (long white dress, tartan shawl, clogs)
+ *                 and an oil lantern; the corset is pulled for Noises Off!'s
+ *                 neighbour show right now (migration 019)
  *   copies=1      five more Silver Trays (it12 is in Props Room A): one
  *                 more loose in Props Room A, two in the Loft (one out on
  *                 Noises Off!), one in the Shakespeare Box, one on shelf B
@@ -124,6 +129,32 @@ export function resetFixtures(options?: URLSearchParams): void {
       token: HANDOVER_TOKEN, org_id: "org-hill", created_by: "u-old", created_at: now,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     });
+  }
+  if (options?.get("costumes") === "1") {
+    const piece = (id: string, name: string) => ({
+      id, org_id: "org1", name, category: "costume", description: null, photo_url: null, quantity: 1,
+      condition: "good", location_id: "costume", created_at: now, auto_tags: [], import_data: {},
+    });
+    db.items.push(piece("it-dress", "Long white dress"), piece("it-shawl", "Tartan shawl"), piece("it-clogs", "Clogs"), piece("it-corset", "Corset"));
+    db.productions.push(
+      { id: "prod-past", org_id: "org1", name: "Brigadoon (2024)", status: "closed", start_date: "2024-03-01", end_date: "2024-03-20", created_at: "2024-01-10T00:00:00Z" },
+      { id: "prod-next", org_id: "org1", name: "Oliver!", status: "in_run", start_date: "2026-11-05", end_date: "2026-11-30", created_at: now },
+    );
+    db.pull_lists.push(
+      { id: "pl-past", production_id: "prod-past", name: "Pull List", created_at: "2024-01-10T00:00:00Z" },
+      { id: "pl-next", production_id: "prod-next", name: "Pull List", created_at: now },
+    );
+    db.pull_list_groups.push({ id: "g-past", pull_list_id: "pl-past", name: "Margaret costume", position: 0, created_at: "2024-01-11T00:00:00Z" });
+    const line = (id: string, pull_list_id: string, item_id: string, group_id: string | null, status: string) => ({
+      id, pull_list_id, item_id, group_id, quantity_needed: 1, status, check_state: "open", checked_at: null, checked_by: null, created_at: "2024-01-12T00:00:00Z",
+    });
+    db.pull_list_items.push(
+      line("pli-p1", "pl-past", "it-dress", "g-past", "returned"),
+      line("pli-p2", "pl-past", "it-shawl", "g-past", "returned"),
+      line("pli-p3", "pl-past", "it-clogs", "g-past", "returned"),
+      line("pli-p4", "pl-past", "it10", null, "returned"),
+      line("pli-n1", "pl-next", "it-corset", null, "pulled"),
+    );
   }
   if (options?.get("pictures") === "1") {
     // The second brass candlestick (it6) has two extra pictures, kept from
@@ -182,6 +213,11 @@ function embed(table: string, row: Row, select: string): Row {
       out.pull_lists = pl ? { name: pl.name, production_id: pl.production_id, productions: prod ?? null } : null;
     }
   }
+  if (table === "pull_list_groups" && select.includes("pull_lists(")) {
+    const pl = DB.pull_lists.find((x) => x.id === row.pull_list_id);
+    const prod = pl && DB.productions.find((x) => x.id === pl.production_id);
+    out.pull_lists = pl ? { name: pl.name, production_id: pl.production_id, productions: prod ?? null } : null;
+  }
   if (table === "pull_lists" && select.includes("productions(")) {
     out.productions = DB.productions.find((x) => x.id === row.production_id) ?? null;
   }
@@ -213,7 +249,14 @@ function cascade(table: string, gone: string[]) {
     return removed.map((r) => r.id as string);
   };
   if (table === "productions") cascade("pull_lists", drop("pull_lists", "production_id", gone));
-  if (table === "pull_lists") drop("pull_list_items", "pull_list_id", gone);
+  if (table === "pull_lists") {
+    drop("pull_list_items", "pull_list_id", gone);
+    drop("pull_list_groups", "pull_list_id", gone);
+  }
+  // Deleting a costume leaves its pieces on the list (migration 019).
+  if (table === "pull_list_groups") {
+    for (const line of DB.pull_list_items) if (gone.includes(line.group_id as string)) line.group_id = null;
+  }
   if (table === "items") {
     drop("pull_list_items", "item_id", gone);
     drop("item_photo_embeddings", "item_id", gone);
@@ -262,7 +305,9 @@ export function query(table: string) {
     if (op?.kind === "insert") {
       const defaults: Row =
         table === "pull_list_items"
-          ? { status: "pending", check_state: "open", quantity_needed: 1, checked_at: null, checked_by: null }
+          ? { status: "pending", check_state: "open", quantity_needed: 1, checked_at: null, checked_by: null, group_id: null }
+          : table === "pull_list_groups"
+          ? { position: 0 }
           : table === "items"
             ? { auto_tags: [], import_data: {}, quantity: 1, category: "prop", condition: null, description: null, photo_url: null, location_id: null }
             : table === "deleted_records"

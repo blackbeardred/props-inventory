@@ -43,6 +43,7 @@ with expected (schemaname, tablename, policyname) as (
     ('public', 'profiles', 'members can read profiles they share an org with'),
     ('public', 'profiles', 'members can update their own profile'),
     ('public', 'pull_list_items', 'org members can manage their pull list items'),
+    ('public', 'pull_list_groups', 'org members can manage their pull list groups'),
     ('public', 'pull_lists', 'org members can manage their pull lists'),
     ('storage', 'objects', 'members can read avatars from their orgs'),
     ('storage', 'objects', 'org members can delete their item photos'),
