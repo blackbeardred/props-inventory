@@ -90,6 +90,9 @@ echo ""
 echo "── Migration 020 on top"
 check "applies cleanly" "" "$(run "$HERE/../migrations/020_survey_notifications.sql")"
 check "applies a second time (re-runnable)" "" "$(run "$HERE/../migrations/020_survey_notifications.sql")"
+# 021 replaces the trigger function again (a tap opens the response), and
+# schema.sql holds that final version.
+check "021 then applies cleanly on top" "" "$(run "$HERE/../migrations/021_survey_results.sql")"
 check "the functions match a fresh install" "$FRESH" "$(q "$FN")"
 check "one trigger, not two" "1" "$(q "select count(*) from pg_trigger where tgname = 'survey_response_notify'")"
 
@@ -116,6 +119,8 @@ check "on the channel, with the role and the count, as JSON" \
   "propolis-testchannel0123456789|New survey response|Stage manager
 3 responses so far|application/json" \
   "$(q "select body->>'topic' || '|' || (body->>'title') || '|' || (body->>'message') || '|' || (headers->>'Content-Type') from net.sent order by at desc limit 1")"
+check "a tap opens that response on the live site" "t" \
+  "$(q "select (body->>'click') = 'https://props-inventory-xi.vercel.app/survey-results#r-' || (select id from survey_responses order by created_at desc limit 1) from net.sent order by at desc limit 1")"
 check "and not the email" "f" \
   "$(q "select body::text ~* 'someone@example' from net.sent order by at desc limit 1")"
 check "another survey counts on its own: its first response" "Stage manager
@@ -134,9 +139,9 @@ echo ""
 echo "── Who answered"
 check "role 'other' uses their own words, then the theater" "|Board president/executive director, Santa Cruz Actors' Theatre
 2 responses so far" \
-  "$(submit_json testers-2027 '{"role": "other", "role_other": "Board president/executive director", "theater_name": "Santa Cruz Actors'"''"' Theatre", "anything_else": "secret back room", "problems": ["cant-find"]}')|$(last)"
-check "no other answer and no email in what's sent" "f" \
-  "$(q "select body::text ~* 'secret back room|cant-find|board@example' from net.sent order by at desc limit 1")"
+  "$(submit_json testers-2027 '{"role": "other", "role_other": "Board president/executive director", "theater_name": "Santa Cruz Actors'"''"' Theatre", "anything_else": "secret back room", "problems": ["cant-find"], "phone": "(831) 555-0142"}')|$(last)"
+check "no other answer, no phone number and no email in what's sent" "f" \
+  "$(q "select body::text ~* 'secret back room|cant-find|555-0142|board@example' from net.sent order by at desc limit 1")"
 check "a theater with no role" "|Pacific Repertory Theatre
 3 responses so far" \
   "$(submit_json testers-2027 '{"theater_name": "  Pacific Repertory Theatre "}')|$(last)"

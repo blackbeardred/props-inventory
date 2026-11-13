@@ -92,17 +92,57 @@ export const DB: Record<string, Row[]> = new Proxy({} as Record<string, Row[]>, 
  *                 Margaret costume (long white dress, tartan shawl, clogs)
  *                 and an oil lantern; the corset is pulled for Noises Off!'s
  *                 neighbour show right now (migration 019)
+ *   survey=reader the signed-in person is the survey's reader (migration
+ *                 021), and three responses are in: SURVEY_RESPONSES
+ *   survey=empty  the reader, with no responses yet
+ *   survey=pre021 migration 021 hasn't been run
+ *                 (with no survey option, they're not the reader)
  *   copies=1      five more Silver Trays (it12 is in Props Room A): one
  *                 more loose in Props Room A, two in the Loft (one out on
  *                 Noises Off!), one in the Shakespeare Box, one on shelf B
  */
+/** Three survey responses for survey=reader (migration 021). */
+export const SURVEY_RESPONSES: Row[] = [
+  {
+    id: "resp-scat", survey: "storage-2026", email: null, created_at: "2026-11-11T00:03:00Z",
+    answers: {
+      role: "other", role_other: "Board president/executive director", theater_name: "Santa Cruz Actors' Theatre",
+      company: "community", items: "under-200", tracking: ["memory"], find: "ask", pull_time: "not-involved",
+      rebought: "once-twice", problems: ["cant-find", "not-returned", "new-crew"],
+      importance: { search: "very", photos: "somewhat", location: "very", "pull-lists": "somewhat", "in-use": "somewhat", offline: "not", "photo-search": "somewhat" },
+      price_points: { "too-cheap": "under-5", bargain: "5-15", expensive: "15-30", "too-expensive": "30-60" },
+      pay_model: "either",
+      anything_else: "There is stuff in the back of the storage unit that nobody on the Board has seen.",
+    },
+  },
+  {
+    id: "resp-pacrep", survey: "storage-2026", email: null, created_at: "2026-11-13T18:30:00Z",
+    answers: {
+      role: "stage-manager", theater_name: "Pacific Repertory Theatre", company: "professional", items: "500-1000",
+      tracking: ["spreadsheet", "other"], tracking_detail: "A whiteboard", find: "look", pull_time: "1-2d",
+      rebought: "several", problems: ["cant-find", "double-booked"],
+      importance: { search: "very", location: "very", offline: "somewhat" },
+      price_points: { "too-cheap": "5-15", bargain: "15-30", expensive: "30-60", "too-expensive": "60-100" },
+      pay_model: "subscription", software_name: "Sortly", phone: "(831) 555-0142",
+    },
+  },
+  {
+    id: "resp-old", survey: "storage-2026", email: "early@example.com", created_at: "2026-10-30T16:00:00Z",
+    answers: { role: "director", pay: "maybe" },
+  },
+];
+
 export function resetFixtures(options?: URLSearchParams): void {
   const db = seed();
   const flags = new Set<string>();
   if (options?.get("pre012") === "1") flags.add("pre012");
+  const survey = options?.get("survey");
+  if (survey === "reader" || survey === "empty") flags.add("survey-reader");
+  if (survey === "pre021") flags.add("pre021");
   // tagging=1: the search tagger answers (e2e/fixtures/tag-item.ts).
   if (options?.get("tagging") === "1") flags.add("tagging");
   (globalThis as unknown as { __fixtureFlags?: Set<string> }).__fixtureFlags = flags;
+  db.survey_responses = survey === "reader" ? SURVEY_RESPONSES.map((r) => ({ ...r })) : [];
   if (options?.get("role") === "member") db.memberships[0].role = "member";
   if (options?.get("deleted") === "old") {
     const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
@@ -445,6 +485,22 @@ export function rpc(name: string, args: Record<string, unknown>) {
     if (g.__surveyFail) return Promise.resolve({ data: null, error: { code: "P0001", message: g.__surveyFail } });
     (g.__surveySent ??= []).push(args);
     return Promise.resolve({ data: null, error: null });
+  }
+  if (name === "is_survey_reader" || name === "survey_results") {
+    // Migration 021, in miniature: only the reader gets the responses,
+    // newest first. pre021 answers the way PostgREST does when the
+    // functions don't exist yet.
+    const flags = (globalThis as unknown as { __fixtureFlags?: Set<string> }).__fixtureFlags;
+    if (flags?.has("pre021")) {
+      return Promise.resolve({ data: null, error: { code: "PGRST202", message: `Could not find the function public.${name} in the schema cache` } });
+    }
+    const reader = Boolean(flags?.has("survey-reader"));
+    if (name === "is_survey_reader") return Promise.resolve({ data: reader, error: null });
+    if (!reader) return Promise.resolve({ data: null, error: { code: "42501", message: "Only the survey's reader can see its responses." } });
+    const rows = (DB.survey_responses ?? [])
+      .filter((r) => !args.p_survey || r.survey === args.p_survey)
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    return Promise.resolve({ data: rows, error: null });
   }
   if (name === "tryout_label") {
     return Promise.resolve({ data: args.p_token === TRYOUT_TOKEN ? "Tester 1" : null, error: null });

@@ -103,6 +103,11 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   // Opened from a tryout link (migration 013): no email or password to manage,
   // and the link is how they get back in.
   const tryout = Boolean(user.is_anonymous);
+  // The survey's reader (migration 021) gets a link to its results. Before
+  // 021 is run the call fails, which reads as "not the reader".
+  const { data: surveyReader } = tryout
+    ? { data: false }
+    : await supabase.rpc("is_survey_reader");
 
   return (
     <>
@@ -318,6 +323,18 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </Section>
           </>
         )}
+
+        {surveyReader === true ? (
+          <Section id="survey" title="Survey results" intro="The storage survey’s responses, in words, with totals and the price range. Only you can see them.">
+            <Link
+              href="/survey-results"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-rule px-4 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface md:min-h-0"
+              data-survey-results-link
+            >
+              Survey results
+            </Link>
+          </Section>
+        ) : null}
 
         <Section id="device" title="This device">
           <InstallApp />
