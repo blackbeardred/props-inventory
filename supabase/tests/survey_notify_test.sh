@@ -2,7 +2,8 @@
 # Tests migration 020 (a phone notification per survey response) against a
 # real Postgres. pg_net isn't installed here, so a stand-in net.http_post
 # records what would be sent. A response is always saved, whatever happens
-# to the notification; only the count is sent; the channel name can't be
+# to the notification; only the role, theater and count are sent (never
+# the email or any other answer); the channel name can't be
 # read by app users; the migration runs twice and matches schema.sql.
 #
 # Usage:  ./survey_notify_test.sh [port]
@@ -64,7 +65,7 @@ SQL
 
 echo "── A fresh install from schema.sql"
 check "schema.sql applies cleanly" "" "$(run "$HERE/../schema.sql")"
-FN="select md5(prosrc) from pg_proc where proname = 'notify_new_survey_response'"
+FN="select string_agg(md5(prosrc), ',' order by proname) from pg_proc where proname in ('notify_new_survey_response', 'survey_notify_text')"
 FRESH="$(q "$FN")"
 
 psql -h /tmp -p "$PORT" -U postgres -d $DB -q >/dev/null 2>&1 <<'SQL'
@@ -89,7 +90,7 @@ echo ""
 echo "── Migration 020 on top"
 check "applies cleanly" "" "$(run "$HERE/../migrations/020_survey_notifications.sql")"
 check "applies a second time (re-runnable)" "" "$(run "$HERE/../migrations/020_survey_notifications.sql")"
-check "the trigger function matches a fresh install" "$FRESH" "$(q "$FN")"
+check "the functions match a fresh install" "$FRESH" "$(q "$FN")"
 check "one trigger, not two" "1" "$(q "select count(*) from pg_trigger where tgname = 'survey_response_notify'")"
 
 submit() { # survey
@@ -111,20 +112,53 @@ echo "── With the channel set"
 q "insert into notify_settings (key, value) values ('ntfy_topic', 'propolis-testchannel0123456789') on conflict (key) do update set value = excluded.value" >/dev/null
 check "a response sends one notification" "|1" "$(submit storage-2026)|$(sent)"
 check "to ntfy" "https://ntfy.sh/" "$(q "select url from net.sent order by at desc limit 1")"
-check "on the channel, with the count, as JSON" \
-  "propolis-testchannel0123456789|New survey response|3 responses so far|application/json" \
+check "on the channel, with the role and the count, as JSON" \
+  "propolis-testchannel0123456789|New survey response|Stage manager
+3 responses so far|application/json" \
   "$(q "select body->>'topic' || '|' || (body->>'title') || '|' || (body->>'message') || '|' || (headers->>'Content-Type') from net.sent order by at desc limit 1")"
-check "and nothing from the answers or the email" "f" \
-  "$(q "select body::text ~* 'stage-manager|someone@example|role' from net.sent order by at desc limit 1")"
-check "another survey counts on its own: its first response" "1 response so far" \
+check "and not the email" "f" \
+  "$(q "select body::text ~* 'someone@example' from net.sent order by at desc limit 1")"
+check "another survey counts on its own: its first response" "Stage manager
+1 response so far" \
   "$(submit testers-2027 >/dev/null; q "select body->>'message' from net.sent order by at desc limit 1")"
+
+# submit_json survey answers-json: the JSON goes into SQL as a literal, so
+# double any single quote in it.
+submit_json() {
+  psql -h /tmp -p "$PORT" -U postgres -d $DB -tAc \
+    "set role anon; select submit_survey('$1', '$2'::jsonb, 'board@example.com')" 2>&1 | grep -v -e '^SET$' -e '^$' | head -1
+}
+last() { q "select body->>'message' from net.sent order by at desc limit 1"; }
+
+echo ""
+echo "── Who answered"
+check "role 'other' uses their own words, then the theater" "|Board president/executive director, Santa Cruz Actors' Theatre
+2 responses so far" \
+  "$(submit_json testers-2027 '{"role": "other", "role_other": "Board president/executive director", "theater_name": "Santa Cruz Actors'"''"' Theatre", "anything_else": "secret back room", "problems": ["cant-find"]}')|$(last)"
+check "no other answer and no email in what's sent" "f" \
+  "$(q "select body::text ~* 'secret back room|cant-find|board@example' from net.sent order by at desc limit 1")"
+check "a theater with no role" "|Pacific Repertory Theatre
+3 responses so far" \
+  "$(submit_json testers-2027 '{"theater_name": "  Pacific Repertory Theatre "}')|$(last)"
+check "neither role nor theater: just the count" "|4 responses so far" \
+  "$(submit_json testers-2027 '{"items": "under-200"}')|$(last)"
+check "'other' left blank says Other" "|Other
+5 responses so far" \
+  "$(submit_json testers-2027 '{"role": "other", "role_other": "   "}')|$(last)"
+check "line breaks and tabs become one space" "|Director, The Old Barn Players
+6 responses so far" \
+  "$(submit_json testers-2027 '{"role": "director", "theater_name": "The Old\n\tBarn   Players"}')|$(last)"
+check "long typed text is cut to 60 characters" "60|…" \
+  "$(submit_json testers-2027 '{"theater_name": "ABCDEFGHIJ ABCDEFGHIJ ABCDEFGHIJ ABCDEFGHIJ ABCDEFGHIJ ABCDEFGHIJ ABCDEFGHIJ"}' >/dev/null; q "select length(split_part(body->>'message', E'\n', 1)) || '|' || right(split_part(body->>'message', E'\n', 1), 1) from net.sent order by at desc limit 1")"
+check "an unknown role value is left out" "|8 responses so far" \
+  "$(submit_json testers-2027 '{"role": "<b>hi</b>"}')|$(last)"
 
 echo ""
 echo "── When sending fails"
-check "the response is still saved" "|5" \
+check "the response is still saved" "|12" \
   "$(psql -h /tmp -p "$PORT" -U postgres -d $DB -tAc "set test.fail_send = 'yes'; set role anon; select submit_survey('storage-2026', '{\"role\": \"director\"}'::jsonb, null)" 2>&1 | grep -v -e '^SET$' -e '^$' -e '^WARNING' | head -1)|$(saved)"
 q "drop schema net cascade" >/dev/null
-check "without pg_net at all, still saved" "|6" "$(submit storage-2026)|$(saved)"
+check "without pg_net at all, still saved" "|13" "$(submit storage-2026)|$(saved)"
 
 echo ""
 echo "── Who can see the channel"
@@ -138,6 +172,8 @@ check "someone signed out can't read it" "permission denied for table notify_set
   "$(as_user anon "select value from notify_settings")"
 check "nobody can call the trigger function directly" "f" \
   "$(q "select has_function_privilege('authenticated', 'notify_new_survey_response()', 'execute')")"
+check "or the text helper" "false|false" \
+  "$(q "select has_function_privilege('authenticated', 'survey_notify_text(text)', 'execute') || '|' || has_function_privilege('anon', 'survey_notify_text(text)', 'execute')")"
 
 echo ""
 echo "════ $PASS passed, $FAIL failed ════"
