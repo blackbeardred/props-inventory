@@ -11,6 +11,8 @@ const PUBLIC_PATHS = new Set([
   "/privacy",
   // The research survey (migration 017): answered by people with no account.
   "/survey",
+  // The business card's QR code: forwards anyone, signed in or not.
+  "/card",
   "/auth/callback",
 ]);
 // Tryout links (/try/<token>, migration 013) and school handover links
